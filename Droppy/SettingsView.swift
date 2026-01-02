@@ -30,7 +30,8 @@ struct SettingsView: View {
                         .tag("About Droppy")
                 }
                 .navigationTitle("Settings")
-                .scrollContentBackground(.hidden)
+                // Fix: Use compatible background modifer
+                .background(Color.clear) 
             } detail: {
                 Form {
                     if selectedTab == "General" {
@@ -42,11 +43,13 @@ struct SettingsView: View {
                     }
                 }
                 .formStyle(.grouped)
-                .scrollContentBackground(.hidden)
+                // Fix: Use compatible background modifier
+                .background(Color.clear)
             }
         }
         .coordinateSpace(name: "settingsView")
-        .glassEffect(.regular)
+        // Fix: Replace visionOS glassEffect with macOS material
+        .background(.ultraThinMaterial)
         .onContinuousHover(coordinateSpace: .named("settingsView")) { phase in
             switch phase {
             case .active(let location):
