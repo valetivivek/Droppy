@@ -7,7 +7,7 @@
 
 import Foundation
 import AppKit
-import AVFoundation
+@preconcurrency import AVFoundation
 import UniformTypeIdentifiers
 import PDFKit
 
@@ -437,6 +437,14 @@ class FileCompressor {
             writer.startSession(atSourceTime: .zero)
             
             // Process video and audio in parallel
+            // Note: These AV types are thread-safe but not marked Sendable
+            nonisolated(unsafe) let videoInputRef = videoInput
+            nonisolated(unsafe) let videoOutputRef = videoOutput
+            nonisolated(unsafe) let audioInputRef = audioInput
+            nonisolated(unsafe) let audioOutputRef = audioOutput
+            nonisolated(unsafe) let readerRef = reader
+            nonisolated(unsafe) let writerRef = writer
+            
             return await withCheckedContinuation { continuation in
                 let group = DispatchGroup()
                 var success = true
@@ -444,12 +452,12 @@ class FileCompressor {
                 // Video processing
                 group.enter()
                 let videoQueue = DispatchQueue(label: "com.droppy.videoQueue")
-                videoInput.requestMediaDataWhenReady(on: videoQueue) {
-                    while videoInput.isReadyForMoreMediaData {
-                        if let sampleBuffer = videoOutput.copyNextSampleBuffer() {
-                            videoInput.append(sampleBuffer)
+                videoInputRef.requestMediaDataWhenReady(on: videoQueue) {
+                    while videoInputRef.isReadyForMoreMediaData {
+                        if let sampleBuffer = videoOutputRef.copyNextSampleBuffer() {
+                            videoInputRef.append(sampleBuffer)
                         } else {
-                            videoInput.markAsFinished()
+                            videoInputRef.markAsFinished()
                             group.leave()
                             break
                         }
@@ -457,15 +465,18 @@ class FileCompressor {
                 }
                 
                 // Audio processing
-                if let audioInput = audioInput, let audioOutput = audioOutput {
+                if let audioInput = audioInputRef, let audioOutput = audioOutputRef {
                     group.enter()
                     let audioQueue = DispatchQueue(label: "com.droppy.audioQueue")
-                    audioInput.requestMediaDataWhenReady(on: audioQueue) {
-                        while audioInput.isReadyForMoreMediaData {
-                            if let sampleBuffer = audioOutput.copyNextSampleBuffer() {
-                                audioInput.append(sampleBuffer)
+                    // Create refs for inner closure
+                    nonisolated(unsafe) let audioInRef = audioInput
+                    nonisolated(unsafe) let audioOutRef = audioOutput
+                    audioInRef.requestMediaDataWhenReady(on: audioQueue) {
+                        while audioInRef.isReadyForMoreMediaData {
+                            if let sampleBuffer = audioOutRef.copyNextSampleBuffer() {
+                                audioInRef.append(sampleBuffer)
                             } else {
-                                audioInput.markAsFinished()
+                                audioInRef.markAsFinished()
                                 group.leave()
                                 break
                             }
@@ -475,16 +486,16 @@ class FileCompressor {
                 
                 // Wait for completion
                 group.notify(queue: .main) {
-                    if reader.status == .failed {
-                        print("Reader failed: \(reader.error?.localizedDescription ?? "unknown")")
+                    if readerRef.status == .failed {
+                        print("Reader failed: \(readerRef.error?.localizedDescription ?? "unknown")")
                         success = false
                     }
                     
-                    writer.finishWriting {
-                        if writer.status == .completed && success {
+                    writerRef.finishWriting {
+                        if writerRef.status == .completed && success {
                             continuation.resume(returning: outputURL)
                         } else {
-                            print("Writer failed: \(writer.error?.localizedDescription ?? "unknown")")
+                            print("Writer failed: \(writerRef.error?.localizedDescription ?? "unknown")")
                             continuation.resume(returning: nil)
                         }
                     }
