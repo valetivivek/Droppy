@@ -261,12 +261,18 @@ class FileCompressor {
         for i in 0..<pdfDocument.pageCount {
             guard let page = pdfDocument.page(at: i) else { continue }
             let bounds = page.bounds(for: .mediaBox)
+            let rotationAngle = page.rotation
             
-            // Calculate scaled bounds, preserving orientation
+            // Calculate scaled bounds
+            // If rotation is 90 or 270, the VISUAL width/height are swapped relative to the media box
+            let isRotated = rotationAngle == 90 || rotationAngle == 270
+            let visualWidth = isRotated ? bounds.height : bounds.width
+            let visualHeight = isRotated ? bounds.width : bounds.height
+            
             let scaledBounds = CGRect(
                 x: 0, y: 0,
-                width: bounds.width * scale,
-                height: bounds.height * scale
+                width: visualWidth * scale,
+                height: visualHeight * scale
             )
             
             // Begin PDF page with correct size
@@ -373,9 +379,22 @@ class FileCompressor {
         
         guard let naturalSize = naturalSize else { return nil }
         
-        // Determine output size (maintain aspect ratio, max 1080p)
+        // Determine output size (maintain aspect ratio)
         var outputSize = naturalSize
-        let maxDimension: CGFloat = 1920
+        var maxDimension: CGFloat = 1920
+        
+        // Dynamic resolution scaling based on bitrate
+        // If bitrate is low, we MUST reduce resolution or encoder will overshoot minimum size
+        if videoBitrate < 500_000 {
+            maxDimension = 640 // 480p-ish
+        } else if videoBitrate < 1_000_000 {
+            maxDimension = 960 // 540p
+        } else if videoBitrate < 2_500_000 {
+            maxDimension = 1280 // 720p
+        } else {
+            maxDimension = 1920 // 1080p
+        }
+        
         if outputSize.width > maxDimension || outputSize.height > maxDimension {
             let scale = maxDimension / max(outputSize.width, outputSize.height)
             outputSize = CGSize(width: outputSize.width * scale, height: outputSize.height * scale)
