@@ -551,10 +551,13 @@ struct NotchItemView: View {
     @State private var isConverting = false
     @State private var isExtractingText = false
     @State private var isCreatingZIP = false
+    @State private var isCompressing = false
     @State private var isPoofing = false
     @State private var pendingConvertedItem: DroppedItem?
     // Removed local isRenaming
     @State private var renamingText = ""
+    
+    @AppStorage("compressionMode") private var compressionMode = 1
     
     var body: some View {
         DraggableArea(
@@ -683,6 +686,16 @@ struct NotchItemView: View {
             // Create ZIP option
             Divider()
             
+            // Compress option - only show for compressible file types
+            if FileCompressor.canCompress(fileType: item.fileType) {
+                Button {
+                    compressFile()
+                } label: {
+                    Label("Compress", systemImage: "arrow.down.right.and.arrow.up.left")
+                }
+                .disabled(isCompressing)
+            }
+            
             Button {
                 createZIPFromSelection()
             } label: {
@@ -803,6 +816,58 @@ struct NotchItemView: View {
                     isCreatingZIP = false
                 }
                 print("ZIP creation failed")
+            }
+        }
+    }
+    
+    // MARK: - Compression
+    
+    private func compressFile() {
+        guard !isCompressing else { return }
+        isCompressing = true
+        
+        Task {
+            // Determine compression mode from settings
+            let mode: CompressionMode
+            
+            if compressionMode == 3 {
+                // Ask for target size
+                guard let currentSize = FileCompressor.fileSize(url: item.url) else {
+                    await MainActor.run { isCompressing = false }
+                    return
+                }
+                
+                guard let targetBytes = await TargetSizeDialogController.shared.show(
+                    currentSize: currentSize,
+                    fileName: item.name
+                ) else {
+                    // User cancelled
+                    await MainActor.run { isCompressing = false }
+                    return
+                }
+                
+                mode = .targetSize(bytes: targetBytes)
+            } else {
+                // Use preset quality
+                let quality = CompressionQuality(rawValue: compressionMode) ?? .medium
+                mode = .preset(quality)
+            }
+            
+            if let compressedURL = await FileCompressor.shared.compress(url: item.url, mode: mode) {
+                let newItem = DroppedItem(url: compressedURL)
+                
+                await MainActor.run {
+                    isCompressing = false
+                    pendingConvertedItem = newItem
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        isPoofing = true
+                    }
+                }
+            } else {
+                await MainActor.run {
+                    isCompressing = false
+                }
+                print("Compression failed")
             }
         }
     }

@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage("enableNotchShelf") private var enableNotchShelf = true
     @AppStorage("enableFloatingBasket") private var enableFloatingBasket = true
     @AppStorage("hideNotchOnExternalDisplays") private var hideNotchOnExternalDisplays = false
+    @AppStorage("compressionMode") private var compressionMode = 1 // 0=Low, 1=Medium, 2=High, 3=AskForSize
 
     
     // Background Hover Effect State
@@ -30,6 +31,8 @@ struct SettingsView: View {
                         .tag("General")
                     Label("Display", systemImage: "display")
                         .tag("Display")
+                    Label("Files", systemImage: "doc.zipper")
+                        .tag("Files")
                     Label("About Droppy", systemImage: "info.circle")
                         .tag("About Droppy")
                 }
@@ -42,6 +45,8 @@ struct SettingsView: View {
                         generalSettings
                     } else if selectedTab == "Display" {
                         displaySettings
+                    } else if selectedTab == "Files" {
+                        filesSettings
                     } else if selectedTab == "About Droppy" {
                         aboutSettings
                     }
@@ -154,6 +159,33 @@ struct SettingsView: View {
             }
         } header: {
             Text("Display")
+        }
+    }
+    
+    private var filesSettings: some View {
+        Section {
+            Picker(selection: $compressionMode) {
+                Text("Low (Smaller Files)").tag(0)
+                Text("Medium (Balanced)").tag(1)
+                Text("High (Minimal Loss)").tag(2)
+                Divider()
+                Text("Ask for Target Size").tag(3)
+            } label: {
+                VStack(alignment: .leading) {
+                    Text("Compression Quality")
+                    Text("Default quality when compressing files")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Compression")
+        } footer: {
+            if compressionMode == 3 {
+                Text("You'll be asked for a target file size each time you compress.")
+            } else {
+                Text("Files like images, PDFs, and videos can be compressed from the right-click menu.")
+            }
         }
     }
     
