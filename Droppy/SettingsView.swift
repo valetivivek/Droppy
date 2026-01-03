@@ -190,6 +190,7 @@ struct SettingsView: View {
 struct ChangelogData {
 
     static let current = """
+    New: App now runs exclusively in the menu bar (hidden from Dock).
     Fixed: Installation error (SHA mismatch) when installing via Homebrew.
     Fixed: App quitting when closing Settings window
     Fixed: Crash when moving basket during animation
