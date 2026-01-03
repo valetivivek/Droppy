@@ -14,6 +14,7 @@ fi
 
 VERSION="$1"
 NOTES_FILE="$2"
+DMG_NAME="Droppy-$VERSION.dmg"
 
 # Banner
 echo "========================================"
@@ -36,7 +37,9 @@ if [ -n "$NOTES_FILE" ] && [ -f "$NOTES_FILE" ]; then
     echo "   - Updating SettingsView.swift..."
     # We look for `static let current = """` ... `"""` block
     # Note: We need to escape quote marks in the content string for Swift
-    export SWIFT_CONTENT=$(echo "$NOTES_CONTENT" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
+    # Also need to indent content by 4 spaces to match Swift multiline string requirements
+    INDENTED_NOTES=$(echo "$NOTES_CONTENT" | sed 's/^/    /')
+    export SWIFT_CONTENT=$(echo "$INDENTED_NOTES" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
     
     cd "$MAIN_REPO" || exit
     perl -0777 -i -pe 's/(\s*)static let current = \"\"\"(.*?)\"\"\"/$1static let current = \"\"\"\n$ENV{SWIFT_CONTENT}\n$1\"\"\"/s' Droppy/SettingsView.swift
@@ -86,7 +89,8 @@ fi
 # 3. Create DMG
 echo "-> Creating $DMG_NAME..."
 cd "$MAIN_REPO" || exit
-rm -f "$DMG_NAME"
+# Clean up old DMGs
+rm -f Droppy*.dmg
 mkdir -p dmg_root
 cp -R "$APP_BUILD_PATH/Build/Products/Release/Droppy.app" dmg_root/
 ln -s /Applications dmg_root/Applications
@@ -106,7 +110,7 @@ CASK_CONTENT="cask \"droppy\" do
   version \"$VERSION\"
   sha256 \"$HASH\"
 
-  url \"https://raw.githubusercontent.com/iordv/Droppy/main/Droppy.dmg\"
+  url \"https://raw.githubusercontent.com/iordv/Droppy/main/$DMG_NAME\"
   name \"Droppy\"
   desc \"Drag and drop file shelf for macOS\"
   homepage \"https://github.com/iordv/Droppy\"
@@ -129,24 +133,36 @@ echo "-> Committing changes..."
 
 # Main Repo
 cd "$MAIN_REPO" || exit
+echo "   - Main Repo: Pulling latest changes..."
+git pull origin main
+# Remove old DMGs from git tracking if they exist, but keep the new one
+git rm --ignore-unmatch Droppy*.dmg
+git add "$DMG_NAME"
 git add .
 git commit -m "Release v$VERSION"
 git tag "v$VERSION"
 
 # Tap Repo
 cd "$TAP_REPO" || exit
+echo "   - Tap Repo: Pulling latest changes..."
+git pull origin main --rebase
 git add .
 git commit -m "Update Droppy to v$VERSION"
 
 # 8. Confirmation
-echo "\n========================================"
-echo "✅ Release v$VERSION prepared successfully!"
-echo "   - App built & DMG created"
-echo "   - Cask updated in Main Repo and Tap Repo"
-echo "   - Changes committed locally"
-echo "========================================"
-read -p "❓ Do you want to PUSH changes to GitHub now? (y/n) " -n 1 -r
-echo
+if [ "$3" == "-y" ] || [ "$3" == "--yes" ]; then
+    REPLY="y"
+else
+    echo "\n========================================"
+    echo "✅ Release v$VERSION prepared successfully!"
+    echo "   - App built & DMG created"
+    echo "   - Cask updated in Main Repo and Tap Repo"
+    echo "   - Changes committed locally"
+    echo "========================================"
+    read -p "❓ Do you want to PUSH changes to GitHub now? (y/n) " -n 1 -r
+    echo
+fi
+
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "\n-> Pushing Main Repo..."
     cd "$MAIN_REPO" || exit

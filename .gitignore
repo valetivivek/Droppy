@@ -26,5 +26,4 @@ Pods/
 .build/
 
 # Other
-.agent/
 .gemini/

@@ -164,19 +164,37 @@ struct SettingsView: View {
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                
+                Divider()
+                    .padding(.vertical, 8)
+                
+                Group {
+                    Text("Foundation (1.0)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    
+                    Label("Notch Shelf", systemImage: "macwindow")
+                    Label("Drag & Drop Staging", systemImage: "hand.draw")
+                    Label("Instant Access", systemImage: "bolt.fill")
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
             }
             .padding(.vertical, 8)
         } header: {
             Text("What's New")
         }
     }
-}
 
 struct ChangelogData {
+
     static let current = """
     Fixed: App quitting when closing Settings window
     Fixed: Crash when moving basket during animation
     Fixed: Window memory management stability improvements
+
+
     """
 }
     
