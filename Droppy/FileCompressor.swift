@@ -345,7 +345,7 @@ class FileCompressor {
     }
     
     private func compressVideoWithBitrate(asset: AVAsset, videoBitrate: Int, outputURL: URL) async -> URL? {
-        // For custom bitrate, we need to use AVAssetWriter
+        // For custom bitrate, we need to use AVAssetReader + AVAssetWriter
         guard let videoTrack = try? await asset.loadTracks(withMediaType: .video).first else {
             // Fallback to preset if no video track
             return await compressVideoWithPreset(asset: asset, preset: AVAssetExportPresetMediumQuality, outputURL: outputURL)
@@ -354,6 +354,7 @@ class FileCompressor {
         // Get video properties
         let naturalSize = try? await videoTrack.load(.naturalSize)
         let transform = try? await videoTrack.load(.preferredTransform)
+        let nominalFrameRate = try? await videoTrack.load(.nominalFrameRate)
         
         guard let naturalSize = naturalSize else { return nil }
         
@@ -370,16 +371,18 @@ class FileCompressor {
         outputSize.height = floor(outputSize.height / 2) * 2
         
         do {
+            // Setup writer
             let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
             
-            // Video settings
+            // Video output settings with custom bitrate
             let videoSettings: [String: Any] = [
                 AVVideoCodecKey: AVVideoCodecType.h264,
                 AVVideoWidthKey: outputSize.width,
                 AVVideoHeightKey: outputSize.height,
                 AVVideoCompressionPropertiesKey: [
                     AVVideoAverageBitRateKey: videoBitrate,
-                    AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel
+                    AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
+                    AVVideoMaxKeyFrameIntervalKey: 30
                 ]
             ]
             
@@ -390,9 +393,21 @@ class FileCompressor {
             }
             writer.add(videoInput)
             
-            // Audio settings (if audio track exists)
+            // Setup reader for video
+            let reader = try AVAssetReader(asset: asset)
+            
+            let videoOutputSettings: [String: Any] = [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+            ]
+            let videoOutput = AVAssetReaderTrackOutput(track: videoTrack, outputSettings: videoOutputSettings)
+            videoOutput.alwaysCopiesSampleData = false
+            reader.add(videoOutput)
+            
+            // Audio handling
             var audioInput: AVAssetWriterInput?
-            if let _ = try? await asset.loadTracks(withMediaType: .audio).first {
+            var audioOutput: AVAssetReaderTrackOutput?
+            
+            if let audioTrack = try? await asset.loadTracks(withMediaType: .audio).first {
                 let audioSettings: [String: Any] = [
                     AVFormatIDKey: kAudioFormatMPEG4AAC,
                     AVSampleRateKey: 44100,
@@ -402,15 +417,74 @@ class FileCompressor {
                 audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
                 audioInput?.expectsMediaDataInRealTime = false
                 writer.add(audioInput!)
+                
+                audioOutput = AVAssetReaderTrackOutput(track: audioTrack, outputSettings: nil)
+                audioOutput?.alwaysCopiesSampleData = false
+                reader.add(audioOutput!)
             }
             
-            // Use AVAssetExportSession for simplicity with bitrate hint
-            // (Full AVAssetWriter implementation is complex)
-            // Fall back to medium quality preset
-            return await compressVideoWithPreset(asset: asset, preset: AVAssetExportPresetMediumQuality, outputURL: outputURL)
+            // Start processing
+            writer.startWriting()
+            reader.startReading()
+            writer.startSession(atSourceTime: .zero)
+            
+            // Process video and audio in parallel
+            return await withCheckedContinuation { continuation in
+                let group = DispatchGroup()
+                var success = true
+                
+                // Video processing
+                group.enter()
+                let videoQueue = DispatchQueue(label: "com.droppy.videoQueue")
+                videoInput.requestMediaDataWhenReady(on: videoQueue) {
+                    while videoInput.isReadyForMoreMediaData {
+                        if let sampleBuffer = videoOutput.copyNextSampleBuffer() {
+                            videoInput.append(sampleBuffer)
+                        } else {
+                            videoInput.markAsFinished()
+                            group.leave()
+                            break
+                        }
+                    }
+                }
+                
+                // Audio processing
+                if let audioInput = audioInput, let audioOutput = audioOutput {
+                    group.enter()
+                    let audioQueue = DispatchQueue(label: "com.droppy.audioQueue")
+                    audioInput.requestMediaDataWhenReady(on: audioQueue) {
+                        while audioInput.isReadyForMoreMediaData {
+                            if let sampleBuffer = audioOutput.copyNextSampleBuffer() {
+                                audioInput.append(sampleBuffer)
+                            } else {
+                                audioInput.markAsFinished()
+                                group.leave()
+                                break
+                            }
+                        }
+                    }
+                }
+                
+                // Wait for completion
+                group.notify(queue: .main) {
+                    if reader.status == .failed {
+                        print("Reader failed: \(reader.error?.localizedDescription ?? "unknown")")
+                        success = false
+                    }
+                    
+                    writer.finishWriting {
+                        if writer.status == .completed && success {
+                            continuation.resume(returning: outputURL)
+                        } else {
+                            print("Writer failed: \(writer.error?.localizedDescription ?? "unknown")")
+                            continuation.resume(returning: nil)
+                        }
+                    }
+                }
+            }
             
         } catch {
-            print("Error setting up video writer: \(error)")
+            print("Error setting up video compression: \(error)")
             return nil
         }
     }
