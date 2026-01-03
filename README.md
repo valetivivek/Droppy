@@ -38,9 +38,11 @@ brew install --cask iordv/tap/droppy
 3. Right-click → Open (required for unsigned apps)
 
 <!-- CHANGELOG_START -->
-Internal: Hardened release process to ensure 100% reliable updates.
-New: Menu Bar Only mode (from v2.0.4) is now standard.
-Fixed: Various stability improvements.
+Feature: Added toggles to enable/disable Notch Shelf and Floating Basket in settings.
+Fixed: Critical 'objc_release' crash by hardening window animation handling.
+Internal: Stability improvements through centralized event monitor management.
+UI: Cleaned up settings layout by removing redundant dividers.
+🛠️ Hardened release process for 100% reliable updates.
 <!-- CHANGELOG_END -->
 
 ## Features
