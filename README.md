@@ -28,7 +28,7 @@ Droppy is a **free, open-source** utility that makes file management on macOS ef
 ### Homebrew (Recommended)
 
 ```bash
-brew install iordv/tap/droppy
+brew install --cask iordv/tap/droppy
 ```
 
 ### Manual Download
