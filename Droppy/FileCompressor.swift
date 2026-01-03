@@ -235,23 +235,28 @@ class FileCompressor {
     }
     
     private func compressPDFByRerendering(pdfDocument: PDFDocument, mode: CompressionMode, outputURL: URL) async -> URL? {
-        // Determine scale factor based on mode
-        let scale: CGFloat
+        // Determine JPEG quality and scale based on mode
+        let jpegQuality: CGFloat
+        let dpiScale: CGFloat
         switch mode {
         case .preset(let quality):
             switch quality {
-            case .low: 
-                scale = 0.5
-            case .medium: 
-                scale = 0.72
-            case .high: 
-                scale = 0.85
+            case .low:
+                jpegQuality = 0.3
+                dpiScale = 0.5  // 72 DPI
+            case .medium:
+                jpegQuality = 0.5
+                dpiScale = 0.75 // 108 DPI
+            case .high:
+                jpegQuality = 0.7
+                dpiScale = 1.0  // 144 DPI
             }
         case .targetSize:
-            scale = 0.6
+            jpegQuality = 0.4
+            dpiScale = 0.6
         }
         
-        // Create PDF context with correct page sizes
+        // Create new PDF from rendered page images
         guard let pdfData = CFDataCreateMutable(nil, 0) else { return nil }
         guard let consumer = CGDataConsumer(data: pdfData) else { return nil }
         
@@ -260,32 +265,44 @@ class FileCompressor {
         
         for i in 0..<pdfDocument.pageCount {
             guard let page = pdfDocument.page(at: i) else { continue }
-            let bounds = page.bounds(for: .mediaBox)
-            let rotationAngle = page.rotation
             
-            // Calculate scaled bounds
-            // If rotation is 90 or 270, the VISUAL width/height are swapped relative to the media box
-            let isRotated = rotationAngle == 90 || rotationAngle == 270
-            let visualWidth = isRotated ? bounds.height : bounds.width
-            let visualHeight = isRotated ? bounds.width : bounds.height
+            // Get the VISUAL bounds (respecting rotation)
+            // bounds(for:) returns the rotated bounds when rotation is applied
+            let pageBounds = page.bounds(for: .cropBox)
+            let rotation = page.rotation
             
-            let scaledBounds = CGRect(
-                x: 0, y: 0,
-                width: visualWidth * scale,
-                height: visualHeight * scale
-            )
+            // Calculate visual dimensions after rotation
+            let isRotated = rotation == 90 || rotation == 270
+            let visualWidth = isRotated ? pageBounds.height : pageBounds.width
+            let visualHeight = isRotated ? pageBounds.width : pageBounds.height
             
-            // Begin PDF page with correct size
-            let pageInfo: [CFString: Any] = [
-                kCGPDFContextMediaBox: scaledBounds
-            ]
+            // Render size (scaled for compression)
+            let renderWidth = visualWidth * dpiScale
+            let renderHeight = visualHeight * dpiScale
+            
+            // Render page to image using PDFPage's thumbnail method (handles rotation correctly)
+            let pageImage = page.thumbnail(of: CGSize(width: renderWidth, height: renderHeight), for: .cropBox)
+            
+            // Convert to JPEG data
+            guard let tiffData = pageImage.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiffData),
+                  let jpegData = bitmap.representation(using: .jpeg, properties: [.compressionFactor: jpegQuality]) else {
+                continue
+            }
+            
+            // Create image from JPEG data
+            guard let jpegImage = NSImage(data: jpegData),
+                  let cgImage = jpegImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                continue
+            }
+            
+            // Create PDF page with this image
+            var pageMediaBox = CGRect(x: 0, y: 0, width: visualWidth, height: visualHeight)
+            let pageInfo: [CFString: Any] = [kCGPDFContextMediaBox: pageMediaBox]
             pdfContext.beginPDFPage(pageInfo as CFDictionary)
             
-            // Draw page scaled
-            pdfContext.scaleBy(x: scale, y: scale)
-            
-            // Use PDFPage's draw which handles rotation
-            page.draw(with: .mediaBox, to: pdfContext)
+            // Draw the JPEG image scaled to fill the page
+            pdfContext.draw(cgImage, in: pageMediaBox)
             
             pdfContext.endPDFPage()
         }
@@ -352,11 +369,12 @@ class FileCompressor {
         guard durationSeconds > 0 else { return nil }
         
         // Target bitrate = (target size in bits) / duration
-        // Add 15% overhead because H.264 encoders often undershoot average bitrate
-        // Also account for audio (~128kbps)
+        // H.264 VBR encoders typically undershoot by 20-40%, so we add overhead
+        // Also account for audio (~128kbps) and container overhead (~5%)
         let audioBitrate: Int64 = 128_000
-        let overheadMultiplier: Double = 1.15 // 15% overhead to hit target more closely
-        let targetBits = Int64(Double(targetBytes * 8) * overheadMultiplier)
+        let overheadMultiplier: Double = 1.40 // 40% overhead to hit target more closely
+        let containerOverhead: Double = 1.05
+        let targetBits = Int64(Double(targetBytes * 8) * overheadMultiplier * containerOverhead)
         let availableBitsForVideo = targetBits - Int64(durationSeconds * Double(audioBitrate))
         let videoBitrate = max(100_000, Int(Double(availableBitsForVideo) / durationSeconds))
         
@@ -375,24 +393,21 @@ class FileCompressor {
         // Get video properties
         let naturalSize = try? await videoTrack.load(.naturalSize)
         let transform = try? await videoTrack.load(.preferredTransform)
-        _ = try? await videoTrack.load(.nominalFrameRate) // Load for side effects
         
         guard let naturalSize = naturalSize else { return nil }
         
-        // Determine output size (maintain aspect ratio)
+        // Keep original resolution unless bitrate is VERY low
+        // Only downscale for extremely constrained scenarios
         var outputSize = naturalSize
-        var maxDimension: CGFloat = 1920
+        let maxDimension: CGFloat
         
-        // Dynamic resolution scaling based on bitrate
-        // If bitrate is low, we MUST reduce resolution or encoder will overshoot minimum size
-        if videoBitrate < 500_000 {
-            maxDimension = 640 // 480p-ish
-        } else if videoBitrate < 1_000_000 {
-            maxDimension = 960 // 540p
-        } else if videoBitrate < 2_500_000 {
-            maxDimension = 1280 // 720p
+        // Only reduce resolution for very low bitrates where quality would be unwatchable otherwise
+        if videoBitrate < 200_000 {
+            maxDimension = 640 // Only for < 200kbps
+        } else if videoBitrate < 400_000 {
+            maxDimension = 854 // Only for < 400kbps (480p)
         } else {
-            maxDimension = 1920 // 1080p
+            maxDimension = 1920 // Keep original up to 1080p for reasonable bitrates
         }
         
         if outputSize.width > maxDimension || outputSize.height > maxDimension {
