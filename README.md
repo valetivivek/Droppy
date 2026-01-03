@@ -118,8 +118,9 @@ brew install --cask iordv/tap/droppy
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
 # New
-- **Fullscreen Mode**: Droppy now smartly hides when you're playing a game or watching a video in fullscreen (even borderless modes).
-- **Light Mode**: Improved text contrast for notifications and the basket when using Light Mode.
+- **Move Files**: You can now move files directly to a destination (like a network drive/NAS) from the context menu. Droppy remembers your recent destinations for quick access!
+- **Fullscreen Smarts**: Droppy intelligently hides when games or video players are fullscreen.
+- **Light Mode improvements**: Better readability for the light mode interface.
 <!-- CHANGELOG_END -->
 
 ---
