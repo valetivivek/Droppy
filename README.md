@@ -135,24 +135,14 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# Droppy v2.6.1 🔍
+# Droppy v2.6.2 Hotfix 🩹
 
-The **Clipboard Manager** gets a major upgrade in this release with search and organization superpowers!
+Quick patch to resolve a stability issue reported by users.
 
-### 🔍 Search Everything
-- **Search Bar**: Press `Cmd+F` or click the search icon to reveal the new liquid-style search bar.
-- **Instant Filtering**: Filter your clipboard history by title, content, or app source in real-time.
-- **Beautiful UI**: Enjoy the same premium "glassy" aesthetics and animations as the rest of the app.
+### 🐛 Bug Fixes
+- **Crash Fix**: Resolved a memory management issue in the notch monitor that could cause the app to crash during high-frequency checks.
 
-### ⭐️ Smart Favorites
-- **Pin to Top**: Favorited items now automatically stick to the top of your list, even when filtering.
-- **Sticky Navigation**: Filter your results but keep your most important clips within reach.
-
-### ⚙️ UI Polish
-- **Settings Refinement**: The History Limit input now features a responsive animated border and crisp auto-selection behavior.
-- **Responsive Animations**: Improved hover and focus states throughout the Clipboard Manager.
-
-Enjoy the polish! ✨
+Stay liquid! 💧
 <!-- CHANGELOG_END -->
 
 ---
