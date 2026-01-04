@@ -176,11 +176,16 @@ class ClipboardManager: ObservableObject {
     }
     
     private func saveToDisk() {
-        do {
-            let data = try JSONEncoder().encode(history)
-            try data.write(to: persistenceURL)
-        } catch {
-            print("Failed to save clipboard history: \(error)")
+        // Run save on background thread to avoid blocking UI
+        let historyToSave = history
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let url = self?.persistenceURL else { return }
+            do {
+                let data = try JSONEncoder().encode(historyToSave)
+                try data.write(to: url)
+            } catch {
+                print("Failed to save clipboard history: \(error)")
+            }
         }
     }
     
