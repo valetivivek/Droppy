@@ -8,7 +8,7 @@
   <strong>The ultimate productivity tool for macOS.</strong><br>
   <em>Notch Shelf • Floating Basket • Clipboard Manager</em><br>
   <br>
-  Designed with ❤️ and pixel-perfect polish. Now featuring **Rich Interactive URL Previews** and a wider **1040px clipboard workspace**.
+  Designed with ❤️ and pixel-perfect polish. Now featuring rich Interactive URL Previews in our Clipboard.
 </p>
 
 <p align="center">
