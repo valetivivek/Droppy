@@ -111,24 +111,29 @@ final class NotchWindowController: NSObject, ObservableObject {
         // Timer for periodic hit test updates (every 50ms)
         // Timer for periodic hit test updates (every 50ms) - Fast, lightweight
         interactionTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
-            autoreleasepool {
-                guard let self = self, let window = self.notchWindow, window.isValid else {
-                    timer.invalidate()
-                    return
-                }
-                window.updateMouseEventHandling()
+            guard let self = self else {
+                timer.invalidate()
+                return
             }
+            guard let window = self.notchWindow, window.isValid else {
+                timer.invalidate()
+                return
+            }
+            // Call on main thread without autoreleasepool to avoid objc_release crashes
+            window.updateMouseEventHandling()
         }
         
         // Timer for fullscreen/visibility checks (every 1s) - Slower, heavier
         fullscreenTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
-            autoreleasepool {
-                guard let self = self, let window = self.notchWindow, window.isValid else {
-                    timer.invalidate()
-                    return
-                }
-                self.checkFullscreenState()
+            guard let self = self else {
+                timer.invalidate()
+                return
             }
+            guard let window = self.notchWindow, window.isValid else {
+                timer.invalidate()
+                return
+            }
+            self.checkFullscreenState()
         }
         
         // Global monitor catches mouse movement when Droppy is not frontmost
@@ -255,18 +260,24 @@ class NotchWindow: NSWindow {
     
     func updateMouseEventHandling() {
         // Early exit if window is being deallocated or not on main thread
-        guard isValid, Thread.isMainThread else { return }
+        guard isValid else { return }
+        guard Thread.isMainThread else { return }
         
-        // Capture state references safely
-        guard let state = Optional(DroppyState.shared),
-              let dragMonitor = Optional(DragMonitor.shared) else { return }
+        // Additional safety: check if window itself is still accessible
+        guard self.contentView != nil else { return }
+        
+        // Capture state values directly and safely
+        let isExpanded = DroppyState.shared.isExpanded
+        let isHovering = DroppyState.shared.isMouseHovering
+        let isDragging = DragMonitor.shared.isDragging
+        let isDropTargeted = DroppyState.shared.isDropTargeted
         
         // Window should accept mouse events when:
         // - Shelf is expanded (need to interact with items)
         // - User is hovering over notch (need click to open)
         // - Files are being dragged (need to accept drops)
         // Note: Basket being visible doesn't block notch - they work independently
-        let shouldAcceptEvents = state.isExpanded || state.isMouseHovering || dragMonitor.isDragging || state.isDropTargeted
+        let shouldAcceptEvents = isExpanded || isHovering || isDragging || isDropTargeted
         
         if self.ignoresMouseEvents == shouldAcceptEvents {
             self.ignoresMouseEvents = !shouldAcceptEvents
