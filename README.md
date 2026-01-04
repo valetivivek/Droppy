@@ -92,11 +92,11 @@ Droppy provides a **temporary shelf** for your files. Drag files to the top of y
 *Your history, beautifully organized. Search, Edit, and Drag & Drop.*
 
 <p align="center">
-  <img src="https://i.postimg.cc/ZKzM7j76/image.png" alt="Multi-select, Favorite, and Paste" width="100%">
+  <img src="https://i.postimg.cc/rpdpn8sH/image.png" alt="Multi-select, Favorite, and Paste" width="100%">
 </p>
 
 <p align="center">
-  <img src="https://i.postimg.cc/NFqpnf45/image.png" alt="Rename, Copy, and Delete" width="100%">
+  <img src="https://i.postimg.cc/63npKYdc/image.png" alt="Rename, Copy, and Delete" width="100%">
 </p>
 
 ---
