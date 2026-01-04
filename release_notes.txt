@@ -1,6 +1,6 @@
-Release v2.9.2
+Release v2.9.3
 
-New Features:
-- OCR for Images: You can now extract text directly from images in your clipboard using the new "Extract Text" button.
-- RTF Support: Enhanced rendering for Rich Text content in the clipboard preview.
-- UI Refinements: Improved OCR result view and window layering.
+Bug Fixes:
+- Fixed a critical rendering crash in the Clipboard Manager.
+- Implemented asynchronous caching for images and rich text previews for improved performance and stability.
+- Smoother scrolling and navigation when viewing clipboard history.

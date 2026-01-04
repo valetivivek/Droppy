@@ -891,6 +891,11 @@ struct ClipboardPreviewView: View {
     @State private var dashPhase: CGFloat = 0
     @State private var isExtractingText = false
     
+    // Cached Preview Content
+    @State private var cachedImage: NSImage?
+    @State private var cachedAttributedText: AttributedString?
+    @State private var isLoadingPreview = false
+    
     private func copyToClipboard() {
         NSPasteboard.general.clearContents()
         if let str = item.content {
@@ -920,13 +925,15 @@ struct ClipboardPreviewView: View {
                             }
                     } else {
                         ScrollView {
-                            // Try to render RTF if available, otherwise fallback to plain text
-                            if let rtfData = liveItem.rtfData,
-                               let attributed = try? rtfToAttributedString(rtfData) {
+                            if let attributed = cachedAttributedText {
                                 Text(attributed)
                                     .padding()
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .textSelection(.enabled)
+                            } else if isLoadingPreview {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .padding()
                             } else {
                                 Text(liveItem.content ?? "")
                                     .font(.body)
@@ -939,7 +946,7 @@ struct ClipboardPreviewView: View {
                     }
                     
                 case .image:
-                    if let data = item.imageData, let nsImg = NSImage(data: data) {
+                    if let nsImg = cachedImage {
                         ZStack(alignment: .bottomTrailing) {
                             Image(nsImage: nsImg)
                                 .resizable()
@@ -994,6 +1001,9 @@ struct ClipboardPreviewView: View {
                             .buttonStyle(.plain)
                             .padding(12)
                         }
+                    } else if isLoadingPreview {
+                        ProgressView()
+                            .padding()
                     } else {
                         Image(systemName: "photo")
                             .font(.system(size: 48))
@@ -1251,6 +1261,32 @@ struct ClipboardPreviewView: View {
             .buttonStyle(.plain)
         }
         .padding(20)
+        .task(id: item.id) {
+            // Asynchronously load and process preview content
+            isLoadingPreview = true
+            
+            // Clear previous cache immediately to avoid flicker or wrong previews
+            cachedImage = nil
+            cachedAttributedText = nil
+            
+            switch item.type {
+            case .image:
+                if let data = item.imageData {
+                    cachedImage = await Task.detached(priority: .userInitiated) {
+                        NSImage(data: data)
+                    }.value
+                }
+            case .text, .url:
+                if let rtfData = item.rtfData {
+                    cachedAttributedText = await Task.detached(priority: .userInitiated) {
+                        try? rtfToAttributedString(rtfData)
+                    }.value
+                }
+            default: break
+            }
+            
+            isLoadingPreview = false
+        }
     }
 }
 
