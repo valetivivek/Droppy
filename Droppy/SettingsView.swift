@@ -177,9 +177,9 @@ struct SettingsView: View {
     private var aboutSettings: some View {
         Section {
             HStack {
-                Image(systemName: "tray.and.arrow.down.fill")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.blue.gradient)
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 64, height: 64)
                 
                 VStack(alignment: .leading) {
                     Text("Droppy")

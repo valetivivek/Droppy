@@ -16,7 +16,7 @@ struct DroppyApp: App {
     @AppStorage("showInMenuBar") private var showInMenuBar = true
     
     var body: some Scene {
-        MenuBarExtra("Droppy", systemImage: "tray.and.arrow.down.fill", isInserted: $showInMenuBar) {
+        MenuBarExtra("Droppy", image: "MenuBarIcon", isInserted: $showInMenuBar) {
             Button("Check for Updates...") {
                 UpdateChecker.shared.checkAndNotify()
             }
