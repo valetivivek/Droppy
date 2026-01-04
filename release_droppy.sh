@@ -1,24 +1,48 @@
 #!/bin/bash
 
+# Configuration
+MAIN_REPO="/Users/jordyspruit/Desktop/Droppy"
+TAP_REPO="/Users/jordyspruit/Desktop/homebrew-tap"
+
+# --- Colors & Styles ---
+BOLD="\033[1m"
+RESET="\033[0m"
+BLUE="\033[1;34m"
+GREEN="\033[1;32m"
+CYAN="\033[1;36m"
+YELLOW="\033[1;33m"
+RED="\033[1;31m"
+MAGENTA="\033[1;35m"
+DIM="\033[2m"
+
+# --- Helpers ---
+info() { echo -e "${BLUE}==>${RESET} ${BOLD}$1${RESET}"; }
+success() { echo -e "${GREEN}✔ $1${RESET}"; }
+warning() { echo -e "${YELLOW}⚠ $1${RESET}"; }
+error() { echo -e "${RED}✖ Error: $1${RESET}"; exit 1; }
+step() { echo -e "   ${DIM}→ $1${RESET}"; }
+
+header() {
+    clear
+    echo -e "${BLUE}"
+    cat << "EOF"
+    ____                                
+   / __ \_________  ____  ____  __  __
+  / / / / ___/ __ \/ __ \/ __ \/ / / /
+ / /_/ / /  / /_/ / /_/ / /_/ / /_/ / 
+/_____/_/   \____/ .___/ .___/\__, /  
+                /_/   /_/    /____/   
+EOF
+    echo -e "${RESET}"
+    echo -e "   ${CYAN}Release Manager v2.0${RESET}\n"
+}
 
 # Strict error handling
 set -e
 
-# Configuration
-MAIN_REPO="/Users/jordyspruit/Desktop/Droppy"
-TAP_REPO="/Users/jordyspruit/Desktop/homebrew-tap"
-# DMG_NAME defined later based on version
-
 # Check arguments
 if [ -z "$1" ]; then
-    echo "Usage: ./release_droppy.sh [VERSION_NUMBER] [PATH_TO_RELEASE_NOTES]"
-    echo "Example: ./release_droppy.sh 1.2 ./notes.txt"
-    exit 1
-fi
-
-# Ensure git is clean
-if [ -n "$(git status --porcelain)" ]; then
-    echo "❌ Error: Git working directory is not clean. Please commit or stash changes first."
+    echo -e "${RED}Usage:${RESET} ./release_droppy.sh [VERSION] [NOTES_FILE]"
     exit 1
 fi
 
@@ -26,85 +50,62 @@ VERSION="$1"
 NOTES_FILE="$2"
 DMG_NAME="Droppy-$VERSION.dmg"
 
-# Banner
-echo "========================================"
-echo "🚀 Preparing Droppy Release v$VERSION"
-echo "========================================"
+header
+info "Preparing Release: ${GREEN}v$VERSION${RESET}"
 
-# Update Changelogs if notes provided
-if [ -n "$NOTES_FILE" ] && [ -f "$NOTES_FILE" ]; then
-    echo "\n-> Updating Changelogs with notes from $NOTES_FILE..."
-    
-    # Read notes content
-    NOTES_CONTENT=$(cat "$NOTES_FILE")
-    
-    # Escape special characters for sed usage
-    # We replace newlines with literal '\n' for specific formats if needed, 
-    # but for simple replacement we might do differently. 
-    # Since multiline sed is tricky, we'll use perl which handles this better on macOS.
-    
-    # 1. Update README.md
-    echo "   - Updating README.md..."
-    # We look for <!-- CHANGELOG_START --> ... <!-- CHANGELOG_END -->
-    # For README, we want raw markdown, so we use NOTES_CONTENT directly but need to escape for Perl regex replacement string if it has special vars
-    # A safer way with Perl is passing content as env var
-    export NEW_NOTES="$NOTES_CONTENT"
-    perl -0777 -i -pe 's/(<!-- CHANGELOG_START -->)(.*?)(<!-- CHANGELOG_END -->)/$1\n$ENV{NEW_NOTES}\n$3/s' README.md
-
-else
-    if [ -n "$NOTES_FILE" ]; then
-        echo "⚠️ Warning: Notes file '$NOTES_FILE' not found. Skipping changelog updates."
-    else
-        echo "ℹ️ No release notes file provided. Skipping changelog updates."
-    fi
+# Ensure git is clean
+if [ -n "$(git status --porcelain)" ]; then
+    error "Git working directory is not clean. Commit or stash first."
 fi
 
 # Check Repos
-if [ ! -d "$MAIN_REPO" ]; then
-    echo "❌ Error: Main repo not found at $MAIN_REPO"
-    exit 1
-fi
-if [ ! -d "$TAP_REPO" ]; then
-    echo "❌ Error: Tap repo not found at $TAP_REPO"
-    exit 1
+[ -d "$MAIN_REPO" ] || error "Main repo not found at $MAIN_REPO"
+[ -d "$TAP_REPO" ] || error "Tap repo not found at $TAP_REPO"
+
+# Update Release Notes
+if [ -n "$NOTES_FILE" ] && [ -f "$NOTES_FILE" ]; then
+    info "Syncing Documentation"
+    step "Reading $NOTES_FILE..."
+    NOTES_CONTENT=$(cat "$NOTES_FILE")
+    export NEW_NOTES="$NOTES_CONTENT"
+    
+    step "Updating README.md Changelog..."
+    # Update README with perl to handle multiline
+    perl -0777 -i -pe 's/(<!-- CHANGELOG_START -->)(.*?)(<!-- CHANGELOG_END -->)/$1\n$ENV{NEW_NOTES}\n$3/s' README.md
+else
+    warning "No valid notes file provided. Skipping doc updates."
 fi
 
-# 1. Update Workspace Version
-# Update version using sed directly on project file (agvtool is unreliable with generated Info.plist)
-echo "\n-> Updating version to $VERSION in project file..."
+# Update Project Version
+info "Bumping Version"
 cd "$MAIN_REPO" || exit
 sed -i '' "s/MARKETING_VERSION = .*/MARKETING_VERSION = $VERSION;/" Droppy.xcodeproj/project.pbxproj
+step "Set MARKETING_VERSION = $VERSION"
 
-# 2. Build Release Configuration
-echo "-> Building App (Release)..."
+# Build
+info "Compiling Binary"
 APP_BUILD_PATH="$MAIN_REPO/build"
 rm -rf "$APP_BUILD_PATH"
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -scheme Droppy -configuration Release -derivedDataPath "$APP_BUILD_PATH" -destination 'generic/platform=macOS' ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO -quiet
-if [ $? -ne 0 ]; then
-    echo "❌ Error: Build failed."
-    exit 1
-fi
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -scheme Droppy -configuration Release -derivedDataPath "$APP_BUILD_PATH" -destination 'generic/platform=macOS' ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO -quiet || error "Build failed"
+step "Build Successful"
 
-# 3. Create DMG
-echo "-> Creating $DMG_NAME..."
+# Packaging
+info "Packaging DMG"
 cd "$MAIN_REPO" || exit
-# Clean up old DMGs
 rm -f Droppy*.dmg
 mkdir -p dmg_root
 cp -R "$APP_BUILD_PATH/Build/Products/Release/Droppy.app" dmg_root/
 ln -s /Applications dmg_root/Applications
-hdiutil create -volname Droppy -srcfolder dmg_root -ov -format UDZO "$DMG_NAME" -quiet
+hdiutil create -volname Droppy -srcfolder dmg_root -ov -format UDZO "$DMG_NAME" -quiet || error "DMG creation failed"
 rm -rf dmg_root build
-if [ ! -f "$DMG_NAME" ]; then
-    echo "❌ Error: DMG creation failed."
-    exit 1
-fi
+success "$DMG_NAME created"
 
-# 4. Calculate Hash
+# Checksum
+info "Generating Integrity Checksum"
 HASH=$(shasum -a 256 "$DMG_NAME" | awk '{print $1}')
-echo "   SHA256: $HASH"
+step "SHA256: ${DIM}$HASH${RESET}"
 
-# 5. Generate Cask Content
+# Generate Cask
 CASK_CONTENT="cask \"droppy\" do
   version \"$VERSION\"
   sha256 \"$HASH\"
@@ -134,66 +135,57 @@ CASK_CONTENT="cask \"droppy\" do
   ]
 end"
 
-# 6. Update Casks
-echo "-> Updating Cask files..."
+# Update Casks
+info "Updating Homebrew Casks"
 echo "$CASK_CONTENT" > "$MAIN_REPO/Casks/droppy.rb"
 echo "$CASK_CONTENT" > "$TAP_REPO/Casks/droppy.rb"
+step "Cask files written"
 
-# 7. Commit Repos
-echo "-> Committing changes..."
+# Commit Changes
+info "Finalizing Git Repositories"
 
-# Main Repo
-cd "$MAIN_REPO" || exit
-echo "   - Main Repo: Pulling latest changes..."
-git pull origin main
-# Remove old DMGs from git tracking if they exist, but keep the new one
-git rm --ignore-unmatch Droppy*.dmg
-git add "$DMG_NAME"
-git add .
-git commit -m "Release v$VERSION"
-git tag "v$VERSION"
-
-# Tap Repo
-cd "$TAP_REPO" || exit
-echo "   - Tap Repo: Syncing changes..."
-# Ensure clean state by resetting to origin
-git fetch origin
-git reset --hard origin/main
-
-# Re-write Cask content to Tap Repo (since reset removed it if it was dirty)
-echo "$CASK_CONTENT" > "Casks/droppy.rb"
-
-git add .
-git commit -m "Update Droppy to v$VERSION"
-git push --force origin HEAD:main
-
-# 8. Confirmation
+# Confirm
 if [ "$3" == "-y" ] || [ "$3" == "--yes" ]; then
     REPLY="y"
 else
-    echo "\n========================================"
-    echo "✅ Release v$VERSION prepared successfully!"
-    echo "   - App built & DMG created"
-    echo "   - Cask updated in Main Repo and Tap Repo"
-    echo "   - Changes committed locally"
-    echo "========================================"
-    read -p "❓ Do you want to PUSH changes to GitHub now? (y/n) " -n 1 -r
+    echo -e "\n${BOLD}Review Pending Changes:${RESET}"
+    echo -e "   • Version: ${GREEN}$VERSION${RESET}"
+    echo -e "   • Binary:  ${CYAN}$DMG_NAME${RESET}"
+    echo -e "   • Hash:    ${DIM}${HASH:0:8}...${RESET}"
+    read -p "❓ Publish release now? [y/N] " -n 1 -r
     echo
 fi
 
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "\n-> Pushing Main Repo..."
-    cd "$MAIN_REPO" || exit
-    git push origin main
-    git push origin "v$VERSION"
+    # Main Repo Commit
+    cd "$MAIN_REPO"
+    step "Pushing Main Repo..."
+    git pull origin main --quiet
+    git rm --ignore-unmatch Droppy*.dmg --quiet
+    git add "$DMG_NAME"
+    git add .
+    git commit -m "Release v$VERSION" --quiet
+    git tag "v$VERSION"
+    git push origin main --quiet
+    git push origin "v$VERSION" --quiet
+    
+    # Tap Repo Commit
+    cd "$TAP_REPO"
+    step "Pushing Tap Repo..."
+    git fetch origin --quiet
+    git reset --hard origin/main --quiet
+    echo "$CASK_CONTENT" > "Casks/droppy.rb" # Rewrite after reset
+    git add .
+    git commit -m "Update Droppy to v$VERSION" --quiet
+    git push --force origin HEAD:main --quiet
 
-    echo "\n-> Creating GitHub Release v$VERSION..."
-    gh release create "v$VERSION" "$DMG_NAME" \
-        --title "v$VERSION" \
-        --notes-file "$NOTES_FILE"
-
-    echo "\n🎉 DONE! Release is live."
-    echo "Users can run 'brew upgrade droppy' to get the new version."
+    # GitHub Release
+    info "Creating GitHub Release"
+    cd "$MAIN_REPO"
+    gh release create "v$VERSION" "$DMG_NAME" --title "v$VERSION" --notes-file "$NOTES_FILE"
+    
+    echo -e "\n${GREEN}✨ RELEASE COMPLETE! ✨${RESET}"
+    echo -e "Users can now update with: ${CMD}brew upgrade droppy${RESET}\n"
 else
-    echo "\n🛑 Push cancelled. Changes are committed locally."
+    warning "Release cancelled. Changes pending locally."
 fi

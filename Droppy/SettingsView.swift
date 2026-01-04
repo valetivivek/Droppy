@@ -34,6 +34,9 @@ struct SettingsView: View {
 
                     Label("About Droppy", systemImage: "info.circle")
                         .tag("About Droppy")
+                        
+                    Label("Beta", systemImage: "testtube.2")
+                        .tag("Beta")
                 }
                 .navigationTitle("Settings")
                 // Fix: Use compatible background modifer
@@ -47,6 +50,8 @@ struct SettingsView: View {
 
                     } else if selectedTab == "About Droppy" {
                         aboutSettings
+                    } else if selectedTab == "Beta" {
+                        betaSettings
                     }
                 }
                 .formStyle(.grouped)
@@ -174,6 +179,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading) {
                     Text("Droppy")
                         .font(.headline)
+                        .foregroundStyle(.primary)
                     Text("Version \(UpdateChecker.shared.currentVersion)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -193,6 +199,105 @@ struct SettingsView: View {
             }
         } header: {
             Text("About")
+        }
+    }
+    
+    // MARK: - Beta
+    @AppStorage("enableClipboardBeta") private var enableClipboardBeta = false
+    @AppStorage("clipboardHistoryLimit") private var clipboardHistoryLimit = 50
+    @State private var currentShortcut: SavedShortcut?
+    
+    // Custom Persistence for struct
+    private func loadShortcut() {
+        if let data = UserDefaults.standard.data(forKey: "clipboardShortcut"),
+           let decoded = try? JSONDecoder().decode(SavedShortcut.self, from: data) {
+            currentShortcut = decoded
+        } else {
+            // Default: Shift + Cmd + Space (49)
+            currentShortcut = SavedShortcut(keyCode: 49, modifiers: NSEvent.ModifierFlags([.command, .shift]).rawValue)
+        }
+    }
+    
+    private func saveShortcut(_ shortcut: SavedShortcut?) {
+        if let s = shortcut, let encoded = try? JSONEncoder().encode(s) {
+            UserDefaults.standard.set(encoded, forKey: "clipboardShortcut")
+            // Update active monitor
+            if enableClipboardBeta {
+                 ClipboardWindowController.shared.startMonitoringShortcut()
+            }
+        }
+    }
+    
+    private var betaSettings: some View {
+        Section {
+            Toggle(isOn: $enableClipboardBeta) {
+                VStack(alignment: .leading) {
+                    Text("Clipboard Manager")
+                    Text("History with Preview")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .onChange(of: enableClipboardBeta) { oldValue, newValue in
+                if newValue {
+                    // Check for Accessibility Permissions
+                    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+                    let isTrusted = AXIsProcessTrustedWithOptions(options)
+                    
+                    if !isTrusted {
+                        // User needs to approve. 
+                        // The system prompt appears automatically due to options above.
+                        // We can also show a helper alert if needed, but system prompt is standard.
+                        print("Prompting for Accessibility permissions")
+                    }
+                    
+                    ClipboardManager.shared.startMonitoring()
+                    ClipboardWindowController.shared.startMonitoringShortcut()
+                } else {
+                    ClipboardManager.shared.stopMonitoring()
+                    ClipboardWindowController.shared.stopMonitoringShortcut()
+                    ClipboardWindowController.shared.close()
+                }
+            }
+            
+            if enableClipboardBeta {
+                HStack {
+                    Text("Global Shortcut")
+                    Spacer()
+                    KeyShortcutRecorder(shortcut: Binding(
+                        get: { currentShortcut },
+                        set: { newVal in
+                            currentShortcut = newVal
+                            saveShortcut(newVal)
+                        }
+                    ))
+                }
+                
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("History Limit")
+                        Text("Number of items to keep in history")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Stepper(value: $clipboardHistoryLimit, in: 10...2000, step: 10) {
+                        Text("\(clipboardHistoryLimit)")
+                            .font(.system(.body, design: .monospaced))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(4)
+                    }
+                }
+            }
+        } header: {
+            Text("Beta Features")
+        } footer: {
+            Text("Experimental features. Shortcuts may conflict with other apps. Requires Accessibility/Input Monitoring permissions for strict global shortcuts.")
+        }
+        .onAppear {
+            loadShortcut()
         }
     }
 }

@@ -1,0 +1,1134 @@
+import SwiftUI
+
+struct ClipboardManagerView: View {
+    @ObservedObject var manager = ClipboardManager.shared
+    @State private var hoverLocation: CGPoint = .zero
+    @State private var isBgHovering: Bool = false
+    @State private var selectedItems: Set<UUID> = []
+    @State private var isResetHovering = false
+    @State private var scrollProxy: ScrollViewProxy?
+    @State private var renamingItemId: UUID?
+    @State private var renamingText: String = ""
+    
+    /// Helper to get selected items as array
+    private var selectedItemsArray: [ClipboardItem] {
+        manager.history.filter { selectedItems.contains($0.id) }
+    }
+    
+    // Actions passed from Controller
+    var onPaste: (ClipboardItem) -> Void
+    var onClose: () -> Void
+    var onReset: () -> Void
+    
+    var body: some View {
+        mainContentView
+            .overlay(alignment: .bottom) { feedbackToastView }
+            .onAppear { handleOnAppear() }
+            .onChange(of: manager.history) { _, new in handleHistoryChange(new) }
+    }
+    
+    private var mainContentView: some View {
+        HStack(spacing: 0) {
+            sidebarView
+            Divider().overlay(Color.white.opacity(0.1))
+            previewPane
+        }
+        .frame(minWidth: 720, maxWidth: .infinity, minHeight: 480, maxHeight: .infinity)
+        .background(Color.black)
+        .overlay { HexagonDotsEffect(mouseLocation: hoverLocation, isHovering: isBgHovering, coordinateSpaceName: "clipboardContainer") }
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.white.opacity(0.15), lineWidth: 1))
+        .coordinateSpace(name: "clipboardContainer")
+        .background(pasteShortcutButton)
+        .background(navigationShortcutButtons)
+        .onContinuousHover(coordinateSpace: .named("clipboardContainer")) { phase in
+            handleHover(phase)
+        }
+    }
+    
+    private var pasteShortcutButton: some View {
+        Button("") {
+            for item in selectedItemsArray {
+                onPaste(item)
+            }
+        }
+            .keyboardShortcut(.return, modifiers: [])
+            .opacity(0)
+    }
+    
+    @ViewBuilder
+    private var navigationShortcutButtons: some View {
+        VStack {
+            Button("") { navigateSelection(direction: -1) }.keyboardShortcut(.upArrow, modifiers: [])
+            Button("") { navigateSelection(direction: 1) }.keyboardShortcut(.downArrow, modifiers: [])
+            Button("") { deleteSelectedItems() }.keyboardShortcut(.delete, modifiers: [])
+            Button("") { deleteSelectedItems() }.keyboardShortcut(KeyEquivalent("\u{08}"), modifiers: [])
+        }
+        .opacity(0)
+    }
+    
+    private func handleOnAppear() {
+        if selectedItems.isEmpty, let first = manager.history.first {
+            selectedItems.insert(first.id)
+        }
+    }
+    
+    private func handleHistoryChange(_ new: [ClipboardItem]) {
+        // Remove any selected items that no longer exist
+        selectedItems = selectedItems.filter { id in new.contains { $0.id == id } }
+        if selectedItems.isEmpty, let first = new.first {
+            selectedItems.insert(first.id)
+        }
+    }
+    
+    private func handleHover(_ phase: HoverPhase) {
+        switch phase {
+        case .active(let location):
+            hoverLocation = location
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) { isBgHovering = true }
+        case .ended:
+            withAnimation(.linear(duration: 0.2)) { isBgHovering = false }
+        }
+    }
+    
+    @ViewBuilder
+    private var feedbackToastView: some View {
+        if manager.showPasteFeedback {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                Text("Copied to Clipboard & Pasting...")
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
+            .padding(.bottom, 24)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+    
+    private func navigateSelection(direction: Int) {
+        // Find current "anchor" item for navigation
+        guard let firstSelected = selectedItems.first,
+              let currentItem = manager.history.first(where: { $0.id == firstSelected }),
+              let index = manager.history.firstIndex(where: { $0.id == currentItem.id }) else {
+            if let first = manager.history.first {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    selectedItems = [first.id]
+                }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    scrollProxy?.scrollTo(first.id, anchor: .center)
+                }
+            }
+            return
+        }
+        
+        let newIndex = index + direction
+        if newIndex >= 0 && newIndex < manager.history.count {
+            let newId = manager.history[newIndex].id
+            // Silky smooth scrolling - instant selection, fluid scroll
+            selectedItems = [newId]
+            withAnimation(.timingCurve(0.25, 0.1, 0.25, 1.0, duration: 0.22)) {
+                scrollProxy?.scrollTo(newId, anchor: .center)
+            }
+        }
+    }
+    
+    private func deleteSelectedItems() {
+        guard !selectedItems.isEmpty else { return }
+        
+        // Find next item to select after deletion
+        let itemsToDelete = selectedItemsArray
+        let remainingItems = manager.history.filter { !selectedItems.contains($0.id) }
+        
+        withAnimation(.easeInOut(duration: 0.2)) {
+            for item in itemsToDelete {
+                manager.delete(item: item)
+            }
+            if let first = remainingItems.first {
+                selectedItems = [first.id]
+            } else {
+                selectedItems = []
+            }
+        }
+    }
+    
+    var sidebarView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Draggable header area for window repositioning
+            HStack {
+                Text("Clipboard")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.top, 16)
+            .padding(.bottom, 4)
+            .background(WindowDragArea())
+            .contentShape(Rectangle())
+            
+            if !manager.hasAccessibilityPermission {
+                accessibilityWarning
+            }
+            
+            if manager.history.isEmpty {
+                Spacer()
+                Text("Clipboard is empty")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                Spacer()
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(manager.history) { item in
+                                DraggableArea(
+                                    items: {
+                                        // If this item is selected, drag all selected
+                                        if selectedItems.contains(item.id) {
+                                            return selectedItemsArray.flatMap { clipboardItemToPasteboardWritings($0) }
+                                        }
+                                        return clipboardItemToPasteboardWritings(item)
+                                    },
+                                    onTap: { modifiers in
+                                        if modifiers.contains(.command) {
+                                            // Cmd+Click: toggle selection
+                                            if selectedItems.contains(item.id) {
+                                                selectedItems.remove(item.id)
+                                            } else {
+                                                selectedItems.insert(item.id)
+                                            }
+                                        } else {
+                                            // Normal click: select only this
+                                            selectedItems = [item.id]
+                                        }
+                                    },
+                                    onRightClick: {
+                                        // Select if not already selected
+                                        if !selectedItems.contains(item.id) {
+                                            selectedItems = [item.id]
+                                        }
+                                    }
+                                ) {
+                                    ClipboardItemRow(
+                                        item: item, 
+                                        isSelected: selectedItems.contains(item.id),
+                                        isRenaming: renamingItemId == item.id,
+                                        renamingText: $renamingText,
+                                        onRename: {
+                                            manager.rename(item: item, to: renamingText)
+                                            renamingItemId = nil
+                                        },
+                                        onCancelRename: {
+                                            renamingItemId = nil
+                                        }
+                                    )
+                                }
+                                .id(item.id)
+                                .contextMenu {
+                                    if selectedItems.count > 1 {
+                                        // Multi-select context menu
+                                        Button {
+                                            for item in selectedItemsArray {
+                                                onPaste(item)
+                                            }
+                                        } label: {
+                                            Label("Paste All (\(selectedItems.count))", systemImage: "doc.on.clipboard")
+                                        }
+                                        Button {
+                                            copySelectedToClipboard()
+                                        } label: {
+                                            Label("Copy All (\(selectedItems.count))", systemImage: "doc.on.doc")
+                                        }
+                                        Divider()
+                                        Button(role: .destructive) {
+                                            deleteSelectedItems()
+                                        } label: {
+                                            Label("Delete \(selectedItems.count) Items", systemImage: "trash")
+                                        }
+                                    } else {
+                                        // Single item context menu
+                                        Button { onPaste(item) } label: {
+                                            Label("Paste", systemImage: "doc.on.clipboard")
+                                        }
+                                        Button {
+                                            manager.toggleFavorite(item)
+                                        } label: {
+                                            Label(item.isFavorite ? "Unfavorite" : "Favorite", systemImage: item.isFavorite ? "star.slash" : "star")
+                                        }
+                                        Divider()
+                                        Button {
+                                            renamingText = item.title
+                                            renamingItemId = item.id
+                                        } label: {
+                                            Label("Rename", systemImage: "pencil")
+                                        }
+                                        Divider()
+                                        Button(role: .destructive) {
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                manager.delete(item: item)
+                                                selectedItems.remove(item.id)
+                                                if selectedItems.isEmpty, let first = manager.history.first {
+                                                    selectedItems.insert(first.id)
+                                                }
+                                            }
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, 16)
+                    }
+                    .onAppear {
+                        scrollProxy = proxy
+                    }
+                }
+            } // Close else
+            Spacer()
+            
+            HStack {
+                 Button(action: onReset) {
+                     Image(systemName: "arrow.counterclockwise")
+                         .font(.system(size: 12))
+                         .foregroundStyle(isResetHovering ? .primary : .secondary)
+                         .opacity(isResetHovering ? 1.0 : 0.5)
+                         .padding(8)
+                         .background(Color.white.opacity(isResetHovering ? 0.15 : 0.05))
+                         .clipShape(Circle())
+                         .scaleEffect(isResetHovering ? 1.1 : 1.0)
+                 }
+                 .buttonStyle(.plain)
+                 .help("Reset Window Size")
+                 .onHover { hovering in
+                     withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                         isResetHovering = hovering
+                     }
+                 }
+                 .padding(8)
+                 Spacer()
+            }
+        }
+        .frame(width: 300)
+        .frame(maxHeight: .infinity) // Sidebar takes full height, but width fixed
+        .background(Color.black.opacity(0.3)) // Slight separation for sidebar
+    }
+    
+    var accessibilityWarning: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Color.orange)
+                Text("Accessibility Needed")
+                    .fontWeight(.bold)
+            }
+            .font(.caption)
+            
+            Text("Droppy needs permission to paste into other apps.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            
+            Button(action: openAccessibilitySettings) {
+                Text("Open Settings")
+                    .font(.caption.bold())
+                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.white.opacity(0.1))
+                    .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .background(Color.orange.opacity(0.1))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+        )
+        .padding(.horizontal)
+    }
+    
+    private func openAccessibilitySettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
+    }
+    
+    /// Converts a ClipboardItem to a temp file URL for drag operations
+    /// This ensures dragged items can be dropped as actual files
+    private func clipboardItemToPasteboardWritings(_ item: ClipboardItem) -> [NSPasteboardWriting] {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("DroppyClipboard", isDirectory: true)
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        
+        switch item.type {
+        case .text:
+            if let content = item.content {
+                // Create a .txt file
+                let fileName = sanitizeFileName(item.title) + ".txt"
+                let fileURL = tempDir.appendingPathComponent(fileName)
+                do {
+                    try content.write(to: fileURL, atomically: true, encoding: .utf8)
+                    return [fileURL as NSURL]
+                } catch {
+                    return [content as NSString]
+                }
+            }
+        case .url:
+            if let content = item.content {
+                // Create a .webloc file for URLs
+                let fileName = sanitizeFileName(item.title) + ".webloc"
+                let fileURL = tempDir.appendingPathComponent(fileName)
+                let plist = ["URL": content]
+                do {
+                    let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+                    try data.write(to: fileURL)
+                    return [fileURL as NSURL]
+                } catch {
+                    return [content as NSString]
+                }
+            }
+        case .file:
+            if let path = item.content {
+                return [URL(fileURLWithPath: path) as NSURL]
+            }
+        case .image:
+            if let data = item.imageData {
+                // Determine format and create appropriate file
+                let fileName = sanitizeFileName(item.title)
+                let fileURL: URL
+                
+                // Check if it's PNG or use PNG as default
+                if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
+                    fileURL = tempDir.appendingPathComponent(fileName + ".png")
+                } else if data.starts(with: [0xFF, 0xD8, 0xFF]) {
+                    fileURL = tempDir.appendingPathComponent(fileName + ".jpg")
+                } else {
+                    // Convert to PNG for unknown formats
+                    fileURL = tempDir.appendingPathComponent(fileName + ".png")
+                }
+                
+                do {
+                    try data.write(to: fileURL)
+                    return [fileURL as NSURL]
+                } catch {
+                    if let image = NSImage(data: data) {
+                        return [image]
+                    }
+                }
+            }
+        case .color:
+            break
+        }
+        return []
+    }
+    
+    /// Sanitize filename for safe filesystem use
+    private func sanitizeFileName(_ name: String) -> String {
+        let invalid = CharacterSet(charactersIn: "/\\:*?\"<>|")
+        var sanitized = name.components(separatedBy: invalid).joined(separator: "_")
+        sanitized = sanitized.trimmingCharacters(in: .whitespacesAndNewlines)
+        if sanitized.isEmpty { sanitized = "clipboard_item" }
+        if sanitized.count > 50 { sanitized = String(sanitized.prefix(50)) }
+        return sanitized
+    }
+    
+    /// Copy all selected items to system clipboard
+    private func copySelectedToClipboard() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        
+        var strings: [String] = []
+        var urls: [URL] = []
+        
+        for item in selectedItemsArray {
+            switch item.type {
+            case .text, .url:
+                if let content = item.content {
+                    strings.append(content)
+                }
+            case .file:
+                if let path = item.content {
+                    urls.append(URL(fileURLWithPath: path))
+                }
+            case .image:
+                if let data = item.imageData, let image = NSImage(data: data) {
+                    pasteboard.writeObjects([image])
+                }
+            case .color:
+                break
+            }
+        }
+        
+        if !strings.isEmpty {
+            pasteboard.setString(strings.joined(separator: "\n"), forType: .string)
+        }
+        if !urls.isEmpty {
+            pasteboard.writeObjects(urls as [NSURL])
+        }
+    }
+    
+    var previewPane: some View {
+        VStack(spacing: 0) {
+            // Draggable header area for window repositioning (top right)
+            HStack {
+                Spacer()
+            }
+            .frame(height: 40)
+            .background(WindowDragArea())
+            .contentShape(Rectangle())
+            
+            if selectedItems.count > 1 {
+                // Multi-select stacked preview
+                MultiSelectPreviewView(
+                    items: selectedItemsArray,
+                    onPasteAll: {
+                        for item in selectedItemsArray {
+                            onPaste(item)
+                        }
+                    },
+                    onCopyAll: copySelectedToClipboard,
+                    onDeleteAll: deleteSelectedItems
+                )
+            } else if let firstId = selectedItems.first,
+                      let item = manager.history.first(where: { $0.id == firstId }) {
+                ClipboardPreviewView(
+                    item: item, 
+                    onPaste: { onPaste(item) },
+                    onDelete: { deleteSelectedItems() }
+                )
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "doc.on.clipboard")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                    Text("Select an item to preview")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+
+        .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black.opacity(0.2))
+    }
+}
+
+struct ClipboardItemRow: View {
+    let item: ClipboardItem
+    let isSelected: Bool
+    let isRenaming: Bool
+    @Binding var renamingText: String
+    let onRename: () -> Void
+    let onCancelRename: () -> Void
+    
+    @State private var isHovering = false
+    @State private var dashPhase: CGFloat = 0
+    
+    var body: some View {
+        HStack {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 32, height: 32)
+                
+                Image(systemName: iconName(for: item.type))
+                    .foregroundStyle(.white)
+                    .font(.system(size: 14))
+            }
+            
+            // Title or rename field
+            if isRenaming {
+                ClipboardRenameTextField(
+                    text: $renamingText,
+                    onSubmit: onRename,
+                    onCancel: onCancelRename
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    
+                    HStack {
+                        if let app = item.sourceApp {
+                            Text(app)
+                                .font(.system(size: 10))
+                        }
+                        Text(item.date, style: .time)
+                            .font(.system(size: 10))
+                    }
+                    .foregroundStyle(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            if item.isFavorite && !isRenaming {
+                Image(systemName: "star.fill")
+                    .foregroundStyle(.yellow)
+                    .font(.system(size: 10))
+            }
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(isSelected ? Color.blue.opacity(0.4) : (isHovering ? Color.white.opacity(0.12) : Color.white.opacity(0.06)))
+        )
+        .overlay {
+            if isRenaming {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        Color.accentColor.opacity(0.8),
+                        style: StrokeStyle(
+                            lineWidth: 1.5,
+                            lineCap: .round,
+                            dash: [4, 4],
+                            dashPhase: dashPhase
+                        )
+                    )
+                    .onAppear {
+                        withAnimation(.linear(duration: 0.5).repeatForever(autoreverses: false)) {
+                            dashPhase = 8
+                        }
+                    }
+            }
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                isHovering = hovering
+            }
+        }
+    }
+    
+    func iconName(for type: ClipboardType) -> String {
+        switch type {
+        case .text: return "text.alignleft"
+        case .image: return "photo"
+        case .file: return "doc"
+        case .url: return "link"
+        case .color: return "paintpalette"
+        }
+    }
+}
+
+// MARK: - Clipboard Rename TextField
+private struct ClipboardRenameTextField: NSViewRepresentable {
+    @Binding var text: String
+    let onSubmit: () -> Void
+    let onCancel: () -> Void
+    
+    func makeNSView(context: Context) -> NSTextField {
+        let textField = NSTextField()
+        textField.delegate = context.coordinator
+        textField.isBordered = false
+        textField.drawsBackground = true
+        textField.backgroundColor = NSColor.black.withAlphaComponent(0.3)
+        textField.textColor = .white
+        textField.font = .systemFont(ofSize: 11, weight: .medium)
+        textField.alignment = .left
+        textField.focusRingType = .none
+        textField.stringValue = text
+        textField.wantsLayer = true
+        textField.layer?.cornerRadius = 6 // Match basket corner radius
+        
+        // Add left padding to the text field content if possible, or handle via frame
+        // For NSTextField we can adjust its frame or use a custom cell, but 
+        // let's keep it simple and just ensure font and background match.
+        
+        // Auto-focus and select text
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            guard let window = textField.window else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
+            window.makeFirstResponder(textField)
+            textField.selectText(nil)
+            if let editor = textField.currentEditor() {
+                editor.selectedRange = NSRange(location: 0, length: textField.stringValue.count)
+            }
+        }
+        
+        return textField
+    }
+    
+    func updateNSView(_ nsView: NSTextField, context: Context) {
+        if nsView.stringValue != text {
+            nsView.stringValue = text
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, NSTextFieldDelegate {
+        let parent: ClipboardRenameTextField
+        
+        init(_ parent: ClipboardRenameTextField) {
+            self.parent = parent
+        }
+        
+        func controlTextDidChange(_ notification: Notification) {
+            if let textField = notification.object as? NSTextField {
+                parent.text = textField.stringValue
+            }
+        }
+        
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+                parent.onSubmit()
+                return true
+            } else if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+                parent.onCancel()
+                return true
+            }
+            return false
+        }
+    }
+}
+
+struct ClipboardPreviewView: View {
+    let item: ClipboardItem
+    let onPaste: () -> Void
+    let onDelete: () -> Void
+    
+    @ObservedObject private var manager = ClipboardManager.shared
+    
+    /// Get live item from manager to reflect immediate changes
+    private var liveItem: ClipboardItem {
+        manager.history.first(where: { $0.id == item.id }) ?? item
+    }
+    
+    @State private var isPasteHovering = false
+    @State private var isCopyHovering = false
+    @State private var isStarHovering = false
+    @State private var isTrashHovering = false
+    @State private var starAnimationTrigger = false
+    
+    private func copyToClipboard() {
+        NSPasteboard.general.clearContents()
+        if let str = item.content {
+            NSPasteboard.general.setString(str, forType: .string)
+        } else if let imgData = item.imageData {
+            NSPasteboard.general.setData(imgData, forType: .tiff)
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            
+            // Content Preview
+            VStack {
+                switch item.type {
+                case .text, .url:
+                    ScrollView {
+                        Text(item.content ?? "")
+                            .font(.body)
+                            .foregroundStyle(.white)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                    }
+                    
+                case .image:
+                    if let data = item.imageData, let nsImg = NSImage(data: data) {
+                        Image(nsImage: nsImg)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxHeight: 220)
+                            .cornerRadius(8)
+                    } else {
+                        Image(systemName: "photo")
+                            .font(.system(size: 48))
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                case .file:
+                    if let path = item.content {
+                        VStack(spacing: 12) {
+                            Image(nsImage: NSWorkspace.shared.icon(forFile: path))
+                                .resizable()
+                                .frame(width: 64, height: 64)
+                            Text(URL(fileURLWithPath: path).lastPathComponent)
+                                .font(.headline)
+                                .foregroundStyle(.white)
+                            Text(path)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                default:
+                     Text("Preview not available")
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.white.opacity(0.05))
+            .cornerRadius(12)
+            
+            // Metadata Footer
+            HStack {
+                if let app = item.sourceApp {
+                    Label(app, systemImage: "app")
+                }
+                Spacer()
+                Text(item.date, style: .date)
+                Text(item.date, style: .time)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 4)
+            
+            // Action Buttons
+            HStack(spacing: 12) {
+                // Main Paste Button
+                Button(action: onPaste) {
+                    Text("Paste")
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.blue.opacity(isPasteHovering ? 1.0 : 0.8))
+                        .foregroundStyle(.white)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                        .scaleEffect(isPasteHovering ? 1.02 : 1.0)
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        isPasteHovering = hovering
+                    }
+                }
+
+                // Copy Button
+                Button(action: copyToClipboard) {
+                    Text("Copy")
+                        .fontWeight(.medium)
+                        .frame(width: 80)
+                        .padding(.vertical, 12)
+                        .background(Color.white.opacity(isCopyHovering ? 0.2 : 0.1))
+                        .foregroundStyle(.white)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        )
+                        .scaleEffect(isCopyHovering ? 1.02 : 1.0)
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        isCopyHovering = hovering
+                    }
+                }
+                
+                // Favorite Button
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                        starAnimationTrigger.toggle()
+                    }
+                    manager.toggleFavorite(item)
+                } label: {
+                    ZStack {
+                        // Background glow when favorited
+                        Circle()
+                            .fill(Color.yellow.opacity(liveItem.isFavorite ? 0.2 : 0))
+                            .blur(radius: 8)
+                            .scaleEffect(liveItem.isFavorite ? 1.2 : 0.8)
+                        
+                        Image(systemName: liveItem.isFavorite ? "star.fill" : "star")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(liveItem.isFavorite ? .yellow : (isStarHovering ? .yellow.opacity(0.7) : .secondary))
+                            .symbolEffect(.bounce, value: starAnimationTrigger)
+                    }
+                    .frame(width: 44, height: 44)
+                    .background(isStarHovering ? Color.yellow.opacity(0.1) : Color.clear)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isStarHovering ? Color.yellow.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1)
+                    )
+                    .scaleEffect(isStarHovering ? 1.08 : 1.0)
+                }
+                .buttonStyle(.plain)
+                .help("Toggle Favorite")
+                .onHover { hovering in
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        isStarHovering = hovering
+                    }
+                }
+                
+                // Delete Button
+                Button {
+                    onDelete()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(isTrashHovering ? .red : .red.opacity(0.6))
+                        .frame(width: 44, height: 44)
+                        .background(isTrashHovering ? Color.red.opacity(0.15) : Color.clear)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(isTrashHovering ? Color.red.opacity(0.4) : Color.white.opacity(0.1), lineWidth: 1)
+                        )
+                        .scaleEffect(isTrashHovering ? 1.08 : 1.0)
+                        .shadow(color: isTrashHovering ? .red.opacity(0.3) : .clear, radius: 8, x: 0, y: 2)
+                }
+                .buttonStyle(.plain)
+                .help("Delete (Backspace)")
+                .onHover { hovering in
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        isTrashHovering = hovering
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(20)
+    }
+}
+
+// MARK: - Multi-Select Preview View
+
+struct MultiSelectPreviewView: View {
+    let items: [ClipboardItem]
+    let onPasteAll: () -> Void
+    let onCopyAll: () -> Void
+    let onDeleteAll: () -> Void
+    
+    @State private var isPasteHovering = false
+    @State private var isCopyHovering = false
+    @State private var isDeleteHovering = false
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            
+            // Stacked cards preview
+            ZStack {
+                ForEach(Array(items.prefix(5).enumerated().reversed()), id: \.element.id) { index, item in
+                    StackedCardView(item: item, index: index, totalCount: min(items.count, 5))
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.9).combined(with: .opacity)
+                        ))
+                }
+            }
+            .frame(height: 180)
+            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: items.count)
+            
+            // Selection count badge
+            HStack(spacing: 8) {
+                Image(systemName: "rectangle.stack.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.blue)
+                
+                Text("\(items.count) items selected")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.primary)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+            )
+            
+            Spacer()
+            
+            // Bulk action buttons
+            HStack(spacing: 12) {
+                // Paste All Button
+                Button(action: onPasteAll) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "doc.on.clipboard")
+                        Text("Paste All")
+                    }
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.blue.opacity(isPasteHovering ? 1.0 : 0.8))
+                    .foregroundStyle(.white)
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                    )
+                    .scaleEffect(isPasteHovering ? 1.02 : 1.0)
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        isPasteHovering = hovering
+                    }
+                }
+                
+                // Copy All Button
+                Button(action: onCopyAll) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "doc.on.doc")
+                        Text("Copy All")
+                    }
+                    .fontWeight(.medium)
+                    .frame(width: 110)
+                    .padding(.vertical, 12)
+                    .background(Color.white.opacity(isCopyHovering ? 0.2 : 0.1))
+                    .foregroundStyle(.white)
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    )
+                    .scaleEffect(isCopyHovering ? 1.02 : 1.0)
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        isCopyHovering = hovering
+                    }
+                }
+                
+                // Delete All Button
+                Button(action: onDeleteAll) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(isDeleteHovering ? .red : .red.opacity(0.6))
+                        .frame(width: 44, height: 44)
+                        .background(isDeleteHovering ? Color.red.opacity(0.15) : Color.clear)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(isDeleteHovering ? Color.red.opacity(0.4) : Color.white.opacity(0.1), lineWidth: 1)
+                        )
+                        .scaleEffect(isDeleteHovering ? 1.08 : 1.0)
+                        .shadow(color: isDeleteHovering ? .red.opacity(0.3) : .clear, radius: 8, x: 0, y: 2)
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        isDeleteHovering = hovering
+                    }
+                }
+            }
+        }
+        .padding(20)
+    }
+}
+
+// MARK: - Stacked Card View
+
+struct StackedCardView: View {
+    let item: ClipboardItem
+    let index: Int
+    let totalCount: Int
+    
+    private var offset: CGFloat {
+        CGFloat(index) * 8
+    }
+    
+    private var rotation: Double {
+        Double(index - totalCount / 2) * 3.0
+    }
+    
+    private var scale: CGFloat {
+        1.0 - CGFloat(index) * 0.05
+    }
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.15))
+                    .frame(width: 48, height: 48)
+                
+                Image(systemName: iconName(for: item.type))
+                    .font(.system(size: 22))
+                    .foregroundStyle(.white)
+            }
+            
+            // Title
+            Text(item.title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(width: 100)
+        }
+        .padding(16)
+        .frame(width: 130, height: 120)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [.white.opacity(0.3), .white.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+        .scaleEffect(scale)
+        .offset(x: offset, y: -offset)
+        .rotationEffect(.degrees(rotation))
+        .zIndex(Double(totalCount - index))
+    }
+    
+    private func iconName(for type: ClipboardType) -> String {
+        switch type {
+        case .text: return "text.alignleft"
+        case .image: return "photo"
+        case .file: return "doc"
+        case .url: return "link"
+        case .color: return "paintpalette"
+        }
+    }
+}
+
+// MARK: - Window Drag Area
+/// An NSViewRepresentable that enables window dragging when used as a background
+struct WindowDragArea: NSViewRepresentable {
+    func makeNSView(context: Context) -> WindowDragNSView {
+        return WindowDragNSView()
+    }
+    
+    func updateNSView(_ nsView: WindowDragNSView, context: Context) {}
+}
+
+class WindowDragNSView: NSView {
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
+    }
+    
+    override func mouseUp(with event: NSEvent) {
+        // Consumed
+    }
+}
+

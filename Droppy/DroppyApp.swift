@@ -50,17 +50,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = NotchWindowController.shared
         _ = FloatingBasketWindowController.shared
         _ = UpdateChecker.shared
+        _ = ClipboardManager.shared
+        _ = ClipboardWindowController.shared
         
         // Start monitoring for drag events (polling-based, safe)
         DragMonitor.shared.startMonitoring()
         
-        // Setup the notch overlay window if enabled (deferred to ensure NSApp is ready)
+        // Setup UI components on main thread
         DispatchQueue.main.async {
+            // 1. Notch Shelf
             let enableNotch = UserDefaults.standard.bool(forKey: "enableNotchShelf")
-            // Default to true if not set
             let isSet = UserDefaults.standard.object(forKey: "enableNotchShelf") != nil
             if enableNotch || !isSet {
                 NotchWindowController.shared.setupNotchWindow()
+            }
+            
+            // 2. Clipboard Global Shortcut (Beta)
+            // This MUST start even if no windows are visible
+            if UserDefaults.standard.bool(forKey: "enableClipboardBeta") {
+                print("⌨️ Droppy: Starting Global Clipboard Monitor")
+                ClipboardWindowController.shared.startMonitoringShortcut()
             }
         }
         
