@@ -140,20 +140,11 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-Clipboard Engine Overhaul (v2.9.0)
-
-Features:
-- New high-performance Clipboard Engine using IOHIDManager.
-- Full Keyboard Navigation: Use Arrows and Enter to navigate/paste.
-- Global Hotkey is now compatible with Secure Input (password fields).
-- Multi-item capture: Copy multiple files or photos simultaneously.
-- Smooth Fade-Out animation for the clipboard window.
-- Enhanced password manager exclusion logic.
+Hotfix Release (v2.9.1)
 
 Fixes:
-- Fixed keyboard navigation being blocked in the clipboard UI.
-- Fixed clipboard window "popping" out of existence without animation.
-- Improved focus management to prevent stealing focus when unnecessary.
+- CRITICAL: Fixed a crash in DragMonitor related to memory management (objc_release).
+- Stability improvements for long-running drag sessions.
 <!-- CHANGELOG_END -->
 
 ---
