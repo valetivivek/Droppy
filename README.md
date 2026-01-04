@@ -140,14 +140,13 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-Release v3.1.3
+Release v3.1.4
 
-Hotfix:
-- **Crash Fix**: Resolved a startup crash related to saving preferences. This ensures the app launches reliably for all users.
+Fixes:
+- **Icon Compatibility**: Ensured the new app icon uses the correct PNG format for compatibility with all macOS versions. (Fixed an issue where the icon might not appear on some systems).
 
-New in v3.1.2:
-- **Brand New Icon**: A fresh "Soft 3D" icon representing the trio of Droppy's tools.
-- **Icon Rendering Fix**: Resolved an issue where the app icon appeared huge on macOS Sequoia.
+New in v3.1.3:
+- **Crash Fix**: Resolved a startup crash related to preferences.
 <!-- CHANGELOG_END -->
 
 ---
