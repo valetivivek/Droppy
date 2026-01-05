@@ -33,8 +33,8 @@ Droppy reimagines productivity on macOS by combining five essential tools into o
 1.  **Notch Shelf**: A sleek holding zone hidden in your webcam notch.
 2.  **Floating Basket**: Summon a drop zone anywhere with a quick mouse jiggle.
 3.  **Clipboard Manager**: A powerful history tool with OCR, favorites, and instant search.
-4.  **🆕 Media Player**: Beautiful Now Playing controls embedded in the notch.
-5.  **🆕 Custom HUDs**: Gorgeous volume and brightness overlays that replace the ugly system HUDs.
+4.  **🆕 Media Player**: Beautiful Now Playing embedded in the notch.
+5.  **🆕 Custom HUDs**: Gorgeous volume and brightness overlays that replace the standard system HUDs.
 
 It's the perfect bridge between your apps, spaces, and workflow.
 
