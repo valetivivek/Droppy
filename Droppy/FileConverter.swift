@@ -133,13 +133,9 @@ class FileConverter {
     /// Converts a file to the specified format
     /// Returns the URL of the converted file (in temp directory), or nil if conversion failed
     static func convert(_ url: URL, to format: ConversionFormat) async -> URL? {
-        // Generate output URL in temp directory
-        let tempDirectory = FileManager.default.temporaryDirectory
+        // Generate output URL in centrally managed temp directory
         let filename = url.deletingPathExtension().lastPathComponent + "." + format.fileExtension
-        let outputURL = tempDirectory.appendingPathComponent(filename)
-        
-        // Ensure unique filename in temp
-        let finalURL = uniqueURL(for: outputURL)
+        let finalURL = TemporaryFileManager.shared.temporaryFileURL(filename: filename)
         
         // Route to appropriate converter
         if format == .pdf {
@@ -374,18 +370,14 @@ class FileConverter {
     static func createZIP(from items: [DroppedItem], archiveName: String? = nil) async -> URL? {
         guard !items.isEmpty else { return nil }
         
-        let tempDirectory = FileManager.default.temporaryDirectory
         let zipName = archiveName ?? "Archive"
         let zipFilename = zipName + ".zip"
-        let zipURL = uniqueURL(for: tempDirectory.appendingPathComponent(zipFilename))
+        // Use central temp manager for the output ZIP
+        let zipURL = TemporaryFileManager.shared.temporaryFileURL(filename: zipFilename)
         
-        // Create a temporary work directory to hold file copies
-        let workDir = tempDirectory.appendingPathComponent(UUID().uuidString)
-        
-        do {
-            try FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
-        } catch {
-            print("FileConverter: Failed to create work directory: \(error)")
+        // Create a central temp directory for holding file copies
+        guard let workDir = TemporaryFileManager.shared.createTemporaryDirectory(name: UUID().uuidString) else {
+            print("FileConverter: Failed to create work directory for ZIP")
             return nil
         }
         

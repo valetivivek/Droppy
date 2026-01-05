@@ -560,9 +560,24 @@ struct ClipboardManagerView: View {
                 return [URL(fileURLWithPath: path) as NSURL]
             }
         case .image:
+            let fileName = sanitizeFileName(item.title)
+            
+            // 1. Try from disk (Efficient)
+            if let imageURL = manager.imageURL(for: item) {
+                // Determine extension from original file or default to png
+                let ext = imageURL.pathExtension.isEmpty ? "png" : imageURL.pathExtension
+                let fileURL = tempDir.appendingPathComponent(fileName + ".\(ext)")
+                do {
+                    try FileManager.default.copyItem(at: imageURL, to: fileURL)
+                    return [fileURL as NSURL]
+                } catch {
+                     // Fallback to loading image
+                }
+            }
+            
+            // 2. Fallback to memory / extraction
             if let data = item.imageData {
                 // Determine format and create appropriate file
-                let fileName = sanitizeFileName(item.title)
                 let fileURL: URL
                 
                 // Check if it's PNG or use PNG as default
@@ -583,6 +598,8 @@ struct ClipboardManagerView: View {
                         return [image]
                     }
                 }
+            } else if let imageURL = manager.imageURL(for: item), let image = NSImage(contentsOf: imageURL) {
+                 return [image]
             }
         case .color:
             break
@@ -607,6 +624,7 @@ struct ClipboardManagerView: View {
         
         var strings: [String] = []
         var urls: [URL] = []
+        var imageObjects: [NSImage] = []
         
         for item in selectedItemsArray {
             switch item.type {
@@ -619,8 +637,11 @@ struct ClipboardManagerView: View {
                     urls.append(URL(fileURLWithPath: path))
                 }
             case .image:
+                // Try from memory first (legacy), then disk
                 if let data = item.imageData, let image = NSImage(data: data) {
-                    pasteboard.writeObjects([image])
+                    imageObjects.append(image)
+                } else if let url = manager.imageURL(for: item), let image = NSImage(contentsOf: url) {
+                     imageObjects.append(image)
                 }
             case .color:
                 break
@@ -632,6 +653,9 @@ struct ClipboardManagerView: View {
         }
         if !urls.isEmpty {
             pasteboard.writeObjects(urls as [NSURL])
+        }
+        if !imageObjects.isEmpty {
+            pasteboard.writeObjects(imageObjects)
         }
     }
     
@@ -928,6 +952,8 @@ struct ClipboardPreviewView: View {
         NSPasteboard.general.clearContents()
         if let str = item.content {
             NSPasteboard.general.setString(str, forType: .string)
+        } else if let imageURL = manager.imageURL(for: item), let image = NSImage(contentsOf: imageURL) {
+            NSPasteboard.general.writeObjects([image])
         } else if let imgData = item.imageData {
             NSPasteboard.general.setData(imgData, forType: .tiff)
         }
@@ -982,7 +1008,12 @@ struct ClipboardPreviewView: View {
         do {
             switch item.type {
             case .image:
-                if let data = item.imageData,
+                // 1. Try direct copy from disk (fastest, preserves format)
+                if let imageURL = manager.imageURL(for: item) {
+                     try FileManager.default.copyItem(at: imageURL, to: destinationURL)
+                } 
+                // 2. Fallback to memory / extraction
+                else if let data = item.imageData,
                    let nsImage = NSImage(data: data),
                    let tiffData = nsImage.tiffRepresentation,
                    let bitmap = NSBitmapImageRep(data: tiffData),
@@ -1467,7 +1498,11 @@ struct ClipboardPreviewView: View {
             
             switch item.type {
             case .image:
-                if let data = item.imageData {
+                if let url = manager.imageURL(for: item) {
+                     cachedImage = await Task.detached(priority: .userInitiated) {
+                         NSImage(contentsOf: url)
+                     }.value
+                } else if let data = item.imageData {
                     cachedImage = await Task.detached(priority: .userInitiated) {
                         NSImage(data: data)
                     }.value

@@ -209,6 +209,9 @@ final class FloatingBasketWindowController: NSObject {
             panel.orderOut(nil)
             self?.basketWindow = nil
             self?.isShowingOrHiding = false
+            
+            // CLEANUP: Empty the temp cache when basket session ends
+            TemporaryFileManager.shared.cleanUp()
         })
     }
 }
@@ -272,8 +275,10 @@ class BasketDragContainer: NSView {
         if let promiseReceivers = pasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self], options: nil) as? [NSFilePromiseReceiver],
            !promiseReceivers.isEmpty {
             
-            let dropLocation = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("DroppyDrops-\(UUID().uuidString)")
-            try? FileManager.default.createDirectory(at: dropLocation, withIntermediateDirectories: true, attributes: nil)
+            // Create a temporary directory using central manager
+            guard let dropLocation = TemporaryFileManager.shared.createTemporaryDirectory(name: "DroppyDrops-\(UUID().uuidString)") else {
+                return false
+            }
             
             for receiver in promiseReceivers {
                 receiver.receivePromisedFiles(atDestination: dropLocation, options: [:], operationQueue: filePromiseQueue) { fileURL, error in
@@ -294,9 +299,10 @@ class BasketDragContainer: NSView {
         
         // Handle plain text drops - create a .txt file
         if let text = pasteboard.string(forType: .string), !text.isEmpty {
-            // Create a temp directory for text files
-            let dropLocation = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("DroppyDrops-\(UUID().uuidString)")
-            try? FileManager.default.createDirectory(at: dropLocation, withIntermediateDirectories: true, attributes: nil)
+            // Create a temp directory for text files using central manager
+            guard let dropLocation = TemporaryFileManager.shared.createTemporaryDirectory(name: "DroppyDrops-\(UUID().uuidString)") else {
+                return false
+            }
             
             // Generate a timestamped filename
             let formatter = DateFormatter()

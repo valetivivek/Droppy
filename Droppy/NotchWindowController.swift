@@ -161,6 +161,14 @@ final class NotchWindowController: NSObject, ObservableObject {
             // dispatch async to run update AFTER the change is applied.
             DispatchQueue.main.async { [weak self] in
                 self?.notchWindow?.updateMouseEventHandling()
+                
+                // TRIGGER CLEANUP if shelf is now closed
+                // We purposefully do this even if just hover state changed, as long as it's closed.
+                // The cleanup function is safe/idempotent (checks if dir exists).
+                if !DroppyState.shared.isExpanded {
+                    TemporaryFileManager.shared.cleanUp()
+                }
+                
                 // Must re-register observation after it fires (one-shot)
                 self?.setupStateObservation()
             }
@@ -477,7 +485,7 @@ class NotchDragContainer: NSView {
         // Strategy: 
         // 1. Default "Sleep" state: VERY strict area. Just the notch + tiny margin. 
         //    Height <= 44 to stay within standard menu bar height.
-        // 2. "Hovering" state: If user triggered hover, expand area to include the "Open Shelf" button so they can click it.
+        // 2. "Hovering" state: If user triggered hover, expand area to include the "Open Shelf" indicator so they can click it.
         
         let isHovering = DroppyState.shared.isMouseHovering
         
@@ -549,9 +557,10 @@ class NotchDragContainer: NSView {
         if let promiseReceivers = pasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self], options: nil) as? [NSFilePromiseReceiver],
            !promiseReceivers.isEmpty {
             
-            // Create a temporary directory for these files
-            let dropLocation = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("DroppyDrops-\(UUID().uuidString)")
-            try? FileManager.default.createDirectory(at: dropLocation, withIntermediateDirectories: true, attributes: nil)
+            // Create a temporary directory for these files using central manager
+            guard let dropLocation = TemporaryFileManager.shared.createTemporaryDirectory(name: "DroppyDrops-\(UUID().uuidString)") else {
+                return false
+            }
             
             for receiver in promiseReceivers {
                 receiver.receivePromisedFiles(atDestination: dropLocation, options: [:], operationQueue: filePromiseQueue) { fileURL, error in
@@ -593,9 +602,10 @@ class NotchDragContainer: NSView {
         
         // 4. Handle plain text drops - create a .txt file
         if let text = pasteboard.string(forType: .string), !text.isEmpty {
-            // Create a temp directory for text files
-            let dropLocation = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("DroppyDrops-\(UUID().uuidString)")
-            try? FileManager.default.createDirectory(at: dropLocation, withIntermediateDirectories: true, attributes: nil)
+            // Create a temp directory for text files using central manager
+            guard let dropLocation = TemporaryFileManager.shared.createTemporaryDirectory(name: "DroppyDrops-\(UUID().uuidString)") else {
+                return false
+            }
             
             // Generate a timestamped filename
             let formatter = DateFormatter()
