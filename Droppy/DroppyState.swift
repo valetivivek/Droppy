@@ -74,6 +74,7 @@ final class DroppyState {
     
     /// Removes an item from the shelf
     func removeItem(_ item: DroppedItem) {
+        item.cleanupIfTemporary()  // Clean up temp file before removing
         items.removeAll { $0.id == item.id }
         selectedItems.remove(item.id)
     }
@@ -86,6 +87,9 @@ final class DroppyState {
     
     /// Clears all items from the shelf
     func clearAll() {
+        for item in items {
+            item.cleanupIfTemporary()  // Clean up each temp file
+        }
         items.removeAll()
         selectedItems.removeAll()
     }
@@ -153,12 +157,16 @@ final class DroppyState {
     
     /// Removes an item from the basket
     func removeBasketItem(_ item: DroppedItem) {
+        item.cleanupIfTemporary()  // Clean up temp file before removing
         basketItems.removeAll { $0.id == item.id }
         selectedBasketItems.remove(item.id)
     }
     
     /// Clears all items from the basket
     func clearBasket() {
+        for item in basketItems {
+            item.cleanupIfTemporary()  // Clean up each temp file
+        }
         basketItems.removeAll()
         selectedBasketItems.removeAll()
     }

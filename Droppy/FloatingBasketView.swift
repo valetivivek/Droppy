@@ -709,8 +709,8 @@ struct BasketItemView: View {
         
         Task {
             if let convertedURL = await FileConverter.convert(item.url, to: format) {
-                // Create new DroppedItem from converted file
-                let newItem = DroppedItem(url: convertedURL)
+                // Create new DroppedItem from converted file (marked as temporary for cleanup)
+                let newItem = DroppedItem(url: convertedURL, isTemporary: true)
                 
                 await MainActor.run {
                     isConverting = false
@@ -771,7 +771,8 @@ struct BasketItemView: View {
                 : "Archive (\(itemsToZip.count) items)"
             
             if let zipURL = await FileConverter.createZIP(from: itemsToZip, archiveName: archiveName) {
-                let newItem = DroppedItem(url: zipURL)
+                // Mark ZIP as temporary for cleanup when removed
+                let newItem = DroppedItem(url: zipURL, isTemporary: true)
                 
                 await MainActor.run {
                     isCreatingZIP = false
@@ -822,7 +823,8 @@ struct BasketItemView: View {
             }
             
             if let compressedURL = await FileCompressor.shared.compress(url: item.url, mode: mode) {
-                let newItem = DroppedItem(url: compressedURL)
+                // Mark compressed file as temporary for cleanup when removed
+                let newItem = DroppedItem(url: compressedURL, isTemporary: true)
                 
                 await MainActor.run {
                     isCompressing = false

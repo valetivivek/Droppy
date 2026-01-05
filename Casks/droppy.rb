@@ -9,6 +9,12 @@ cask "droppy" do
 
   app "Droppy.app"
 
+  postflight do
+    system_command "/usr/bin/xattr",
+      args: ["-rd", "com.apple.quarantine", "#{appdir}/Droppy.app"],
+      sudo: false
+  end
+
   caveats <<~EOS
     ____                             
    / __ \_________  ____  ____  __  __

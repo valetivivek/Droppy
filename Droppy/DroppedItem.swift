@@ -19,19 +19,28 @@ struct DroppedItem: Identifiable, Hashable, Transferable {
     let icon: NSImage
     var thumbnail: NSImage?
     let dateAdded: Date
+    var isTemporary: Bool = false  // Tracks if this file was created as a temp file (conversion, ZIP, etc.)
     
     // Conformance to Transferable using the URL as a proxy
     static var transferRepresentation: some TransferRepresentation {
         ProxyRepresentation(exporting: \.url)
     }
     
-    init(url: URL) {
+    init(url: URL, isTemporary: Bool = false) {
         self.url = url
         self.name = url.lastPathComponent
         self.fileType = UTType(filenameExtension: url.pathExtension)
         self.icon = NSWorkspace.shared.icon(forFile: url.path)
         self.dateAdded = Date()
         self.thumbnail = nil
+        self.isTemporary = isTemporary
+    }
+    
+    /// Cleans up temporary files when item is removed from shelf/basket
+    func cleanupIfTemporary() {
+        if isTemporary {
+            TemporaryFileStorageService.shared.removeTemporaryFileIfNeeded(at: url)
+        }
     }
     
     /// Generates a thumbnail for the file asynchronously

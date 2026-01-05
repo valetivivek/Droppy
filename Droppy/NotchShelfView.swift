@@ -14,6 +14,23 @@ struct NotchShelfView: View {
     @ObservedObject var dragMonitor = DragMonitor.shared
     @AppStorage("useTransparentBackground") private var useTransparentBackground = false
     @AppStorage("hideNotchOnExternalDisplays") private var hideNotchOnExternalDisplays = false
+    @AppStorage("enableHUDReplacement") private var enableHUDReplacement = true
+    @AppStorage("showMediaPlayer") private var showMediaPlayer = true
+    @AppStorage("autoFadeMediaHUD") private var autoFadeMediaHUD = true
+    
+    // HUD State - Use @ObservedObject for singletons (they manage their own lifecycle)
+    @ObservedObject private var volumeManager = VolumeManager.shared
+    @ObservedObject private var brightnessManager = BrightnessManager.shared
+    @ObservedObject private var musicManager = MusicManager.shared
+    @State private var showVolumeHUD = false
+    @State private var showBrightnessHUD = false
+    @State private var hudWorkItem: DispatchWorkItem?
+    @State private var hudType: HUDContentType = .volume
+    @State private var hudValue: CGFloat = 0
+    @State private var hudIsVisible = false
+    @State private var mediaHUDFadedOut = false  // Tracks if media HUD has auto-faded
+    @State private var mediaFadeWorkItem: DispatchWorkItem?
+    @State private var isSongTransitioning = false  // Temporarily hide media during song transitions
     
     
     /// Animation state for the border dash
@@ -38,9 +55,57 @@ struct NotchShelfView: View {
     private let notchWidth: CGFloat = 180
     private let notchHeight: CGFloat = 32
     private let expandedWidth: CGFloat = 450
+    
+    /// HUD dimensions (notch expands to show HUD)
+    private let hudWidth: CGFloat = 350
+    private let hudHeight: CGFloat = 70
+    
+    /// Whether media player HUD should be shown
+    private var shouldShowMediaHUD: Bool {
+        // Don't show during song transitions (collapse-expand effect)
+        if isSongTransitioning { return false }
+        // Don't show if auto-fade is enabled and it has faded out
+        if autoFadeMediaHUD && mediaHUDFadedOut {
+            return false
+        }
+        return showMediaPlayer && musicManager.isPlaying && !hudIsVisible && !state.isExpanded
+    }
+    
+    /// Current notch width based on state
+    private var currentNotchWidth: CGFloat {
+        if state.isExpanded {
+            return expandedWidth
+        } else if hudIsVisible || shouldShowMediaHUD {
+            return hudWidth
+        } else if dragMonitor.isDragging || state.isMouseHovering {
+            return notchWidth + 20
+        } else {
+            return notchWidth
+        }
+    }
+    
+    /// Current notch height based on state
+    private var currentNotchHeight: CGFloat {
+        if state.isExpanded {
+            return currentExpandedHeight
+        } else if hudIsVisible || shouldShowMediaHUD {
+            return hudHeight
+        } else if dragMonitor.isDragging || state.isMouseHovering {
+            return notchHeight + 40
+        } else {
+            return notchHeight
+        }
+    }
+    
     private var currentExpandedHeight: CGFloat {
         let rowCount = (Double(state.items.count) / 5.0).rounded(.up)
-        return max(1, rowCount) * 110 + 54 // 110 per row + 54 header
+        let baseHeight = max(1, rowCount) * 110 + 54 // 110 per row + 54 header
+        
+        // Add extra height when showing media player to prevent overlap with header buttons
+        if state.items.isEmpty && showMediaPlayer && musicManager.isPlaying && !musicManager.isPlayerIdle {
+            return baseHeight + 50 // Extra space for media player content
+        }
+        return baseHeight
     }
     
     /// Helper to check if current screen is built-in (MacBook display)
@@ -67,11 +132,11 @@ struct NotchShelfView: View {
         ZStack(alignment: .top) {
             // MARK: - Main Morphing Background
             // This is the persistent black shape that grows/shrinks
-            NotchShape(bottomRadius: state.isExpanded ? 20 : 16)
+            NotchShape(bottomRadius: state.isExpanded ? 20 : (hudIsVisible ? 18 : 16))
                 .fill(useTransparentBackground ? Color.clear : Color.black)
                 .frame(
-                    width: state.isExpanded ? expandedWidth : ((dragMonitor.isDragging || state.isMouseHovering) ? notchWidth + 20 : notchWidth),
-                    height: state.isExpanded ? currentExpandedHeight : ((dragMonitor.isDragging || state.isMouseHovering) ? notchHeight + 40 : notchHeight)
+                    width: currentNotchWidth,
+                    height: currentNotchHeight
                 )
                 .opacity(shouldShowVisualNotch ? 1.0 : 0.0)
                 .background {
@@ -109,25 +174,67 @@ struct NotchShelfView: View {
                 )
                 .animation(.spring(response: 0.35, dampingFraction: 0.7), value: state.isExpanded)
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragMonitor.isDragging)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: hudIsVisible)
+                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: musicManager.isPlaying)
+                .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isSongTransitioning)  // Match song transition timing
                 // Animate height changes when items are added/removed
                 .animation(.spring(response: 0.35, dampingFraction: 0.7), value: state.items.count)
             
             // MARK: - Content Overlay
             ZStack {
                 // Always have the drop zone / interaction layer at the top
+                // BUT disable hit testing when expanded so slider/buttons can receive gestures
                 dropZone
                     .zIndex(1)
+                    .allowsHitTesting(!state.isExpanded)
+                
+                // MARK: - HUD Content (embedded in notch)
+                if hudIsVisible && enableHUDReplacement && !state.isExpanded {
+                    NotchHUDView(
+                        hudType: $hudType,
+                        value: $hudValue,
+                        onValueChange: { newValue in
+                            if hudType == .volume {
+                                volumeManager.setAbsolute(Float32(newValue))
+                            } else {
+                                brightnessManager.setAbsolute(value: Float(newValue))
+                            }
+                        }
+                    )
+                    .frame(width: hudWidth, height: hudHeight)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    .zIndex(3)
+                }
+                
+                // MARK: - Media Player HUD (when music is playing)
+                // Only show if we have valid song info (not just isPlaying)
+                // Wait for songDuration > 0 to ensure complete metadata is loaded
+                // Hide during song transitions for collapse-expand effect
+                if showMediaPlayer && musicManager.isPlaying && !musicManager.songTitle.isEmpty && musicManager.songDuration > 0 && !hudIsVisible && !state.isExpanded && !(autoFadeMediaHUD && mediaHUDFadedOut) && !isSongTransitioning {
+                    MediaHUDView(musicManager: musicManager)
+                        .frame(width: hudWidth, height: hudHeight)
+                        // Match the exact notch collapse/expand animation
+                        .transition(.scale(scale: 0.8).combined(with: .opacity).animation(.spring(response: 0.25, dampingFraction: 0.8)))
+                        .zIndex(3)
+                }
                 
                 if state.isExpanded {
                     expandedShelfContent
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.92)).animation(.spring(response: 0.35, dampingFraction: 0.7)),
+                            removal: .opacity.combined(with: .scale(scale: 0.95)).animation(.spring(response: 0.3, dampingFraction: 0.8))
+                        ))
                         .frame(width: expandedWidth, height: currentExpandedHeight)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: currentExpandedHeight)
                         .clipShape(NotchShape(bottomRadius: 20))
                         .zIndex(2)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // Animate all state changes smoothly
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showMediaPlayer)
+        .animation(.easeOut(duration: 0.4), value: mediaHUDFadedOut)
         .onChange(of: state.items.count) { oldCount, newCount in
              if newCount > oldCount && !state.isExpanded {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
@@ -154,7 +261,100 @@ struct NotchShelfView: View {
                 }
             }
         }
-
+        // MARK: - HUD Observers
+        .onChange(of: volumeManager.lastChangeAt) { _, _ in
+            guard enableHUDReplacement, !state.isExpanded else { return }
+            triggerVolumeHUD()
+        }
+        .onChange(of: brightnessManager.lastChangeAt) { _, _ in
+            guard enableHUDReplacement, !state.isExpanded else { return }
+            triggerBrightnessHUD()
+        }
+        // MARK: - Media HUD Auto-Fade
+        .onChange(of: musicManager.songTitle) { oldTitle, newTitle in
+            // Trigger collapse-expand animation on song change
+            if !oldTitle.isEmpty && !newTitle.isEmpty && oldTitle != newTitle {
+                // Start transition: collapse (hide media)
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                    isSongTransitioning = true
+                }
+                // End transition after a delay: expand (show new song)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                        isSongTransitioning = false
+                    }
+                }
+            }
+            // Reset fade state when song changes (new song = show HUD again)
+            if !newTitle.isEmpty {
+                mediaHUDFadedOut = false
+                startMediaFadeTimer()
+            }
+        }
+        .onChange(of: musicManager.isPlaying) { wasPlaying, isPlaying in
+            // When playback starts, reset fade state and start timer
+            if isPlaying && !wasPlaying {
+                mediaHUDFadedOut = false
+                startMediaFadeTimer()
+            }
+        }
+        // HUD is now embedded in the notch content (see ZStack above)
+    }
+    
+    // MARK: - HUD Overlay Content (Legacy - now embedded in notch)
+    // Kept for reference but no longer used
+    
+    // MARK: - HUD Helper Functions
+    
+    private func triggerVolumeHUD() {
+        hudWorkItem?.cancel()
+        hudType = .volume
+        hudValue = CGFloat(volumeManager.rawVolume)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            hudIsVisible = true
+        }
+        
+        let workItem = DispatchWorkItem { [self] in
+            withAnimation(.easeOut(duration: 0.3)) {
+                hudIsVisible = false
+            }
+        }
+        hudWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + volumeManager.visibleDuration, execute: workItem)
+    }
+    
+    private func triggerBrightnessHUD() {
+        hudWorkItem?.cancel()
+        hudType = .brightness
+        hudValue = CGFloat(brightnessManager.rawBrightness)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            hudIsVisible = true
+        }
+        
+        let workItem = DispatchWorkItem { [self] in
+            withAnimation(.easeOut(duration: 0.3)) {
+                hudIsVisible = false
+            }
+        }
+        hudWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + brightnessManager.visibleDuration, execute: workItem)
+    }
+    
+    private func startMediaFadeTimer() {
+        // Only start timer if auto-fade is enabled
+        guard autoFadeMediaHUD else { return }
+        
+        // Cancel any existing timer
+        mediaFadeWorkItem?.cancel()
+        
+        // Start 5-second timer to fade out media HUD
+        let workItem = DispatchWorkItem { [self] in
+            withAnimation(.easeOut(duration: 0.4)) {
+                mediaHUDFadedOut = true
+            }
+        }
+        mediaFadeWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0, execute: workItem)
     }
     
     // MARK: - Glow Effect
@@ -300,14 +500,35 @@ struct NotchShelfView: View {
                 state.deselectAll()
             }
             
-            // Grid Items
-            if state.items.isEmpty {
-                emptyShelfContent
-                    .frame(height: currentExpandedHeight - 54)
-            } else {
-                itemsGridView
-                    .frame(height: currentExpandedHeight - 54)
+            // Grid Items or Media Player or Drop Zone
+            ZStack {
+                // Show drop zone when dragging over (takes priority)
+                if state.isDropTargeted && state.items.isEmpty {
+                    emptyShelfContent
+                        .frame(height: currentExpandedHeight - 54)
+                        .transition(.opacity.animation(.spring(response: 0.3, dampingFraction: 0.8)))
+                }
+                // Show media player when music is playing and NOT drop targeted
+                else if state.items.isEmpty && showMediaPlayer && musicManager.isPlaying && !musicManager.isPlayerIdle && !state.isDropTargeted {
+                    MediaPlayerView(musicManager: musicManager)
+                        .frame(height: currentExpandedHeight - 54)
+                        .transition(.opacity.animation(.spring(response: 0.35, dampingFraction: 0.7)))
+                }
+                // Show empty shelf when no items and no music
+                else if state.items.isEmpty {
+                    emptyShelfContent
+                        .frame(height: currentExpandedHeight - 54)
+                        .transition(.opacity.animation(.spring(response: 0.35, dampingFraction: 0.7)))
+                }
+                // Show items grid when items exist
+                else {
+                    itemsGridView
+                        .frame(height: currentExpandedHeight - 54)
+                        .transition(.opacity.animation(.spring(response: 0.35, dampingFraction: 0.7)))
+                }
             }
+            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: state.isDropTargeted)
+            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: musicManager.isPlaying)
         }
     }
     
@@ -897,8 +1118,8 @@ struct NotchItemView: View {
         
         Task {
             if let convertedURL = await FileConverter.convert(item.url, to: format) {
-                // Create new DroppedItem from converted file
-                let newItem = DroppedItem(url: convertedURL)
+                // Create new DroppedItem from converted file (marked as temporary for cleanup)
+                let newItem = DroppedItem(url: convertedURL, isTemporary: true)
                 
                 await MainActor.run {
                     isConverting = false
@@ -938,7 +1159,8 @@ struct NotchItemView: View {
                 : "Archive (\(itemsToZip.count) items)"
             
             if let zipURL = await FileConverter.createZIP(from: itemsToZip, archiveName: archiveName) {
-                let newItem = DroppedItem(url: zipURL)
+                // Mark ZIP as temporary for cleanup when removed
+                let newItem = DroppedItem(url: zipURL, isTemporary: true)
                 
                 await MainActor.run {
                     isCreatingZIP = false
@@ -989,7 +1211,8 @@ struct NotchItemView: View {
             }
             
             if let compressedURL = await FileCompressor.shared.compress(url: item.url, mode: mode) {
-                let newItem = DroppedItem(url: compressedURL)
+                // Mark compressed file as temporary for cleanup when removed
+                let newItem = DroppedItem(url: compressedURL, isTemporary: true)
                 
                 await MainActor.run {
                     isCompressing = false

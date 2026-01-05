@@ -74,6 +74,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 print("⌨️ Droppy: Starting Global Clipboard Monitor")
                 ClipboardWindowController.shared.startMonitoringShortcut()
             }
+            
+            // 3. Media Key Interceptor for HUD replacement
+            // Start if HUD replacement is enabled to suppress system HUD
+            if UserDefaults.standard.bool(forKey: "enableHUDReplacement") {
+                print("🎛️ Droppy: Starting Media Key Interceptor for HUD")
+                MediaKeyInterceptor.shared.start()
+            }
         }
         
         // Check for updates in background (notify only if update available)

@@ -9,6 +9,11 @@ struct SettingsView: View {
     @AppStorage("enableNotchShelf") private var enableNotchShelf = true
     @AppStorage("enableFloatingBasket") private var enableFloatingBasket = true
     @AppStorage("hideNotchOnExternalDisplays") private var hideNotchOnExternalDisplays = false
+    
+    // HUD and Media Player settings
+    @AppStorage("enableHUDReplacement") private var enableHUDReplacement = true
+    @AppStorage("showMediaPlayer") private var showMediaPlayer = true
+    @AppStorage("autoFadeMediaHUD") private var autoFadeMediaHUD = true
 
 
     
@@ -217,26 +222,72 @@ struct SettingsView: View {
     }
     
     private var displaySettings: some View {
-        Section {
-            Toggle(isOn: $useTransparentBackground) {
-                VStack(alignment: .leading) {
-                    Text("Transparent Background")
-                    Text("Make the shelf, notch, clipboard and notifications transparent")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        Group {
+            Section {
+                Toggle(isOn: $useTransparentBackground) {
+                    VStack(alignment: .leading) {
+                        Text("Transparent Background")
+                        Text("Make the shelf, notch, clipboard and notifications transparent")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                
+                Toggle(isOn: $hideNotchOnExternalDisplays) {
+                    VStack(alignment: .leading) {
+                        Text("Hide Notch on External Displays")
+                        Text("Don't show the visual notch on non-built-in displays")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Display")
             }
             
-            Toggle(isOn: $hideNotchOnExternalDisplays) {
-                VStack(alignment: .leading) {
-                    Text("Hide Notch on External Displays")
-                    Text("Don't show the visual notch on non-built-in displays")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            Section {
+                Toggle(isOn: $showMediaPlayer) {
+                    VStack(alignment: .leading) {
+                        Text("Media Player")
+                        Text("Show Now Playing controls in the expanded notch")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                
+                if showMediaPlayer {
+                    Toggle(isOn: $autoFadeMediaHUD) {
+                        VStack(alignment: .leading) {
+                            Text("Auto-Fade Preview")
+                            Text("Fade away small preview after 5 seconds")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                
+                Toggle(isOn: $enableHUDReplacement) {
+                    VStack(alignment: .leading) {
+                        Text("Replace System HUD")
+                        Text("Show volume and brightness changes in the notch")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .onChange(of: enableHUDReplacement) { _, newValue in
+                    if newValue {
+                        // Start interceptor to capture keys and suppress system HUD
+                        MediaKeyInterceptor.shared.start()
+                    } else {
+                        // Stop interceptor, let system handle keys normally
+                        MediaKeyInterceptor.shared.stop()
+                    }
+                }
+            } header: {
+                Text("HUD & Media")
+            } footer: {
+                Text("HUD replacement requires Accessibility permissions to intercept media keys.")
             }
-        } header: {
-            Text("Display")
         }
     }
     
