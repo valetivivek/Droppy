@@ -895,3 +895,36 @@ struct AnimatedGIFView: NSViewRepresentable {
     
     func updateNSView(_ nsView: WKWebView, context: Context) {}
 }
+
+// MARK: - GIF Pre-loader
+/// Pre-loads all feature preview GIFs at app launch so they're instantly ready in Settings
+class GIFPreloader {
+    static let shared = GIFPreloader()
+    
+    /// All preview GIF URLs
+    private let gifURLs = [
+        "https://i.postimg.cc/jqkPwkRp/Schermopname2026-01-05om22-04-43-ezgif-com-video-to-gif-converter.gif",
+        "https://i.postimg.cc/dtHH09fB/Schermopname2026-01-05om22-01-22-ezgif-com-video-to-gif-converter.gif",
+        "https://i.postimg.cc/X7VmqqYM/Schermopname2026-01-05om21-57-55-ezgif-com-video-to-gif-converter.gif",
+        "https://i.postimg.cc/wM52HXm6/Schermopname2026-01-05om21-48-08-ezgif-com-video-to-gif-converter.gif",
+        "https://i.postimg.cc/hG22QtJ8/Schermopname2026-01-05om19-08-22-ezgif-com-video-to-gif-converter.gif"
+    ]
+    
+    private init() {}
+    
+    /// Call this at app launch to pre-fetch all GIFs into URLCache
+    func preloadAll() {
+        for urlString in gifURLs {
+            guard let url = URL(string: urlString) else { continue }
+            
+            let request = URLRequest(url: url, cachePolicy: .returnCacheDataElseLoad)
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                if let data = data, let response = response {
+                    // Store in URLCache for instant access later
+                    let cachedResponse = CachedURLResponse(response: response, data: data)
+                    URLCache.shared.storeCachedResponse(cachedResponse, for: request)
+                }
+            }.resume()
+        }
+    }
+}

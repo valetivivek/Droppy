@@ -58,7 +58,7 @@ struct NotchShelfView: View {
     
     /// HUD dimensions (notch expands to show HUD)
     private let hudWidth: CGFloat = 350
-    private let hudHeight: CGFloat = 70
+    private let hudHeight: CGFloat = 73
     
     /// Whether media player HUD should be shown
     private var shouldShowMediaHUD: Bool {

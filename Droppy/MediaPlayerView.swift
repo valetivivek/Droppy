@@ -187,36 +187,86 @@ struct MediaPlayerView: View {
     private func progressSliderView(at date: Date) -> some View {
         GeometryReader { geo in
             let width = geo.size.width
-            let progressWidth = max(0, min(width, width * progress(at: date)))
+            let currentProgress = progress(at: date)
+            let progressWidth = max(0, min(width, width * currentProgress))
+            let height: CGFloat = isDragging ? 10 : 6
+            let accentColor = Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6)
             
             ZStack(alignment: .leading) {
-                // Background track
+                // Track background - concave glass well (matches LiquidSlider)
                 Capsule()
-                    .fill(Color.white.opacity(0.15))
-                    .frame(height: 6)
-                
-                // Filled track
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.5),
-                                Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.7)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        Capsule()
+                            .fill(Color.white.opacity(0.05))
                     )
-                    .frame(width: progressWidth, height: 6)
+                    // Concave lighting: shadow on top, highlight on bottom
+                    .overlay(
+                        Capsule()
+                            .stroke(
+                                LinearGradient(
+                                    stops: [
+                                        .init(color: .black.opacity(0.3), location: 0),
+                                        .init(color: .clear, location: 0.3),
+                                        .init(color: .white.opacity(0.2), location: 1.0)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 0.5
+                            )
+                    )
+                    .frame(height: height)
                 
-                // Knob
-                Circle()
-                    .fill(.white)
-                    .frame(width: isDragging ? 14 : 10, height: isDragging ? 14 : 10)
-                    .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
-                    .offset(x: progressWidth - (isDragging ? 7 : 5))
-                    .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isDragging)
+                // Filled portion - gradient with glow (matches LiquidSlider)
+                if currentProgress > 0 {
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    accentColor,
+                                    accentColor.opacity(0.6)
+                                ],
+                                startPoint: .trailing,
+                                endPoint: .leading
+                            )
+                        )
+                        .frame(width: max(height, progressWidth), height: height)
+                        // Inner glow
+                        .overlay(
+                            Capsule()
+                                .stroke(
+                                    LinearGradient(
+                                        stops: [
+                                            .init(color: .white.opacity(0.6), location: 0),
+                                            .init(color: .clear, location: 0.5)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 0.5
+                                )
+                        )
+                        // Glow shadow
+                        .shadow(
+                            color: accentColor.opacity(isDragging ? 0.5 : 0.3),
+                            radius: isDragging ? 8 : 4,
+                            x: 2,
+                            y: 0
+                        )
+                }
+                
+                // Knob (only during drag)
+                if isDragging {
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 14, height: 14)
+                        .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+                        .offset(x: progressWidth - 7)
+                }
             }
+            .frame(height: height)
+            .frame(maxHeight: .infinity, alignment: .center)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
@@ -233,6 +283,7 @@ struct MediaPlayerView: View {
                         lastDragTime = Date()
                     }
             )
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isDragging)
         }
         .frame(height: 14)
     }

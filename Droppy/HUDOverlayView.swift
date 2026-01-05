@@ -60,6 +60,8 @@ struct NotchHUDView: View {
         .padding(.horizontal, 24)
         .padding(.top, 4)
         .padding(.bottom, 8)
+        // Ensure all elements scale together during notch expansion
+        .geometryGroup()
     }
 }
 

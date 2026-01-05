@@ -53,6 +53,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = ClipboardManager.shared
         _ = ClipboardWindowController.shared
         
+        // Pre-load GIFs for Settings so they're instantly ready
+        GIFPreloader.shared.preloadAll()
+        
         // Start analytics (anonymous launch tracking)
         AnalyticsService.shared.logAppLaunch()
         
