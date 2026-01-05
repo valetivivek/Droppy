@@ -506,6 +506,23 @@ struct BasketItemView: View {
                     }
                 }
                 
+                // Share submenu with system sharing services
+                Menu {
+                    ForEach(NSSharingService.sharingServices(forItems: [item.url]), id: \.title) { service in
+                        Button {
+                            service.perform(withItems: [item.url])
+                        } label: {
+                            Label {
+                                Text(service.title)
+                            } icon: {
+                                Image(nsImage: service.image)
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                
                 Button {
                     item.saveToDownloads()
                 } label: {
