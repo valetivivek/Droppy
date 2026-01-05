@@ -163,10 +163,11 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# Droppy v4.3.6
+# Droppy v4.3.7
 
 ## Fixes
-- **Fixed System HUD not being suppressed**: Resolved an issue where some users would see both the native macOS volume slider and Droppy's HUD when pressing volume keys. The MediaKeyInterceptor now properly starts by default for all users.
+- **Fixed crash when pressing volume/brightness keys**: Resolved an objc_release crash in the MediaKeyInterceptor by properly managing NSEvent memory with autoreleasepool
+- **Fixed System HUD not being suppressed**: The MediaKeyInterceptor now properly starts by default for all users
 <!-- CHANGELOG_END -->
 
 ---
