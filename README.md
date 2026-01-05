@@ -163,35 +163,16 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-## Droppy 4.0 — The HUD Update 🎛️
-
-This is a HUGE update! Droppy now replaces the ugly macOS system HUDs with beautiful, animated overlays embedded right in your notch.
+## Droppy 4.1 — GIF Preview Update
 
 ### ✨ New Features
+- Added animated GIF previews in Settings for all features
+- Beautiful squarcle corners with Liquid Glass styling on all previews
+- Updated README with animated visual tour
 
-**🎵 Media Player HUD**
-- Full media controls directly in the notch
-- Album art with smooth crossfade transitions between songs
-- Interactive seek slider with tactile feedback
-- Play/pause, skip forward/back controls
-- Tap album art to open the source app
-
-**🔊 Volume HUD**
-- Beautiful volume indicator replaces the system HUD
-- Animated icon that morphs between mute/low/high states
-- Smooth liquid glass styling
-
-**🔆 Brightness HUD**
-- Elegant brightness control overlay
-- Dynamic sun icon animation
-
-### 🎨 Design
-- All HUDs use the signature Liquid Glass aesthetic
-- Buttery smooth spring animations throughout
-- Icon-centric design that feels native to macOS
-
-### 🔧 Improvements
-- Fixed Homebrew quarantine issue — no more security dialogs on updates
+### 🎨 Improvements
+- Settings now show live previews when features are enabled
+- Visual tour in README now uses animated GIFs
 <!-- CHANGELOG_END -->
 
 ---
