@@ -151,10 +151,41 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-Fixes:
-- Fixed notch position not updating when docking/undocking MacBook (screen resolution changes)
-- Fixed objc_release crash in clipboard monitoring loop
-- Fixed RenderBox crash during drag operations by retaining preview images
+## Droppy 4.0 — The HUD Update 🎛️
+
+This is a HUGE update! Droppy now replaces the ugly macOS system HUDs with beautiful, animated overlays embedded right in your notch.
+
+### ✨ New Features
+
+**🎵 Media Player HUD**
+- Full media controls directly in the notch
+- Album art with smooth crossfade transitions between songs
+- Interactive seek slider with tactile feedback
+- Play/pause, skip forward/back controls
+- Tap album art to open the source app (Safari, Spotify, etc.)
+- Silky smooth collapse-expand animations
+
+**🔊 Volume HUD**
+- Beautiful volume indicator replaces the system HUD
+- Animated icon that morphs between mute/low/high states
+- Smooth liquid glass styling
+- Percentage display with live updates
+
+**🔆 Brightness HUD**
+- Elegant brightness control overlay
+- Dynamic sun icon animation
+- Matches the volume HUD design language
+
+### 🎨 Design
+- All HUDs use the signature Liquid Glass aesthetic
+- Crazy smooth spring animations throughout
+- Perfectly synchronized transitions
+- Icon-centric design that feels native to macOS
+
+### 🔧 Improvements
+- Fixed Homebrew quarantine issue — no more security dialogs on updates
+- Optimized animation performance
+- Better memory management for media metadata
 <!-- CHANGELOG_END -->
 
 ---
