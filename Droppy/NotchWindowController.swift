@@ -102,7 +102,12 @@ final class NotchWindowController: NSObject, ObservableObject {
         stopMonitors()
         notchWindow?.isValid = false  // Mark as invalid before closing
         notchWindow?.close()
-        notchWindow = nil
+        
+        // CRITICAL: Delay setting to nil to allow the window process to 
+        // finish its display cycle and internal cleanup.
+        DispatchQueue.main.async { [weak self] in
+            self?.notchWindow = nil
+        }
     }
     
     /// Starts monitoring mouse events to handle expands/collapses
