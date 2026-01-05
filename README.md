@@ -163,16 +163,15 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-## Droppy 4.3.2 — Share Feature
+## Droppy 4.3.3 — Menu Bar & Settings Fixes
 
-### ✨ New Features
-- **Share Files**: Right-click any file to Share → Mail, Messages, AirDrop, and more
-  - Works with single or multiple files
-  - Uses native macOS sharing services
-
-### 🐛 Fixes
-- Delayed GIF preloading to avoid startup race conditions
-- Improved system stability
+### 🔧 Fixes
+- **Menu bar icon**: Restored to original 44×44 Retina sizing (22×22 @1x, 44×44 @2x)
+  - Should now appear correctly on all displays (M1, M4, external monitors)
+- **Settings GIF previews**: Fixed broken layout
+  - Added proper aspect ratio constraints
+  - Restored subtle visual anchoring
+  - Improved centering and sizing
 <!-- CHANGELOG_END -->
 
 ---
