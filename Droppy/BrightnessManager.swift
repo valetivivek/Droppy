@@ -28,6 +28,9 @@ final class BrightnessManager: ObservableObject {
     private var displayServicesBundle: CFBundle?
     private var isFrameworkLoaded = false
     
+    // Cached display ID to avoid thread-unsafe NSScreen access from background threads
+    private var mainDisplayID: CGDirectDisplayID?
+    
     // Function pointers loaded at runtime (DisplayServices API for Apple Silicon)
     private var DisplayServicesGetBrightnessPtr: (@convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32)?
     private var DisplayServicesSetBrightnessPtr: (@convention(c) (CGDirectDisplayID, Float) -> Int32)?
@@ -44,6 +47,11 @@ final class BrightnessManager: ObservableObject {
     // MARK: - Initialization
     private init() {
         loadFrameworks()
+        // Cache the main display ID on main thread to avoid thread-safety issues
+        if let screen = NSScreen.main,
+           let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID {
+            mainDisplayID = displayID
+        }
         if let brightness = getCurrentBrightness() {
             rawBrightness = brightness
             lastPolledBrightness = brightness
@@ -172,11 +180,7 @@ final class BrightnessManager: ObservableObject {
     // MARK: - Private Brightness Helpers
     
     private func getCurrentBrightness() -> Float? {
-        guard let screen = NSScreen.main else { return nil }
-        
-        guard let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
-            return nil
-        }
+        guard let displayID = mainDisplayID else { return nil }
         
         var currentBrightness: Float = 0.5
         
@@ -200,11 +204,7 @@ final class BrightnessManager: ObservableObject {
     }
     
     private func setBrightness(_ value: Float) -> Bool {
-        guard let screen = NSScreen.main else { return false }
-        
-        guard let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
-            return false
-        }
+        guard let displayID = mainDisplayID else { return false }
         
         // Try DisplayServices first (Apple Silicon)
         if let setBrightnessFunc = DisplayServicesSetBrightnessPtr {
