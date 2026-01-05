@@ -135,37 +135,6 @@ final class NotchWindowController: NSObject, ObservableObject {
             self?.handleMouseEvent(event)
             return event
         }
-        
-        // 3. Monitor screen parameter changes (resolution, docking)
-        NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                print("📺 Screen parameters changed - Updating Notch Window Frame")
-                self?.updateWindowFrame()
-            }
-            .store(in: &cancellables)
-    }
-    
-    /// Updates the window frame to center it on the current screen
-    private func updateWindowFrame() {
-        guard let window = notchWindow, let screen = NSScreen.main else { return }
-        
-        // Use same dimensions as setup
-        let windowWidth: CGFloat = 500
-        let windowHeight: CGFloat = 200
-        
-        // Recalculate position based on new screen dimensions
-        let xPosition = (screen.frame.width - windowWidth) / 2
-        let yPosition = screen.frame.height - windowHeight
-        
-        let newFrame = NSRect(
-            x: xPosition,
-            y: yPosition,
-            width: windowWidth,
-            height: windowHeight
-        )
-        
-        window.setFrame(newFrame, display: true)
     }
     
     private func fullscreenMonitorLoop() {
@@ -192,14 +161,6 @@ final class NotchWindowController: NSObject, ObservableObject {
             // dispatch async to run update AFTER the change is applied.
             DispatchQueue.main.async { [weak self] in
                 self?.notchWindow?.updateMouseEventHandling()
-                
-                // TRIGGER CLEANUP if shelf is now closed
-                // We purposefully do this even if just hover state changed, as long as it's closed.
-                // The cleanup function is safe/idempotent (checks if dir exists).
-                if !DroppyState.shared.isExpanded {
-                    TemporaryFileManager.shared.cleanUp()
-                }
-                
                 // Must re-register observation after it fires (one-shot)
                 self?.setupStateObservation()
             }
@@ -516,7 +477,7 @@ class NotchDragContainer: NSView {
         // Strategy: 
         // 1. Default "Sleep" state: VERY strict area. Just the notch + tiny margin. 
         //    Height <= 44 to stay within standard menu bar height.
-        // 2. "Hovering" state: If user triggered hover, expand area to include the "Open Shelf" indicator so they can click it.
+        // 2. "Hovering" state: If user triggered hover, expand area to include the "Open Shelf" button so they can click it.
         
         let isHovering = DroppyState.shared.isMouseHovering
         
@@ -588,10 +549,9 @@ class NotchDragContainer: NSView {
         if let promiseReceivers = pasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self], options: nil) as? [NSFilePromiseReceiver],
            !promiseReceivers.isEmpty {
             
-            // Create a temporary directory for these files using central manager
-            guard let dropLocation = TemporaryFileManager.shared.createTemporaryDirectory(name: "DroppyDrops-\(UUID().uuidString)") else {
-                return false
-            }
+            // Create a temporary directory for these files
+            let dropLocation = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("DroppyDrops-\(UUID().uuidString)")
+            try? FileManager.default.createDirectory(at: dropLocation, withIntermediateDirectories: true, attributes: nil)
             
             for receiver in promiseReceivers {
                 receiver.receivePromisedFiles(atDestination: dropLocation, options: [:], operationQueue: filePromiseQueue) { fileURL, error in
@@ -633,10 +593,9 @@ class NotchDragContainer: NSView {
         
         // 4. Handle plain text drops - create a .txt file
         if let text = pasteboard.string(forType: .string), !text.isEmpty {
-            // Create a temp directory for text files using central manager
-            guard let dropLocation = TemporaryFileManager.shared.createTemporaryDirectory(name: "DroppyDrops-\(UUID().uuidString)") else {
-                return false
-            }
+            // Create a temp directory for text files
+            let dropLocation = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("DroppyDrops-\(UUID().uuidString)")
+            try? FileManager.default.createDirectory(at: dropLocation, withIntermediateDirectories: true, attributes: nil)
             
             // Generate a timestamped filename
             let formatter = DateFormatter()

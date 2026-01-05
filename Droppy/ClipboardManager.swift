@@ -15,7 +15,6 @@ struct ClipboardItem: Identifiable, Codable, Hashable {
     var type: ClipboardType
     var content: String? // Text, URL string, or File path
     var imageData: Data? // For images
-    var imagePath: String? // MEMORY OPTIMIZATION: Path to image on disk relative to app storage
     var date: Date = Date()
     var sourceApp: String?
     var isFavorite: Bool = false
@@ -26,17 +25,16 @@ struct ClipboardItem: Identifiable, Codable, Hashable {
     
     // Custom Codable for backwards compatibility
     enum CodingKeys: String, CodingKey {
-        case id, type, content, imageData, imagePath, rtfData, date, sourceApp, isFavorite, isConcealed, customTitle
+        case id, type, content, imageData, rtfData, date, sourceApp, isFavorite, isConcealed, customTitle
     }
     
-    init(id: UUID = UUID(), type: ClipboardType, content: String? = nil, imageData: Data? = nil, imagePath: String? = nil, rtfData: Data? = nil,
+    init(id: UUID = UUID(), type: ClipboardType, content: String? = nil, imageData: Data? = nil, rtfData: Data? = nil,
          date: Date = Date(), sourceApp: String? = nil, isFavorite: Bool = false, 
          isConcealed: Bool = false, customTitle: String? = nil) {
         self.id = id
         self.type = type
         self.content = content
         self.imageData = imageData
-        self.imagePath = imagePath
         self.rtfData = rtfData
         self.date = date
         self.sourceApp = sourceApp
@@ -51,7 +49,6 @@ struct ClipboardItem: Identifiable, Codable, Hashable {
         type = try container.decode(ClipboardType.self, forKey: .type)
         content = try container.decodeIfPresent(String.self, forKey: .content)
         imageData = try container.decodeIfPresent(Data.self, forKey: .imageData)
-        imagePath = try container.decodeIfPresent(String.self, forKey: .imagePath)
         rtfData = try container.decodeIfPresent(Data.self, forKey: .rtfData)
         date = try container.decode(Date.self, forKey: .date)
         sourceApp = try container.decodeIfPresent(String.self, forKey: .sourceApp)
@@ -152,42 +149,12 @@ class ClipboardManager: ObservableObject {
     private var lastChangeCount: Int
     private var isMonitoring = false
     
-    private lazy var appSupportURL: URL = {
+    private lazy var persistenceURL: URL = {
         let paths = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
         let appSupport = paths[0].appendingPathComponent("Droppy", isDirectory: true)
         try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
-        return appSupport
+        return appSupport.appendingPathComponent("clipboard_history.json")
     }()
-    
-    private lazy var persistenceURL: URL = {
-        return appSupportURL.appendingPathComponent("clipboard_history.json")
-    }()
-    
-    private lazy var imagesDirectoryURL: URL = {
-        let url = appSupportURL.appendingPathComponent("images", isDirectory: true)
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
-    }()
-    
-    // Helper to get full URL for image
-    func imageURL(for item: ClipboardItem) -> URL? {
-        guard let filename = item.imagePath else { return nil }
-        return imagesDirectoryURL.appendingPathComponent(filename)
-    }
-    
-    // Helper to save image data to disk and return filename
-    func saveImageToDisk(data: Data, for id: UUID) -> String? {
-        // Use UUID as filename
-        let filename = "\(id.uuidString).data"
-        let url = imagesDirectoryURL.appendingPathComponent(filename)
-        do {
-            try data.write(to: url)
-            return filename
-        } catch {
-            print("Failed to write image to disk: \(error)")
-            return nil
-        }
-    }
     
     init() {
         self.lastChangeCount = NSPasteboard.general.changeCount
@@ -234,31 +201,10 @@ class ClipboardManager: ObservableObject {
         guard FileManager.default.fileExists(atPath: persistenceURL.path) else { return }
         do {
             let data = try Data(contentsOf: persistenceURL)
-            let loadedHistory = try JSONDecoder().decode([ClipboardItem].self, from: data)
-            
-            // MIGRATION: Check for items with in-memory image data and move to disk
-            var migratedHistory = [ClipboardItem]()
-            var needsSave = false
-            
-            for var item in loadedHistory {
-                // If item has binary data but no path, migrate it
-                if let data = item.imageData, item.type == .image {
-                    if let path = saveImageToDisk(data: data, for: item.id) {
-                        item.imagePath = path
-                        item.imageData = nil // Clear memory!
-                        needsSave = true
-                    }
-                }
-                migratedHistory.append(item)
-            }
-            
+            let decoded = try JSONDecoder().decode([ClipboardItem].self, from: data)
             isLoading = true
-            self.history = migratedHistory
+            self.history = decoded
             isLoading = false
-            
-            if needsSave {
-                saveToDisk()
-            }
         } catch {
             print("Failed to load clipboard history: \(error)")
         }
@@ -396,43 +342,16 @@ class ClipboardManager: ObservableObject {
                 continue
             }
             
-            // 2. Check for Image (Prioritize processed data)
-            // MEMORY OPTIMIZATION: Avoid storing raw TIFFs. Prefer PNG/JPEG or compressed data.
-            
-            // Try explicit PNG first (often smaller than TIFF)
-            if let pngData = item.data(forType: .png) {
-                // If it's a huge PNG, we might still want to resize it, but usually PNG is okay.
-                // Let's check size roughly
-                if pngData.count > 5 * 1024 * 1024 { // > 5MB
-                    if let compressed = compressImage(data: pngData) {
-                        // SAVE TO DISK
-                        let id = UUID()
-                        if let path = saveImageToDisk(data: compressed, for: id) {
-                            results.append(ClipboardItem(id: id, type: .image, imagePath: path, sourceApp: app, isConcealed: isConcealed))
-                        }
-                        continue
-                    }
-                }
-                // SAVE TO DISK
-                let id = UUID()
-                if let path = saveImageToDisk(data: pngData, for: id) {
-                    results.append(ClipboardItem(id: id, type: .image, imagePath: path, sourceApp: app, isConcealed: isConcealed))
-                }
-                continue
-            }
-            
-            // Fallback to TIFF/other types, but CONVERT immediately
-            if let tiffData = item.data(forType: .tiff) {
-                 if let image = NSImage(data: tiffData) {
-                     // Compress standardizes to a reasonable JPEG/PNG representation
-                     if let compressedData = compressImage(image: image) {
-                         // SAVE TO DISK
-                         let id = UUID()
-                         if let path = saveImageToDisk(data: compressedData, for: id) {
-                             results.append(ClipboardItem(id: id, type: .image, imagePath: path, sourceApp: app, isConcealed: isConcealed))
-                         }
-                         continue
-                     }
+            // 2. Check for Image (TIFF/PNG/JPEG)
+            // We check for image types directly on the item
+            if let tiffData = item.data(forType: .tiff) ?? item.data(forType: .png) {
+                 // Convert to TIFF for internal standardization if needed, or store as is
+                 // Here we store whatever data we got but marked as image.
+                 // Ideally we want TIFF for NSImage compatibility usually.
+                 // Let's rely on NSImage to parse it from the specific item data if possible
+                 if let image = NSImage(data: tiffData), let tiff = image.tiffRepresentation {
+                    results.append(ClipboardItem(type: .image, imageData: tiff, sourceApp: app, isConcealed: isConcealed))
+                    continue
                  }
             }
             
@@ -609,59 +528,6 @@ class ClipboardManager: ObservableObject {
     
     func isAppExcluded(_ bundleID: String) -> Bool {
         excludedApps.contains(bundleID)
-    }
-    
-    // MARK: - Memory Optimization helpers
-    
-    private func compressImage(data: Data) -> Data? {
-        guard let image = NSImage(data: data) else { return nil }
-        return compressImage(image: image)
-    }
-    
-    private func compressImage(image: NSImage) -> Data? {
-        // Defines max dimensions and quality for clipboard history items
-        let maxDimension: CGFloat = 2048
-        let compressionQuality: Float = 0.8
-        
-        var targetImage = image
-        let size = image.size
-        
-        // Resize if too large
-        if size.width > maxDimension || size.height > maxDimension {
-            let scale = min(maxDimension / size.width, maxDimension / size.height)
-            let newSize = CGSize(width: size.width * scale, height: size.height * scale)
-            
-            if let resized = image.resized(to: newSize) {
-                targetImage = resized
-            }
-        }
-        
-        // Convert to optimized JPEG-like data (or PNG if has alpha)
-        guard let tiff = targetImage.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff) else { return nil }
-        
-        let hasAlpha = bitmap.hasAlpha
-        
-        if hasAlpha {
-            // PNG for transparency
-            return bitmap.representation(using: .png, properties: [:])
-        } else {
-            // JPEG for photos (much smaller)
-            return bitmap.representation(using: .jpeg, properties: [.compressionFactor: compressionQuality])
-        }
-    }
-}
-
-extension NSImage {
-    func resized(to newSize: CGSize) -> NSImage? {
-        let newImage = NSImage(size: newSize)
-        newImage.lockFocus()
-        self.draw(in: NSRect(origin: .zero, size: newSize),
-                  from: NSRect(origin: .zero, size: self.size),
-                  operation: .copy,
-                  fraction: 1.0)
-        newImage.unlockFocus()
-        return newImage
     }
 }
 

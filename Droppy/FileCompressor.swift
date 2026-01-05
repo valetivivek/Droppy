@@ -151,8 +151,9 @@ class FileCompressor {
         }
         
         let fileName = url.deletingPathExtension().lastPathComponent
-        // Use central temp manager
-        let outputURL = TemporaryFileManager.shared.temporaryFileURL(filename: "\(fileName)_compressed.jpg")
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(fileName)_compressed")
+            .appendingPathExtension("jpg")
         
         switch mode {
         case .preset(let quality):
@@ -227,8 +228,9 @@ class FileCompressor {
         }
         
         let fileName = url.deletingPathExtension().lastPathComponent
-        // Use central temp manager
-        let tempURL = TemporaryFileManager.shared.temporaryFileURL(filename: "\(fileName)_temp_qfilter.pdf")
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(fileName)_temp_qfilter")
+            .appendingPathExtension("pdf")
         
         // 2. Apply Quartz Filter (Reduce File Size)
         // This preserves vector content (text) unlike rendering to images
@@ -293,8 +295,9 @@ class FileCompressor {
             }
         }
         
-        // Final output managed by temp manager
-        let outputURL = TemporaryFileManager.shared.temporaryFileURL(filename: "\(fileName)_compressed.pdf")
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(fileName)_compressed")
+            .appendingPathExtension("pdf")
             
         if compressedDoc.write(to: outputURL) {
             // Cleanup temp
@@ -311,10 +314,11 @@ class FileCompressor {
         let asset = AVAsset(url: url)
         
         let fileName = url.deletingPathExtension().lastPathComponent
-        // Use central temp manager
-        let outputURL = TemporaryFileManager.shared.temporaryFileURL(filename: "\(fileName)_compressed.mp4")
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(fileName)_compressed")
+            .appendingPathExtension("mp4")
         
-        // Remove existing file if present (uniqueURL usually handles collision but good to be safe)
+        // Remove existing file if present
         try? FileManager.default.removeItem(at: outputURL)
         
         // Always use Preset since targetSize is disallowed for Video now

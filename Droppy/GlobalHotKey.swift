@@ -198,15 +198,9 @@ class GlobalHotKey {
         if let handler = eventHandler { RemoveEventHandler(handler); eventHandler = nil }
         
         if let manager = hidManager {
-            // CRITICAL: Unschedule from run loop to prevent callbacks after deinit
-            // This fixes the IOHIDQueueCopyNextValue -> objc_release crash
-            IOHIDManagerUnscheduleFromRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
-            IOHIDManagerRegisterInputValueCallback(manager, nil, nil)
-            
             IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
             hidManager = nil
         }
-        isInputMonitoringActive = false 
     }
 }
 

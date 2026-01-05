@@ -16,12 +16,7 @@ struct DroppedItem: Identifiable, Hashable, Transferable {
     let url: URL
     let name: String
     let fileType: UTType?
-    
-    // MEMORY OPTIMIZATION: Icon is now computed on demand
-    var icon: NSImage {
-        NSWorkspace.shared.icon(forFile: url.path)
-    }
-    
+    let icon: NSImage
     var thumbnail: NSImage?
     let dateAdded: Date
     
@@ -34,7 +29,7 @@ struct DroppedItem: Identifiable, Hashable, Transferable {
         self.url = url
         self.name = url.lastPathComponent
         self.fileType = UTType(filenameExtension: url.pathExtension)
-        // Icon is no longer stored
+        self.icon = NSWorkspace.shared.icon(forFile: url.path)
         self.dateAdded = Date()
         self.thumbnail = nil
     }
