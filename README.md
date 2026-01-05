@@ -163,16 +163,16 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-## Droppy 4.3.1 — Stability Hotfix
+## Droppy 4.3.2 — Share Feature
 
-### 🐛 Critical Fixes
-- **Fixed crash on scroll**: Replaced WebKit-based GIF previews with native NSImageView (no more objc_release crash)
-- **Menu bar icon sizing**: Adjusted to 20pt for better compatibility across M1 and M4 devices
-- **HUD animations**: Volume/brightness now shrink with the notch like the media player
+### ✨ New Features
+- **Share Files**: Right-click any file to Share → Mail, Messages, AirDrop, and more
+  - Works with single or multiple files
+  - Uses native macOS sharing services
 
-### 🎨 Visual Improvements
-- Removed white borders from Settings GIF previews for cleaner look
-- Reduced GIF preview height for less vertical space
+### 🐛 Fixes
+- Delayed GIF preloading to avoid startup race conditions
+- Improved system stability
 <!-- CHANGELOG_END -->
 
 ---
