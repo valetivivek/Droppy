@@ -248,9 +248,11 @@ class ClipboardManager: ObservableObject {
         guard currentCount != lastChangeCount else { return }
         lastChangeCount = currentCount
 
-        let frontmost = NSWorkspace.shared.frontmostApplication
-        let frontmostBundleID = frontmost?.bundleIdentifier
-        let frontmostAppName = frontmost?.localizedName
+        // CRITICAL: Immediately copy String values from frontmostApplication 
+        // to prevent objc_release crash. The NSRunningApplication can be deallocated
+        // at any point, so we must not hold a reference to it across autoreleasepool boundaries.
+        let frontmostBundleID: String? = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        let frontmostAppName: String? = NSWorkspace.shared.frontmostApplication?.localizedName
 
         // Exclusion check using the snapshot value
         if let bundleID = frontmostBundleID, excludedApps.contains(bundleID) {
