@@ -705,6 +705,7 @@ struct NotchItemView: View {
                     .transition(.scale.combined(with: .opacity))
                 }
             }
+        }
         .frame(width: 76, height: 96)
         .background {
             GeometryReader { geo in
@@ -864,7 +865,6 @@ struct NotchItemView: View {
         .task {
             thumbnail = await item.generateThumbnail(size: CGSize(width: 120, height: 120))
         }
-    }
     }
     
     // MARK: - OCR
