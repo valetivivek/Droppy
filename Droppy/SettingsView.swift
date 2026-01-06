@@ -475,7 +475,7 @@ struct SettingsView: View {
             }
             
             if enableClipboard {
-                FeaturePreviewGIF(url: "https://i.postimg.cc/X7VmqqYM/Schermopname2026-01-05om21-57-55-ezgif-com-video-to-gif-converter.gif")
+                FeaturePreviewGIF(url: "https://i.postimg.cc/Kvc9c2Kr/Schermopname2026-01-06om18-05-02-ezgif-com-video-to-gif-converter.gif")
                 
                 HStack {
                     Text("Global Shortcut")
