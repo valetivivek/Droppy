@@ -252,9 +252,16 @@ class ClipboardManager: ObservableObject {
     }
     
     func enforceHistoryLimit() {
-        if history.count > historyLimit {
-            history = Array(history.prefix(historyLimit))
-        }
+        // Separate favorites from non-favorites
+        let favorites = history.filter { $0.isFavorite }
+        let nonFavorites = history.filter { !$0.isFavorite }
+        
+        // Calculate how many non-favorites we can keep
+        let nonFavoriteLimit = max(0, historyLimit - favorites.count)
+        let limitedNonFavorites = Array(nonFavorites.prefix(nonFavoriteLimit))
+        
+        // Rebuild history: favorites first (sorted by date), then non-favorites
+        history = favorites.sorted { $0.date > $1.date } + limitedNonFavorites
     }
 
     private func checkForChanges() {

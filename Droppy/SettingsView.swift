@@ -15,7 +15,7 @@ struct SettingsView: View {
     @AppStorage("showMediaPlayer") private var showMediaPlayer = true
     @AppStorage("autoFadeMediaHUD") private var autoFadeMediaHUD = true
     @AppStorage("autoShrinkShelf") private var autoShrinkShelf = true
-    @AppStorage("autoShrinkDelay") private var autoShrinkDelay = 5  // Seconds
+    @AppStorage("autoShrinkDelay") private var autoShrinkDelay = 3  // Seconds (1-10)
 
 
     
@@ -173,82 +173,91 @@ struct SettingsView: View {
     // MARK: - Sections
     
     private var generalSettings: some View {
-        Section {
-            Toggle(isOn: $showInMenuBar) {
-                VStack(alignment: .leading) {
-                    Text("Menu Bar Icon")
-                    Text("Show Droppy in the menu bar")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        Group {
+            // MARK: System Section
+            Section {
+                Toggle(isOn: $showInMenuBar) {
+                    VStack(alignment: .leading) {
+                        Text("Menu Bar Icon")
+                        Text("Show Droppy in the menu bar")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                
+                Toggle(isOn: Binding(
+                    get: { startAtLogin },
+                    set: { newValue in
+                        startAtLogin = newValue
+                        LaunchAtLoginManager.setLaunchAtLogin(enabled: newValue)
+                    }
+                )) {
+                    VStack(alignment: .leading) {
+                        Text("Launch at Login")
+                        Text("Start Droppy automatically when you log in")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("System")
             }
             
-            Toggle(isOn: Binding(
-                get: { startAtLogin },
-                set: { newValue in
-                    startAtLogin = newValue
-                    LaunchAtLoginManager.setLaunchAtLogin(enabled: newValue)
+            // MARK: Drop Zones Section
+            Section {
+                Toggle(isOn: $enableNotchShelf) {
+                    VStack(alignment: .leading) {
+                        Text("Notch Shelf")
+                        Text("Drop zone at the top of the screen near the notch")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-            )) {
-                VStack(alignment: .leading) {
-                    Text("Startup")
-                    Text("Start automatically at login")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                .onChange(of: enableNotchShelf) { oldValue, newValue in
+                    if newValue {
+                        NotchWindowController.shared.setupNotchWindow()
+                    } else {
+                        NotchWindowController.shared.closeWindow()
+                    }
                 }
-            }
+                
+                if enableNotchShelf {
+                    FeaturePreviewGIF(url: "https://i.postimg.cc/jqkPwkRp/Schermopname2026-01-05om22-04-43-ezgif-com-video-to-gif-converter.gif")
+                }
 
-            Toggle(isOn: $enableNotchShelf) {
-                VStack(alignment: .leading) {
-                    Text("Notch Shelf")
-                    Text("Show the tray at the top of the screen")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                Toggle(isOn: $enableFloatingBasket) {
+                    VStack(alignment: .leading) {
+                        Text("Floating Basket")
+                        Text("Appears when you jiggle files near the notch")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-            }
-            .onChange(of: enableNotchShelf) { oldValue, newValue in
-                if newValue {
-                    NotchWindowController.shared.setupNotchWindow()
-                } else {
-                    NotchWindowController.shared.closeWindow()
+                .onChange(of: enableFloatingBasket) { oldValue, newValue in
+                    if !newValue {
+                        FloatingBasketWindowController.shared.hideBasket()
+                    }
                 }
-            }
-            
-            if enableNotchShelf {
-                FeaturePreviewGIF(url: "https://i.postimg.cc/jqkPwkRp/Schermopname2026-01-05om22-04-43-ezgif-com-video-to-gif-converter.gif")
-            }
-
-            Toggle(isOn: $enableFloatingBasket) {
-                VStack(alignment: .leading) {
-                    Text("Floating Basket")
-                    Text("Show the basket when jiggling files")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                
+                if enableFloatingBasket {
+                    FeaturePreviewGIF(url: "https://i.postimg.cc/dtHH09fB/Schermopname2026-01-05om22-01-22-ezgif-com-video-to-gif-converter.gif")
                 }
+            } header: {
+                Text("Drop Zones")
+            } footer: {
+                Text("Enable one or both drop zones to hold files temporarily.")
             }
-            .onChange(of: enableFloatingBasket) { oldValue, newValue in
-                if !newValue {
-                    FloatingBasketWindowController.shared.hideBasket()
-                }
-            }
-            
-            if enableFloatingBasket {
-                FeaturePreviewGIF(url: "https://i.postimg.cc/dtHH09fB/Schermopname2026-01-05om22-01-22-ezgif-com-video-to-gif-converter.gif")
-            }
-        } header: {
-            Text("General")
-        } footer: {
-            Text("Basic settings for the application.")
         }
     }
     
     private var displaySettings: some View {
         Group {
+            // MARK: Appearance
             Section {
                 Toggle(isOn: $useTransparentBackground) {
                     VStack(alignment: .leading) {
                         Text("Transparent Background")
-                        Text("Make the shelf, notch, clipboard and notifications transparent")
+                        Text("Use glass effect instead of solid black")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -256,57 +265,52 @@ struct SettingsView: View {
                 
                 Toggle(isOn: $hideNotchOnExternalDisplays) {
                     VStack(alignment: .leading) {
-                        Text("Hide Notch on External Displays")
-                        Text("Don't show the visual notch on non-built-in displays")
+                        Text("Hide on External Displays")
+                        Text("Don't show the notch on non-built-in displays")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
             } header: {
-                Text("Display")
+                Text("Appearance")
             }
             
+            // MARK: Shelf Behavior
             Section {
                 Toggle(isOn: $autoShrinkShelf) {
                     VStack(alignment: .leading) {
-                        Text("Auto-Shrink Shelf")
-                        Text("Automatically collapse the shelf after inactivity")
+                        Text("Auto-Collapse")
+                        Text("Shrink shelf when mouse leaves")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
                 
                 if autoShrinkShelf {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Delay")
-                            Text("Seconds until the shelf shrinks back")
-                                .font(.caption)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Collapse Delay")
+                            Spacer()
+                            Text("\(autoShrinkDelay)s")
                                 .foregroundStyle(.secondary)
+                                .monospacedDigit()
                         }
-                        Spacer()
-                        Picker("", selection: $autoShrinkDelay) {
-                            Text("3s").tag(3)
-                            Text("5s").tag(5)
-                            Text("10s").tag(10)
-                            Text("15s").tag(15)
-                            Text("30s").tag(30)
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 200)
+                        Slider(value: Binding(
+                            get: { Double(autoShrinkDelay) },
+                            set: { autoShrinkDelay = Int($0) }
+                        ), in: 1...10, step: 1)
                     }
                 }
             } header: {
                 Text("Shelf Behavior")
-            } footer: {
-                Text("The shelf will automatically collapse when the mouse hasn't hovered over it for the specified time.")
             }
             
+            // MARK: Media Player
             Section {
                 Toggle(isOn: $showMediaPlayer) {
                     VStack(alignment: .leading) {
-                        Text("Media Player")
-                        Text("Show Now Playing controls in the expanded notch")
+                        Text("Now Playing")
+                        Text("Show media controls in expanded notch")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -318,27 +322,30 @@ struct SettingsView: View {
                     Toggle(isOn: $autoFadeMediaHUD) {
                         VStack(alignment: .leading) {
                             Text("Auto-Fade Preview")
-                            Text("Fade away small preview after 5 seconds")
+                            Text("Hide mini player after 5 seconds")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
-                
+            } header: {
+                Text("Media Player")
+            }
+            
+            // MARK: System HUD
+            Section {
                 Toggle(isOn: $enableHUDReplacement) {
                     VStack(alignment: .leading) {
                         Text("Replace System HUD")
-                        Text("Show volume and brightness changes in the notch")
+                        Text("Show volume and brightness in the notch")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
                 .onChange(of: enableHUDReplacement) { _, newValue in
                     if newValue {
-                        // Start interceptor to capture keys and suppress system HUD
                         MediaKeyInterceptor.shared.start()
                     } else {
-                        // Stop interceptor, let system handle keys normally
                         MediaKeyInterceptor.shared.stop()
                     }
                 }
@@ -347,9 +354,9 @@ struct SettingsView: View {
                     FeaturePreviewGIF(url: "https://i.postimg.cc/hG22QtJ8/Schermopname2026-01-05om19-08-22-ezgif-com-video-to-gif-converter.gif")
                 }
             } header: {
-                Text("HUD & Media")
+                Text("System HUD")
             } footer: {
-                Text("HUD replacement requires Accessibility permissions to intercept media keys.")
+                Text("Requires Accessibility permissions to intercept media keys.")
             }
         }
     }

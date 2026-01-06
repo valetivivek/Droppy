@@ -307,10 +307,15 @@ class ClipboardWindowController: NSObject, NSWindowDelegate {
         // Accessibility Check
         let isAccessibilityTrusted = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
         
-        // Input Monitoring Check (Verified by IOHIDManager success)
+        // Input Monitoring Check
+        // First check the runtime variable, then fall back to cached grant
+        // The cache persists across launches when IOHIDManager has successfully opened before
         let isInputMonitoringActive = globalHotKey?.isInputMonitoringActive ?? false
+        let hasCachedGrant = UserDefaults.standard.bool(forKey: "inputMonitoringGranted")
         
-        if isAccessibilityTrusted && isInputMonitoringActive {
+        // If either the runtime check passes OR we have a cached successful grant, consider it active
+        // This prevents repeated prompts when TCC is slow to respond
+        if isAccessibilityTrusted && (isInputMonitoringActive || hasCachedGrant) {
             return
         }
         
@@ -318,9 +323,12 @@ class ClipboardWindowController: NSObject, NSWindowDelegate {
         alert.messageText = "Permissions Required"
         alert.informativeText = "To work in password fields and all apps, Droppy needs specific permissions:\n\n"
         
+        // Use combined check for alert text
+        let inputMonitoringOk = isInputMonitoringActive || hasCachedGrant
+        
         var missingPermissions: [String] = []
         if !isAccessibilityTrusted { missingPermissions.append("• Accessibility (for Paste)") }
-        if !isInputMonitoringActive { missingPermissions.append("• Input Monitoring (for Global Hotkey)") }
+        if !inputMonitoringOk { missingPermissions.append("• Input Monitoring (for Global Hotkey)") }
         
         alert.informativeText += missingPermissions.joined(separator: "\n")
         alert.informativeText += "\n\nPlease enable them in System Settings."
@@ -335,7 +343,7 @@ class ClipboardWindowController: NSObject, NSWindowDelegate {
         
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
-            if !isInputMonitoringActive {
+            if !inputMonitoringOk {
                 // Open Input Monitoring (Privacy_ListenEvent)
                 NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!)
             } else {

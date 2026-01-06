@@ -236,8 +236,23 @@ class NotchWindow: NSWindow {
     var isValid: Bool = true
     private var notchRect: NSRect {
         guard let screen = NSScreen.main else { return .zero }
-        let notchWidth: CGFloat = 180
-        let notchHeight: CGFloat = 32
+        
+        // Dynamic notch dimensions using auxiliary areas
+        var notchWidth: CGFloat = 180
+        var notchHeight: CGFloat = 32
+        
+        // Calculate true notch width from safe areas
+        if let leftArea = screen.auxiliaryTopLeftArea,
+           let rightArea = screen.auxiliaryTopRightArea {
+            notchWidth = screen.frame.width - leftArea.width - rightArea.width + 4
+        }
+        
+        // Get notch height from safe area insets
+        let topInset = screen.safeAreaInsets.top
+        if topInset > 0 {
+            notchHeight = topInset
+        }
+        
         let centerX = screen.frame.width / 2
         return NSRect(
             x: centerX - notchWidth / 2,

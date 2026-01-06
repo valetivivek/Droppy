@@ -25,7 +25,7 @@ struct NotchShelfView: View {
     @AppStorage("showMediaPlayer") private var showMediaPlayer = true
     @AppStorage("autoFadeMediaHUD") private var autoFadeMediaHUD = true
     @AppStorage("autoShrinkShelf") private var autoShrinkShelf = true
-    @AppStorage("autoShrinkDelay") private var autoShrinkDelay = 5  // Seconds
+    @AppStorage("autoShrinkDelay") private var autoShrinkDelay = 3  // Seconds (1-10)
     
     // HUD State - Use @ObservedObject for singletons (they manage their own lifecycle)
     @ObservedObject private var volumeManager = VolumeManager.shared
@@ -58,13 +58,39 @@ struct NotchShelfView: View {
     
     // Removed isDropTargeted state as we use shared state now
     
-    /// Real MacBook notch dimensions
-    private let notchWidth: CGFloat = 180
-    private let notchHeight: CGFloat = 32
+    /// Dynamic notch width based on screen's actual safe areas
+    /// This properly handles all resolutions including "More Space" settings
+    private var notchWidth: CGFloat {
+        guard let screen = NSScreen.main else { return 180 }
+        
+        // Use auxiliary areas to calculate true notch width
+        // These areas represent the usable space on either side of the notch
+        if let leftArea = screen.auxiliaryTopLeftArea,
+           let rightArea = screen.auxiliaryTopRightArea {
+            // Notch width = screen width - left safe area - right safe area
+            let calculatedWidth = screen.frame.width - leftArea.width - rightArea.width
+            // Add small padding to ensure we fully cover the notch
+            return max(calculatedWidth + 4, 180)
+        }
+        
+        // Fallback for screens without notch data
+        return 180
+    }
+    
+    /// Notch height - scales with resolution
+    private var notchHeight: CGFloat {
+        guard let screen = NSScreen.main else { return 32 }
+        let topInset = screen.safeAreaInsets.top
+        return topInset > 0 ? topInset : 32
+    }
+    
     private let expandedWidth: CGFloat = 450
     
-    /// HUD dimensions (notch expands to show HUD)
-    private let hudWidth: CGFloat = 350
+    /// HUD dimensions - scales relative to notch width
+    private var hudWidth: CGFloat {
+        // HUD should be about 1.8x to 2x the notch width, but at least 350
+        max(350, notchWidth * 1.6)
+    }
     private let hudHeight: CGFloat = 73
     
     /// Whether media player HUD should be shown
