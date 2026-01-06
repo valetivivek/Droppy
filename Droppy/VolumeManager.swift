@@ -65,16 +65,11 @@ final class VolumeManager: NSObject, ObservableObject {
     /// Toggle mute state
     @MainActor func toggleMute() {
         let deviceID = systemOutputDeviceID()
-        var willBeMuted = false
-        var resultingVolume: Float32 = rawVolume
         
         if deviceID == kAudioObjectUnknown {
-            willBeMuted = !softwareMuted
-            resultingVolume = willBeMuted ? 0 : previousVolumeBeforeMute
+            // Software mute fallback
         } else {
-            let currentMuted = isMutedInternal()
-            willBeMuted = !currentMuted
-            resultingVolume = willBeMuted ? 0 : (readVolumeInternal() ?? rawVolume)
+            // Hardware mute
         }
         
         toggleMuteInternal()
@@ -359,7 +354,7 @@ final class VolumeManager: NSObject, ObservableObject {
         )
         guard AudioObjectHasProperty(deviceID, &addr) else { return false }
         
-        var size = UInt32(MemoryLayout<Float32>.size)
+        let size = UInt32(MemoryLayout<Float32>.size)
         var val = value
         let status = AudioObjectSetPropertyData(deviceID, &addr, 0, nil, size, &val)
         return status == noErr

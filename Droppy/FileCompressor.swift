@@ -311,7 +311,7 @@ class FileCompressor {
     // MARK: - Video Compression
     
     private func compressVideo(url: URL, mode: CompressionMode) async -> URL? {
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         
         let fileName = url.deletingPathExtension().lastPathComponent
         let outputURL = FileManager.default.temporaryDirectory
