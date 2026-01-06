@@ -50,6 +50,7 @@ final class VolumeManager: NSObject, ObservableObject {
         let delta = step / Float32(divisor)
         let current = readVolumeInternal() ?? rawVolume
         let target = max(0, min(1, current + delta))
+        print("🔊 VolumeManager: increase() current=\(current) delta=\(delta) target=\(target)")
         setAbsolute(target)
     }
     
@@ -59,6 +60,7 @@ final class VolumeManager: NSObject, ObservableObject {
         let delta = step / Float32(divisor)
         let current = readVolumeInternal() ?? rawVolume
         let target = max(0, min(1, current - delta))
+        print("🔉 VolumeManager: decrease() current=\(current) delta=\(delta) target=\(target)")
         setAbsolute(target)
     }
     
@@ -90,6 +92,13 @@ final class VolumeManager: NSObject, ObservableObject {
         }
         
         writeVolumeInternal(clamped)
+        
+        // Verify the write succeeded by reading back
+        if let actualVolume = readVolumeInternal() {
+            if abs(actualVolume - clamped) > 0.02 {
+                print("⚠️ VolumeManager: Write may have failed. Requested=\(clamped) Actual=\(actualVolume)")
+            }
+        }
         
         if clamped == 0 && !currentlyMuted {
             toggleMuteInternal()

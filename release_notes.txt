@@ -1,5 +1,0 @@
-v4.4.7 - Visual Polish
-
-Improvements:
-- Updated shelf control buttons (collapse/trash/settings) to use Liquid Glass style matching macOS 26 Tahoe aesthetic
-- Updated clipboard manager preview GIF
