@@ -159,13 +159,20 @@ private func mediaKeyCallback(
         return Unmanaged.passUnretained(event)
     }
     
+    // SAFETY: Create a copy of the event to avoid race conditions with HID queue
+    // The original event may be deallocated while we're processing
+    guard let eventCopy = event.copy() else {
+        return Unmanaged.passUnretained(event)
+    }
+    
     // Use autoreleasepool to properly manage NSEvent memory
     // This prevents objc_release crashes from CGEvent/NSEvent bridging
     var shouldSuppress = false
     
     autoreleasepool {
         // Convert to NSEvent to extract media key data
-        guard let nsEvent = NSEvent(cgEvent: event),
+        // SAFETY: Use eventCopy instead of original event
+        guard let nsEvent = NSEvent(cgEvent: eventCopy),
               nsEvent.subtype.rawValue == 8 else { // NX_SUBTYPE_AUX_CONTROL_BUTTONS
             return
         }
