@@ -163,21 +163,21 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# v4.5.2 - Universal Display Compatibility
+# v4.5.3 - Media Stability & Polish
 
-## 🖥️ Resolution Scaling
-- Dynamic notch detection for all MacBook screen sizes
-- Works perfectly on "More Space" resolutions (1800x1169, etc.)
-- HUD scales proportionally with notch width
+## 🎵 New Setting: Stabilize Media
+- Optional 1-second delay before showing Now Playing preview
+- Prevents flickering when scrolling through YouTube or video previews
+- Disabled by default (instant response like before)
 
-## ⭐ Clipboard Favorites Fix
-- Favorited entries now persist after restart
-- Custom titles are preserved correctly
+## ✨ Settings Polish
+- Improved English wording throughout settings
+- Floating Basket: "jiggle files anywhere on screen"
+- Better descriptions for all toggle options
 
-## ⚙️ Settings Reorganization
-- General: Split into "System" and "Drop Zones" sections
-- Display: Split into "Appearance", "Shelf Behavior", "Media Player", "System HUD"
-- Auto-shrink delay now uses native slider (1-10 seconds, default 3s)
+## 🔄 Animation Sync
+- Media HUD now collapses in perfect sync with notch shape
+- Unified spring animation timing (0.3s, 0.7 damping)
 <!-- CHANGELOG_END -->
 
 ---
