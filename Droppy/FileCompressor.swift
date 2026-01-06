@@ -345,13 +345,24 @@ class FileCompressor {
         exportSession.outputFileType = .mp4
         exportSession.shouldOptimizeForNetworkUse = true
         
-        await exportSession.export()
-        
-        if exportSession.status == .completed {
-            return outputURL
+        // Use modern async throws API (macOS 15+) with fallback
+        if #available(macOS 15.0, *) {
+            do {
+                try await exportSession.export(to: outputURL, as: .mp4)
+                return outputURL
+            } catch {
+                print("Video export failed: \(error.localizedDescription)")
+                return nil
+            }
         } else {
-            print("Video export failed: \(exportSession.error?.localizedDescription ?? "Unknown error")")
-            return nil
+            // Legacy API for older macOS
+            await exportSession.export()
+            if exportSession.status == .completed {
+                return outputURL
+            } else {
+                print("Video export failed: \(exportSession.error?.localizedDescription ?? "Unknown error")")
+                return nil
+            }
         }
     }
 }

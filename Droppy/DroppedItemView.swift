@@ -130,6 +130,7 @@ struct DroppedItemView: View {
             Divider()
             
             // Share submenu with system sharing services
+            // Note: Using deprecated API because it's the only one that works properly in SwiftUI context menus
             Menu {
                 ForEach(NSSharingService.sharingServices(forItems: [item.url]), id: \.title) { service in
                     Button {
