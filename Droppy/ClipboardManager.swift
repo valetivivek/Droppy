@@ -269,8 +269,17 @@ class ClipboardManager: ObservableObject {
         // CRITICAL: Immediately copy String values from frontmostApplication 
         // to prevent objc_release crash. The NSRunningApplication can be deallocated
         // at any point, so we must not hold a reference to it across autoreleasepool boundaries.
-        let frontmostBundleID: String? = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        let frontmostAppName: String? = NSWorkspace.shared.frontmostApplication?.localizedName
+        // Use String(describing:) or nil-coalescing to force a copy
+        var frontmostBundleID: String? = nil
+        var frontmostAppName: String? = nil
+        if let app = NSWorkspace.shared.frontmostApplication {
+            if let bundleID = app.bundleIdentifier {
+                frontmostBundleID = String(bundleID)
+            }
+            if let name = app.localizedName {
+                frontmostAppName = String(name)
+            }
+        }
 
         // Exclusion check using the snapshot value
         if let bundleID = frontmostBundleID, excludedApps.contains(bundleID) {
