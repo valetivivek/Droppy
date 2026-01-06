@@ -8,6 +8,9 @@ struct SettingsView: View {
     @AppStorage("useTransparentBackground") private var useTransparentBackground = false
     @AppStorage("enableNotchShelf") private var enableNotchShelf = true
     @AppStorage("enableFloatingBasket") private var enableFloatingBasket = true
+    @AppStorage("showClipboardButton") private var showClipboardButton = false
+    @AppStorage("showOpenShelfIndicator") private var showOpenShelfIndicator = true
+    @AppStorage("showDropIndicator") private var showDropIndicator = true
     @AppStorage("hideNotchOnExternalDisplays") private var hideNotchOnExternalDisplays = false
     
     // HUD and Media Player settings
@@ -28,6 +31,7 @@ struct SettingsView: View {
     @State private var hoverGeneral = false
     @State private var hoverClipboard = false
     @State private var hoverDisplay = false
+    @State private var hoverAccessibility = false
     @State private var hoverAbout = false
     @State private var isCoffeeHovering = false
     @State private var scrollOffset: CGFloat = 0
@@ -39,6 +43,7 @@ struct SettingsView: View {
                     sidebarButton(title: "General", icon: "gear", tag: "General", isHovering: $hoverGeneral)
                     sidebarButton(title: "Clipboard", icon: "doc.on.clipboard", tag: "Clipboard", isHovering: $hoverClipboard)
                     sidebarButton(title: "Display", icon: "display", tag: "Display", isHovering: $hoverDisplay)
+                    sidebarButton(title: "Accessibility", icon: "accessibility", tag: "Accessibility", isHovering: $hoverAccessibility)
                     sidebarButton(title: "About Droppy", icon: "info.circle", tag: "About Droppy", isHovering: $hoverAbout)
                     
                     Spacer()
@@ -82,7 +87,8 @@ struct SettingsView: View {
                             clipboardSettings
                         } else if selectedTab == "Display" {
                             displaySettings
-
+                        } else if selectedTab == "Accessibility" {
+                            accessibilitySettings
                         } else if selectedTab == "About Droppy" {
                             aboutSettings
                         }
@@ -258,7 +264,7 @@ struct SettingsView: View {
                 Toggle(isOn: $useTransparentBackground) {
                     VStack(alignment: .leading) {
                         Text("Transparent Background")
-                        Text("Use glass effect instead of solid black")
+                        Text("Use glass effect for windows (not shelf)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -371,7 +377,51 @@ struct SettingsView: View {
         }
     }
     
-
+    private var accessibilitySettings: some View {
+        Group {
+            Section {
+                Toggle(isOn: $showClipboardButton) {
+                    VStack(alignment: .leading) {
+                        Text("Clipboard Button")
+                        Text("Show button to open clipboard in shelf and basket")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                Toggle(isOn: $showOpenShelfIndicator) {
+                    VStack(alignment: .leading) {
+                        Text("Open Shelf Indicator")
+                        Text("Show \"Open Shelf\" tooltip when hovering over notch")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                if showOpenShelfIndicator {
+                    FeaturePreviewImage(url: "https://i.postimg.cc/8CcLwcLd/image.png")
+                }
+                
+                Toggle(isOn: $showDropIndicator) {
+                    VStack(alignment: .leading) {
+                        Text("Drop Indicator")
+                        Text("Show \"Drop!\" tooltip when dragging files over notch")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                if showDropIndicator {
+                    FeaturePreviewImage(url: "https://i.postimg.cc/RhL3vxcz/image.png")
+                }
+            } header: {
+                Text("Interface Helpers")
+            } footer: {
+                Text("Show or hide visual hints and quick-access buttons.")
+            }
+        }
+    }
+    
     
 
     
@@ -911,6 +961,42 @@ struct FeaturePreviewGIF: View {
             )
             .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
             .padding(.vertical, 8)
+    }
+}
+
+/// Static image preview with same styling as GIF previews
+struct FeaturePreviewImage: View {
+    let url: String
+    @State private var image: NSImage?
+    
+    var body: some View {
+        Group {
+            if let image = image {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            } else {
+                ProgressView()
+                    .frame(height: 60)
+            }
+        }
+        .frame(maxWidth: 250, maxHeight: 80)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.vertical, 4)
+        .task {
+            guard let imageURL = URL(string: url) else { return }
+            do {
+                let (data, _) = try await URLSession.shared.data(from: imageURL)
+                if let loadedImage = NSImage(data: data) {
+                    await MainActor.run {
+                        self.image = loadedImage
+                    }
+                }
+            } catch {
+                print("Failed to load preview image: \(error)")
+            }
+        }
     }
 }
 

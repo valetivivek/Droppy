@@ -19,6 +19,7 @@ private func sharingServicesForItems(_ items: [Any]) -> [NSSharingService] {
 struct FloatingBasketView: View {
     @Bindable var state: DroppyState
     @AppStorage("useTransparentBackground") private var useTransparentBackground = false
+    @AppStorage("showClipboardButton") private var showClipboardButton = false
     
     @State private var dashPhase: CGFloat = 0
     
@@ -72,6 +73,7 @@ struct FloatingBasketView: View {
     
     // Hover States for buttons
     @State private var isShelfButtonHovering = false
+    @State private var isClipboardButtonHovering = false
     @State private var isCloseButtonHovering = false
     @State private var headerFrame: CGRect = .zero
     
@@ -250,6 +252,30 @@ struct FloatingBasketView: View {
                 .onHover { isHovering in
                     withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
                         isShelfButtonHovering = isHovering
+                    }
+                }
+                
+                // Clipboard button (optional)
+                if showClipboardButton {
+                    Button {
+                        ClipboardWindowController.shared.toggle()
+                    } label: {
+                        Image(systemName: "doc.on.clipboard")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(isClipboardButtonHovering ? .primary : .secondary)
+                            .frame(width: 32, height: 32)
+                            .background(Color.white.opacity(isClipboardButtonHovering ? 0.2 : 0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { isHovering in
+                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                            isClipboardButtonHovering = isHovering
+                        }
                     }
                 }
                 

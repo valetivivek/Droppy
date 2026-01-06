@@ -27,6 +27,9 @@ struct NotchShelfView: View {
     @AppStorage("debounceMediaChanges") private var debounceMediaChanges = false  // Delay media HUD for rapid changes
     @AppStorage("autoShrinkShelf") private var autoShrinkShelf = true
     @AppStorage("autoShrinkDelay") private var autoShrinkDelay = 3  // Seconds (1-10)
+    @AppStorage("showClipboardButton") private var showClipboardButton = false
+    @AppStorage("showOpenShelfIndicator") private var showOpenShelfIndicator = true
+    @AppStorage("showDropIndicator") private var showDropIndicator = true
     
     // HUD State - Use @ObservedObject for singletons (they manage their own lifecycle)
     @ObservedObject private var volumeManager = VolumeManager.shared
@@ -172,19 +175,16 @@ struct NotchShelfView: View {
         ZStack(alignment: .top) {
             // MARK: - Main Morphing Background
             // This is the persistent black shape that grows/shrinks
+            // NOTE: The shelf/notch always uses solid black background.
+            // The "Transparent Background" setting only applies to other UI elements
+            // (Settings, Clipboard, etc.) - not the shelf, as that would look weird.
             NotchShape(bottomRadius: state.isExpanded ? 20 : (hudIsVisible ? 18 : 16))
-                .fill(useTransparentBackground ? Color.clear : Color.black)
+                .fill(Color.black)
                 .frame(
                     width: currentNotchWidth,
                     height: currentNotchHeight
                 )
                 .opacity(shouldShowVisualNotch ? 1.0 : 0.0)
-                .background {
-                    if useTransparentBackground && shouldShowVisualNotch {
-                        Color.clear
-                            .liquidGlass(shape: NotchShape(bottomRadius: state.isExpanded ? 20 : 16))
-                    }
-                }
                 .overlay(
                    NotchOutlineShape(bottomRadius: state.isExpanded ? 20 : 16)
                        .trim(from: 0, to: 1) // Ensures full path
@@ -458,13 +458,13 @@ struct NotchShelfView: View {
                 .contentShape(Rectangle()) // Only THIS rectangle is interactive
             
             // Beautiful drop indicator when hovering with files
-            if state.isDropTargeted && !state.isExpanded {
+            if showDropIndicator && state.isDropTargeted && !state.isExpanded {
                 dropIndicator
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
                     .allowsHitTesting(false) // Don't let the badge capture clicks
             }
             // "Open Shelf" indicator when hovering with mouse (no drag)
-            else if state.isMouseHovering && !dragMonitor.isDragging && !state.isExpanded {
+            else if showOpenShelfIndicator && state.isMouseHovering && !dragMonitor.isDragging && !state.isExpanded {
                 openIndicator
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
                     .allowsHitTesting(false) // Don't let the badge capture clicks
@@ -525,9 +525,10 @@ struct NotchShelfView: View {
         .offset(y: notchHeight + 50)
     }
     
+    // NOTE: Part of shelf UI - always solid black (transparent setting doesn't apply)
     private var indicatorBackground: some View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .fill(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
+            .fill(Color.black)
             .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .stroke(Color.white.opacity(0.2), lineWidth: 1)
@@ -550,6 +551,14 @@ struct NotchShelfView: View {
                 .padding(.leading, 16)
                 
                 Spacer()
+                
+                // Clipboard button (optional)
+                if showClipboardButton {
+                    NotchControlButton(icon: "doc.on.clipboard") {
+                        ClipboardWindowController.shared.toggle()
+                    }
+                    .padding(.trailing, 8)
+                }
                 
                 // Clear button OR Settings button (when empty)
                 if !state.items.isEmpty {
@@ -859,7 +868,6 @@ struct NotchItemView: View {
     let state: DroppyState
     @Binding var renamingItemId: UUID?
     let onRemove: () -> Void
-    @AppStorage("useTransparentBackground") private var useTransparentBackground = false
     
     @State private var thumbnail: NSImage?
     @State private var isHovering = false
@@ -1002,8 +1010,9 @@ struct NotchItemView: View {
             .overlay(alignment: .center) {
                 if isShakeAnimating {
                     ZStack {
+                        // NOTE: Part of shelf UI - always solid black
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
+                            .fill(Color.black)
                             .frame(width: 44, height: 44)
                             .shadow(radius: 4)
                         Image(systemName: "checkmark.shield.fill")
