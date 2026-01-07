@@ -362,18 +362,22 @@ class NotchWindow: NSWindow {
         // Safely capture state - avoid accessing shared singletons if they might be nil
         // Use local variables to minimize property access time
         let state = DroppyState.shared
-        let dragMonitor = DragMonitor.shared
         
         let isExpanded = state.isExpanded
         let isHovering = state.isMouseHovering
-        let isDragging = dragMonitor.isDragging
+        // Note: We no longer check isDragging here - see comment below
         let isDropTargeted = state.isDropTargeted
         
         // Window should accept mouse events when:
         // - Shelf is expanded (need to interact with items)
         // - User is hovering over notch (need click to open)
-        // - Files are being dragged (need to accept drops)
-        let shouldAcceptEvents = isExpanded || isHovering || isDragging || isDropTargeted
+        // - Dragon is actively targeted on the notch (isDropTargeted handles this)
+        // NOTE: We don't include isDragging here because that would block the ENTIRE
+        // window area (500x200px) from receiving events by other apps (like Chrome bookmarks bar).
+        // The draggingEntered/Updated callbacks will still fire because the view is registered
+        // for drag types - we just don't block other apps from receiving events in areas
+        // where we return nil from hitTest.
+        let shouldAcceptEvents = isExpanded || isHovering || isDropTargeted
         
         // Only update if the value actually needs to change
         if self.ignoresMouseEvents == shouldAcceptEvents {
