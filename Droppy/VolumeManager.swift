@@ -331,23 +331,40 @@ final class VolumeManager: NSObject, ObservableObject {
                 var vol = newVal
                 let size = UInt32(MemoryLayout<Float32>.size)
                 if AudioObjectSetPropertyData(deviceID, &virtualAddr, 0, nil, size, &vol) == noErr {
-                    return
+                    // Verify the write actually worked (some USB devices return success but don't apply)
+                    var readBack = Float32(0)
+                    var readSize = size
+                    if AudioObjectGetPropertyData(deviceID, &virtualAddr, 0, nil, &readSize, &readBack) == noErr {
+                        // Check if the value is close to what we set (within 2%)
+                        if abs(readBack - newVal) < 0.02 {
+                            return
+                        }
+                    }
                 }
             }
             
             // Fall back to VolumeScalar
             if writeValidatedScalar(deviceID: deviceID, element: kAudioObjectPropertyElementMain, value: newVal) {
-                return
+                // Verify this one too
+                let readBack = readValidatedScalar(deviceID: deviceID, element: kAudioObjectPropertyElementMain)
+                if let rb = readBack, abs(rb - newVal) < 0.02 {
+                    return
+                }
             }
             
-            // Try individual channels
+            // Try individual channels - skip verification for simplicity, just try
             var channelSuccess = false
             for el in [UInt32(1), UInt32(2), UInt32(3), UInt32(4)] {
                 if writeValidatedScalar(deviceID: deviceID, element: el, value: newVal) {
                     channelSuccess = true
                 }
             }
-            if channelSuccess { return }
+            if channelSuccess {
+                // Verify at least one channel changed
+                if let vol = readVolumeInternal(), abs(vol - newVal) < 0.05 {
+                    return
+                }
+            }
         }
         
         // Final fallback: AppleScript (works for USB devices that CoreAudio can't control)
