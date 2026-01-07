@@ -111,6 +111,8 @@ struct NotchShelfView: View {
     
     /// Whether media player HUD should be shown
     private var shouldShowMediaHUD: Bool {
+        // Media features require macOS 15.0+
+        guard musicManager.isMediaAvailable else { return false }
         // Don't show during song transitions (collapse-expand effect)
         if isSongTransitioning { return false }
         // Don't show if auto-fade is enabled and it has faded out

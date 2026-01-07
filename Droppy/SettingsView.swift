@@ -319,46 +319,71 @@ struct SettingsView: View {
             
             // MARK: Media Player
             Section {
-                Toggle(isOn: $showMediaPlayer) {
-                    VStack(alignment: .leading) {
-                        Text("Now Playing")
-                        Text("Show current song in the notch")
+                // Media Player requires macOS 15.0+ due to MediaRemoteAdapter.framework
+                if #available(macOS 15.0, *) {
+                    Toggle(isOn: $showMediaPlayer) {
+                        VStack(alignment: .leading) {
+                            Text("Now Playing")
+                            Text("Show current song in the notch")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .onChange(of: showMediaPlayer) { _, newValue in
+                        if newValue {
+                            // Ensure notch window exists (needed even if shelf is disabled)
+                            NotchWindowController.shared.setupNotchWindow()
+                        } else {
+                            // Close window only if shelf and HUD are also disabled
+                            if !enableNotchShelf && !enableHUDReplacement {
+                                NotchWindowController.shared.closeWindow()
+                            }
+                        }
+                    }
+                    
+                    if showMediaPlayer {
+                        FeaturePreviewGIF(url: "https://i.postimg.cc/SKjDMGrP/Schermopname2026-01-07om15-17-29-ezgif-com-video-to-gif-converter.gif")
+                        
+                        Toggle(isOn: $autoFadeMediaHUD) {
+                            VStack(alignment: .leading) {
+                                Text("Auto-Hide Preview")
+                                Text("Fade out mini player after 5 seconds")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        Toggle(isOn: $debounceMediaChanges) {
+                            VStack(alignment: .leading) {
+                                Text("Stabilize Media")
+                                Text("Delay preview by 1 second to prevent flickering")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } else {
+                    // macOS 14 - feature not available
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "music.note")
+                                .foregroundStyle(.secondary)
+                            Text("Now Playing")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("Requires macOS 15")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.orange.opacity(0.15))
+                                .clipShape(Capsule())
+                        }
+                        Text("Media player features require macOS 15.0 (Sequoia) or later.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                }
-                .onChange(of: showMediaPlayer) { _, newValue in
-                    if newValue {
-                        // Ensure notch window exists (needed even if shelf is disabled)
-                        NotchWindowController.shared.setupNotchWindow()
-                    } else {
-                        // Close window only if shelf and HUD are also disabled
-                        if !enableNotchShelf && !enableHUDReplacement {
-                            NotchWindowController.shared.closeWindow()
-                        }
-                    }
-                }
-                
-                if showMediaPlayer {
-                    FeaturePreviewGIF(url: "https://i.postimg.cc/SKjDMGrP/Schermopname2026-01-07om15-17-29-ezgif-com-video-to-gif-converter.gif")
-                    
-                    Toggle(isOn: $autoFadeMediaHUD) {
-                        VStack(alignment: .leading) {
-                            Text("Auto-Hide Preview")
-                            Text("Fade out mini player after 5 seconds")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    
-                    Toggle(isOn: $debounceMediaChanges) {
-                        VStack(alignment: .leading) {
-                            Text("Stabilize Media")
-                            Text("Delay preview by 1 second to prevent flickering")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    .padding(.vertical, 4)
                 }
             } header: {
                 Text("Media Player")

@@ -54,6 +54,10 @@ private struct NowPlayingUpdate: Codable {
 final class MusicManager: ObservableObject {
     static let shared = MusicManager()
     
+    // MARK: - Media Availability
+    /// Whether media features are available (requires macOS 15.0+ due to MediaRemoteAdapter framework)
+    @Published private(set) var isMediaAvailable: Bool = false
+    
     // MARK: - Published Properties
     @Published private(set) var songTitle: String = ""
     @Published private(set) var artistName: String = ""
@@ -83,6 +87,7 @@ final class MusicManager: ObservableObject {
     @Published private(set) var playbackRate: Double = 1.0
     @Published private(set) var timestampDate: Date = .distantPast
     @Published private(set) var bundleIdentifier: String?
+
 
     
     /// Whether playback stopped recently (within 5 seconds) - keeps UI visible
@@ -115,13 +120,21 @@ final class MusicManager: ObservableObject {
     
     // MARK: - Initialization
     private init() {
-        loadMediaRemoteForCommands()
-        startAdapterProcess()
-        
-        // Fetch full metadata after a short delay to solve cold start issue
-        // (when app opens while media is already playing, initial stream may miss duration)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.fetchFullNowPlayingInfo()
+        // MediaRemoteAdapter.framework requires macOS 15.0 (built with that deployment target)
+        if #available(macOS 15.0, *) {
+            isMediaAvailable = true
+            loadMediaRemoteForCommands()
+            startAdapterProcess()
+            
+            // Fetch full metadata after a short delay to solve cold start issue
+            // (when app opens while media is already playing, initial stream may miss duration)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.fetchFullNowPlayingInfo()
+            }
+        } else {
+            // Media features unavailable on macOS 14.x
+            isMediaAvailable = false
+            print("MusicManager: Media features disabled (requires macOS 15.0+)")
         }
     }
     
