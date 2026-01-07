@@ -169,44 +169,23 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# Version 4.7.7 - Battery HUD & Auto-Update Improvements
+# Version 4.7.8 - Native Update Experience
 
-## ✨ New Features
+## ✨ Improvements
 
-### 🔋 Battery Charging HUD
-Beautiful animated indicator that appears when you plug in or unplug your charger, or when battery reaches low levels.
-- **Green pulsing icon** during charging
-- **Orange indicator** for low battery warnings
-- Perfectly aligned with volume/brightness HUD styling
-- Toggle on/off in Settings > System HUD
+### 🎨 Native DroppyUpdater Helper
+The update process now uses a beautiful native macOS window instead of Terminal:
 
-## 🐛 Bug Fixes
+- **Droppy-styled UI** - Matches the update window you already know and love
+- **Animated progress** - Smooth step-by-step progress with checkmarks
+- **Clean and professional** - No more Terminal window with ASCII art
+- **Auto-launches** - When update completes, Droppy starts automatically
 
-### Brightness HUD False Triggers Fixed
-The brightness HUD no longer randomly appears during:
-- Environment lighting changes (auto-brightness)
-- Power state changes (plugging in/unplugging charger)
-- Other automatic brightness adjustments
-
-Now **only triggers when you manually press the brightness keys (F1/F2)**.
-
-### Auto-Update Failures Fixed
-Complete rewrite of the update system to be bulletproof:
-- **Proper process termination**: Kills the old app by PID instead of hoping it closes
-- **Admin privilege fallback**: Automatically requests admin password if regular delete fails
-- **Friendly error messages**: Clear instructions if something goes wrong
-- **Manual fallback**: Opens Applications folder and DMG with instructions if auto-update fails
-- **Reliable cleanup**: Always cleans up temporary files, even on failure
-
-## 🔧 Improvements
-
-- **Battery HUD sizing**: Icon (18pt) and percentage (15pt) match volume/brightness HUD exactly
-- **Consistent spacing**: Horizontal padding matches vertical padding for perfect visual balance
-- **Swift 6 compatibility**: Fixed async/await warnings for future Swift 6 language mode
-
----
-
-This update focuses on reliability and polish. The new Battery HUD brings awareness to your charging status without being intrusive, while the auto-update fix ensures smooth updates for all users regardless of their permission setup.
+### 🔧 Technical Details
+- Helper bundled as universal binary (ARM64 + x86_64)
+- Located at `Droppy.app/Contents/Helpers/DroppyUpdater`
+- Falls back to Terminal script if helper is unavailable
+- Same robust update logic: PID termination, admin fallback, error handling
 <!-- CHANGELOG_END -->
 
 ---
