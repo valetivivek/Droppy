@@ -169,33 +169,22 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# Version 4.8 - Native Update Experience
-
-## ✨ New Features
-
-### 🎨 Native DroppyUpdater Helper
-The update process now uses a beautiful native macOS window instead of Terminal:
-
-- **Droppy-styled UI** - Matches the update window you already know and love
-- **Animated progress** - Smooth step-by-step progress with checkmarks
-- **Confetti celebration** - Festive confetti when update completes!
-- **Clean and professional** - No more Terminal window with ASCII art
-- **Auto-launches** - When update completes, Droppy starts automatically
-
-### 🎵 Media Player Polish
-- **Consistent edge padding** - Album art, timestamps, and controls now align perfectly
-- **Smooth transitions** - Symmetric animations between media player and drop zone
+# Version 4.8.1 - USB Audio Device Support
 
 ## 🐛 Bug Fixes
 
-- Fixed "Cleaning up" spinner staying visible after update completion
-- Fixed inconsistent animation when pausing media in expanded view
+### 🔊 Fixed Volume Control for USB Audio Devices
+The volume slider now works correctly with USB audio devices like Jabra speakers and other USB DACs:
 
-## 🔧 Technical Details
-- Helper bundled as universal binary (ARM64 + x86_64)
-- Located at `Droppy.app/Contents/Helpers/DroppyUpdater`
-- Falls back to Terminal script if helper is unavailable
-- Optimized confetti animation using Canvas for smooth 60fps
+- **Full USB device support** - Volume slider now controls USB speakers, headsets, and audio interfaces
+- **Uses system-level APIs** - Now uses the same `VirtualMainVolume` property that macOS uses
+- **Automatic fallback** - Seamlessly falls back to hardware-level control for built-in speakers
+- **Media key support** - Volume up/down keyboard keys work correctly with USB devices
+
+**Technical Details:**
+- Added `kAudioHardwareServiceDeviceProperty_VirtualMainVolume` support to VolumeManager
+- This property is the system-level volume abstraction that works across all device types
+- Previously used `kAudioDevicePropertyVolumeScalar` which some USB devices don't expose
 <!-- CHANGELOG_END -->
 
 ---
