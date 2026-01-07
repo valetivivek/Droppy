@@ -169,14 +169,15 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# Version 4.8.4 - USB Audio Hotfix (osascript)
+# Version 4.8.5 - USB Audio Compatibility
 
-## 🐛 Bug Fixes
+## � Improvements
 
-### 🔊 Improved USB Volume Control
-- **osascript via Process** - Now uses osascript command-line tool instead of NSAppleScript
-- **Same as macOS** - osascript is the exact tool macOS uses internally for scripting
-- **Better compatibility** - May have different execution context that works with more devices
+### 🔊 Improved USB Audio Device Compatibility
+- **Force-unmute before volume change** - Some USB devices get stuck in muted state
+- **osascript fallback** - Uses the same volume control method as macOS
+
+Note: Some USB audio devices (like certain Jabra models) have firmware-level volume locking that cannot be controlled via software. If your device doesn't respond to system volume controls when Droppy is closed either, this is a hardware/firmware limitation.
 <!-- CHANGELOG_END -->
 
 ---
