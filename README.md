@@ -191,13 +191,27 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# Version 4.9.1 - Hotfix
+# Version 4.9.2 - Integrations Update
+
+## 🆕 New Features
+
+### 🗂️ Finder Services (Built-in)
+- **Right-click integration** - "Add to Droppy Shelf" and "Add to Droppy Basket" in Finder's Services menu
+- **No installation needed** - Works automatically, just right-click files
+- **Toggle in Settings** - Enable/disable in Settings → Features
+
+### 🔷 Raycast Extension
+- **Raycast commands** - "Add to Droppy Shelf" and "Add to Droppy Basket"
+- **Download from GitHub** - Import into Raycast → Extensions
+- **Official icon** in Settings
+
+---
+
+# Version 4.9.1 - Alfred Hotfix
 
 ## 🐛 Bug Fixes
-
-### Alfred Workflow Fix
-- **Fixed "workflow is invalid or corrupted" error** - Workflow now imports correctly into Alfred
-- **Fixed script crash with special characters** - Filenames with quotes, spaces, and unicode now work properly
+- Fixed "workflow is invalid or corrupted" error
+- Fixed script crash with special characters in filenames
 
 ---
 
@@ -206,29 +220,14 @@ brew install --cask iordv/tap/droppy
 ## 🆕 New Features
 
 ### 🔮 Alfred Integration
-- **Push files to Droppy from Alfred** - Select files in Finder, invoke Alfred, and send them directly to Droppy
-- **Two file actions** - Choose between "Add to Droppy Shelf" (notch) or "Add to Droppy Basket" (floating)
-- **One-click install** - Open Settings → Features → click "Install in Alfred" — workflow imports instantly
-- **URL scheme support** - External apps can use `droppy://add?target=shelf&path=/path/to/file` to push files programmatically
-- **Fully bundled** - Alfred workflow included in the app, no external downloads needed
-
-### 🛠️ Under the Hood
-- **New `droppy://` URL scheme** - Enables third-party integrations and automation
-- **URLSchemeHandler** - Robust URL parsing with full path decoding support
-- **Alfred icon in Settings** - Beautiful native integration UI with instant icon loading
-
-## 📖 How to Use
-
-1. Open **Droppy Settings** → **Features**
-2. Click **"Install in Alfred"**
-3. Select files in Finder → Alfred → "Actions"
-4. Choose **Add to Droppy Shelf** or **Add to Droppy Basket**
-
-Files appear in Droppy instantly!
+- **Push files to Droppy from Alfred** - Select files in Finder, invoke Alfred, send to Droppy
+- **Two file actions** - "Add to Droppy Shelf" or "Add to Droppy Basket"
+- **One-click install** - Settings → Features → Install in Alfred
+- **URL scheme support** - `droppy://add?target=shelf&path=/path/to/file`
 
 ---
 
-*Requires Alfred 4+ with Powerpack*
+*Settings → Features now has Finder, Alfred, and Raycast integrations!*
 <!-- CHANGELOG_END -->
 
 ---
