@@ -6,7 +6,8 @@
 <h1 align="center">Droppy</h1>
 
 <p align="center">
-  <strong>Your files. Everywhere. Instantly.</strong>
+  <strong>Your files. Everywhere. Instantly.</strong><br>
+  <em>The free, open-source alternative to paid file management apps.</em>
 </p>
 
 <p align="center">
@@ -18,7 +19,7 @@
 
 <p align="center">
   <a href="#-installation">Install</a> •
-  <a href="#-capabilities">Features</a> •
+  <a href="#-core-features">Features</a> •
   <a href="#-how-to-use">Usage</a> •
   <a href="#-whats-new">Changelog</a>
 </p>
@@ -27,41 +28,49 @@
 
 <div align="center">
 
-![Demo Droppy!](https://github.com/user-attachments/assets/59ed67af-6719-4f83-918d-ed6d10183782)
+![Droppy Demo](https://github.com/user-attachments/assets/59ed67af-6719-4f83-918d-ed6d10183782)
+
+**Drag files to your notch • Summon the basket anywhere • Right-click for powerful actions**
 
 </div>
 
 ---
 
 <p align="center">
-  <strong>Works on ANY Mac</strong> — non-notch displays get a gorgeous Dynamic Island-style pill interface!
+  🆓 <strong>100% Free & Open Source</strong> — No subscriptions. No ads. No tracking. Forever.<br>
+  🖥️ <strong>Works on ANY Mac</strong> — Non-notch displays get a gorgeous Dynamic Island-style pill interface!
 </p>
 
 ---
 
-## ✨ Capabilities
+## ✨ Core Features
+
+The essentials — what you see in the demo above:
 
 | | Feature | Description |
 |:--|:--------|:------------|
 | 🗂️ | **Notch Shelf** | Drag files to your notch — they vanish into a sleek shelf, ready when you need them |
 | 🧺 | **Floating Basket** | Jiggle your mouse while dragging to summon a basket anywhere on screen |
-| 📋 | **Clipboard Manager** | Full history with search, favorites, OCR text extraction, and drag-out support |
-| 🎵 | **Media Player** | Now Playing controls in your notch with album art and seek slider |
-| 🔊 | **Custom HUDs** | Beautiful volume, brightness, battery, and Caps Lock overlays |
-| 🔮 | **Alfred Integration** | Push files to Droppy from Alfred with a quick action |
+| ⚡ | **Quick Actions** | Right-click any file for instant access to compress, convert, OCR, move, share, and more |
 
 ---
 
-### ⚡ Power Features
+## � Full Capabilities
+
+Everything Droppy can do:
 
 | | Feature | Description |
 |:--|:--------|:------------|
-| 📦 | **Move To...** | Send files directly to saved folder locations like your NAS, cloud drives, or project folders |
+| �📋 | **Clipboard Manager** | Full history with search, favorites, OCR text extraction, and drag-out support |
+| 🎵 | **Media Player** | Now Playing controls in your notch with album art and seek slider |
+| 🔊 | **Custom HUDs** | Beautiful volume, brightness, battery, and Caps Lock overlays |
+|  | **Move To...** | Send files directly to saved folder locations like your NAS, cloud drives, or project folders |
 | 📉 | **Smart Compression** | Compress images, PDFs, and videos with auto or target size options — keeps originals if larger |
 | ✏️ | **Fast Actions** | Convert images, extract text (OCR), create ZIPs, rename — all from the shelf with one click |
-| 🙈 | **Auto-Hide Basket** | Basket slides to screen edge when idle, peeks out on hover for quick access when you need it |
+| 🙈 | **Auto-Hide Basket** | Basket slides to screen edge when idle, peeks out on hover for quick access |
 | 🖥️ | **Multi-Monitor** | Works on external displays with smart fullscreen detection and automatic positioning |
 | 🏝️ | **Dynamic Island** | Non-notch Macs get a beautiful floating pill interface that matches the notch experience |
+| 🔮 | **Alfred Integration** | Push files to Droppy from Alfred with a quick action |
 
 ---
 
@@ -83,7 +92,7 @@ brew install --cask iordv/tap/droppy
 
 > ⚠️ **"Droppy is damaged and can't be opened"?**
 > 
-> This happens because macOS quarantines apps downloaded from the internet. The `xattr` command above removes this flag. This is safe — Droppy is open source and you can verify the code yourself.
+> This happens because macOS quarantines apps downloaded from the internet. The `xattr` command above removes this flag. This is safe — Droppy is open source and you can [verify the code yourself](https://github.com/iordv/Droppy).
 >
 > Alternatively, use **Homebrew** which handles this automatically.
 
@@ -120,12 +129,12 @@ Drag files out of the shelf and drop into any app. The file moves and vanishes f
 
 ---
 
-## �️ Pro Tips
+## 🛠️ Pro Tips
 
-### �🔮 Alfred Integration
+### 🔮 Alfred Integration
 Push files from Finder to Droppy: **Settings** → **About** → **Install in Alfred**, then use Alfred's Universal Actions on any file.
 
-### � Smart Compression
+### 📉 Smart Compression
 - **Auto**: Balanced settings for most files
 - **Target Size**: Need under 2MB? Right-click → Compress → **Target Size...**
 - **Size Guard** 🛡️: If compression would make the file larger, Droppy keeps the original
@@ -141,33 +150,44 @@ Enable in Settings → Basket → **Auto-Hide**. The basket slides to the screen
 ## 🆕 What's New
 
 <details>
-<summary><strong>v5.4.1 — Stability & Interaction Fixes</strong></summary>
+<summary><strong>v5.4.2 — Rename Fix</strong></summary>
 
 <!-- CHANGELOG_START -->
-# Droppy v5.4.2 - Rename Fix
-
-## 🔧 Bug Fixes
-
-### File Renaming
+### 🔧 Bug Fixes
 - **Fixed spacebar during rename** — Pressing spacebar while renaming files now correctly inserts a space character instead of triggering Quick Look preview
 
-## 📖 Documentation
-- Added hero demo video to README
+### 📖 Documentation
+- Added hero demo GIF to README
 - Redesigned feature tables for better readability
 - Added clickable badges and download button
-- Streamlined README layout with collapsible changelog
 <!-- CHANGELOG_END -->
 
 </details>
 
 ---
 
-<p align="center">
-  <a href="https://buymeacoffee.com/droppy"><img src="https://img.shields.io/badge/☕_Buy_Me_A_Coffee-FFDD00?style=for-the-badge" alt="Buy Me A Coffee"></a>
-</p>
+## ❤️ Support Droppy
+
+If Droppy saves you time, consider buying me a coffee!
 
 <p align="center">
-  <a href="https://star-history.com/#iordv/droppy&Timeline"><img src="https://img.shields.io/badge/⭐_Star_History-View_Chart-blue?style=flat-square" alt="Star History"></a>
+  <a href="https://buymeacoffee.com/droppy">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="200">
+  </a>
+</p>
+
+---
+
+## ⭐ Star History
+
+<p align="center">
+  <a href="https://star-history.com/#iordv/Droppy&Timeline">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=iordv/Droppy&type=Timeline&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=iordv/Droppy&type=Timeline" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=iordv/Droppy&type=Timeline" width="600" />
+    </picture>
+  </a>
 </p>
 
 ---
