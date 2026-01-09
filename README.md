@@ -45,31 +45,61 @@
 
 ## ✨ Core Features
 
-The essentials — what you see in the demo above:
+### Notch Shelf
+Drag files to your notch — they vanish into a sleek shelf, ready when you need them.
 
-| Feature | Description |
-|:--------|:------------|
-| **Notch Shelf** | Drag files to your notch — they vanish into a sleek shelf, ready when you need them |
-| **Floating Basket** | Jiggle your mouse while dragging to summon a basket anywhere on screen |
-| **Quick Actions** | Right-click any file for instant access to compress, convert, OCR, move, share, and more |
-| **Clipboard Manager** | Full history with search, favorites, OCR text extraction, and drag-out support |
+<p align="center">
+  <img src="assets/previews/shelf_preview.gif" alt="Notch Shelf" width="600">
+</p>
 
 ---
 
-## ⚡ Full Capabilities
+### Floating Basket
+Jiggle your mouse while dragging to summon a basket anywhere on screen.
 
-Everything else Droppy can do:
+<p align="center">
+  <img src="assets/previews/basket_preview.gif" alt="Floating Basket" width="600">
+</p>
+
+---
+
+### Clipboard Manager
+Full history with search, favorites, OCR text extraction, and drag-out support.
+
+<p align="center">
+  <img src="assets/previews/clipboard_preview.gif" alt="Clipboard Manager" width="600">
+</p>
+
+---
+
+### Media Player
+Now Playing controls in your notch with album art and seek slider.
+
+<p align="center">
+  <img src="assets/previews/media_player_preview.gif" alt="Media Player" width="600">
+</p>
+
+---
+
+### Custom HUDs
+Beautiful volume, brightness, battery, and Caps Lock overlays.
+
+<p align="center">
+  <img src="assets/previews/hud_preview.gif" alt="Custom HUDs" width="600">
+</p>
+
+---
+
+## ⚡ More Features
 
 | Feature | Description |
 |:--------|:------------|
-| **Media Player** | Now Playing controls in your notch with album art and seek slider |
-| **Custom HUDs** | Beautiful volume, brightness, battery, and Caps Lock overlays |
-| **Move To...** | Send files directly to saved folder locations like your NAS, cloud drives, or project folders |
-| **Smart Compression** | Compress images, PDFs, and videos with auto or target size options — keeps originals if larger |
-| **Fast Actions** | Convert images, extract text (OCR), create ZIPs, rename — all from the shelf with one click |
-| **Auto-Hide Basket** | Basket slides to screen edge when idle, peeks out on hover for quick access |
-| **Multi-Monitor** | Works on external displays with smart fullscreen detection and automatic positioning |
-| **Dynamic Island** | Non-notch Macs get a beautiful floating pill interface that matches the notch experience |
+| **Quick Actions** | Right-click any file for compress, convert, OCR, move, share, and more |
+| **Move To...** | Send files directly to saved folder locations like your NAS or cloud drives |
+| **Smart Compression** | Compress images, PDFs, and videos with auto or target size options |
+| **Auto-Hide Basket** | Basket slides to screen edge when idle, peeks out on hover |
+| **Multi-Monitor** | Works on external displays with smart fullscreen detection |
+| **Dynamic Island** | Non-notch Macs get a beautiful floating pill interface |
 | **Alfred Integration** | Push files to Droppy from Alfred with a quick action |
 
 ---
