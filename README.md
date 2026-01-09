@@ -52,16 +52,16 @@ The essentials — what you see in the demo above:
 | **Notch Shelf** | Drag files to your notch — they vanish into a sleek shelf, ready when you need them |
 | **Floating Basket** | Jiggle your mouse while dragging to summon a basket anywhere on screen |
 | **Quick Actions** | Right-click any file for instant access to compress, convert, OCR, move, share, and more |
+| **Clipboard Manager** | Full history with search, favorites, OCR text extraction, and drag-out support |
 
 ---
 
 ## ⚡ Full Capabilities
 
-Everything Droppy can do:
+Everything else Droppy can do:
 
 | Feature | Description |
 |:--------|:------------|
-| **Clipboard Manager** | Full history with search, favorites, OCR text extraction, and drag-out support |
 | **Media Player** | Now Playing controls in your notch with album art and seek slider |
 | **Custom HUDs** | Beautiful volume, brightness, battery, and Caps Lock overlays |
 | **Move To...** | Send files directly to saved folder locations like your NAS, cloud drives, or project folders |
