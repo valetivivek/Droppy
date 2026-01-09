@@ -960,6 +960,9 @@ struct NotchShelfView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         state.deselectAll()
+                        if renamingItemId != nil {
+                            state.isRenaming = false
+                        }
                         renamingItemId = nil
                     }
                     // Moved Marquee Drag Gesture HERE so it doesn't conflict with dragging items
@@ -1748,6 +1751,7 @@ struct NotchItemView: View {
     private func startRenaming() {
         // Set the text to filename without extension for easier editing
         state.beginFileOperation()
+        state.isRenaming = true
         renamingItemId = item.id
     }
     
@@ -1756,6 +1760,7 @@ struct NotchItemView: View {
         guard !trimmedName.isEmpty else {
             print("Rename: Empty name, cancelling")
             renamingItemId = nil
+            state.isRenaming = false
             state.endFileOperation()
             return
         }
@@ -1771,6 +1776,7 @@ struct NotchItemView: View {
             print("Rename: Failed - renamed() returned nil")
         }
         renamingItemId = nil
+        state.isRenaming = false
         state.endFileOperation()
     }
 }
@@ -1897,6 +1903,7 @@ private struct NotchItemContent: View {
                         get: { renamingItemId == item.id },
                         set: { if !$0 { 
                             renamingItemId = nil
+                            state.isRenaming = false
                             state.endFileOperation()
                         } }
                     ),

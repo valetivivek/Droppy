@@ -268,9 +268,11 @@ final class NotchWindowController: NSObject, ObservableObject {
         // Keyboard monitor for spacebar Quick Look preview
         keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             // Only handle spacebar when shelf is expanded and has items
+            // Skip if rename is active (let user type spaces in filename)
             if event.keyCode == 49, // Spacebar
                DroppyState.shared.isExpanded,
-               !DroppyState.shared.items.isEmpty {
+               !DroppyState.shared.items.isEmpty,
+               !DroppyState.shared.isRenaming {
                 QuickLookHelper.shared.previewSelectedShelfItems()
                 return nil // Consume the event
             }

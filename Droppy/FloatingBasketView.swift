@@ -346,6 +346,7 @@ struct FloatingBasketView: View {
                         state.deselectAllBasket()
                         // If rename was active, end the file operation lock
                         if renamingItemId != nil {
+                            state.isRenaming = false
                             state.endFileOperation()
                         }
                         renamingItemId = nil
@@ -945,6 +946,7 @@ struct BasketItemView: View {
     private func startRenaming() {
         // Use async to ensure context menu is fully closed before showing rename field
         state.beginFileOperation()
+        state.isRenaming = true
         DispatchQueue.main.async {
             renamingItemId = item.id
         }
@@ -955,6 +957,7 @@ struct BasketItemView: View {
         guard !trimmedName.isEmpty else {
             print("Rename: Empty name, cancelling")
             renamingItemId = nil
+            state.isRenaming = false
             state.endFileOperation()
             return
         }
@@ -970,6 +973,7 @@ struct BasketItemView: View {
             print("Rename: Failed - renamed() returned nil")
         }
         renamingItemId = nil
+        state.isRenaming = false
         state.endFileOperation()
     }
 }
@@ -1054,6 +1058,7 @@ private struct BasketItemContent: View {
                         get: { renamingItemId == item.id },
                         set: { if !$0 { 
                             renamingItemId = nil
+                            state.isRenaming = false
                             state.endFileOperation()
                         } }
                     ),

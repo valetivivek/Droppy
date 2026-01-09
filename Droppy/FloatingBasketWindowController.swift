@@ -254,8 +254,8 @@ final class FloatingBasketWindowController: NSObject {
                 return event
             }
             
-            // Spacebar triggers Quick Look
-            if event.keyCode == 49 {
+            // Spacebar triggers Quick Look (but not during rename)
+            if event.keyCode == 49, !DroppyState.shared.isRenaming {
                 QuickLookHelper.shared.previewSelectedBasketItems()
                 return nil // Consume the event
             }

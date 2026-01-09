@@ -47,6 +47,9 @@ final class DroppyState {
     /// Whether files are being hovered over the basket
     var isBasketTargeted: Bool = false
     
+    /// Whether any rename text field is currently active (blocks spacebar Quick Look)
+    var isRenaming: Bool = false
+    
     /// Counter for file operations in progress (zip, compress, convert, rename)
     /// Used to prevent auto-hide during these operations
     /// Auto-hide is blocked when this is > 0
