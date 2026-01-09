@@ -68,12 +68,20 @@ brew install --cask iordv/tap/droppy
 
 ### Manual Download
 1. Download [**Droppy.dmg**](https://github.com/iordv/Droppy/releases/latest)
-2. Drag to Applications
-3. Right-click → **Open** on first launch
+2. Open the DMG and drag Droppy to Applications
+3. **Important:** Before first launch, run this command in Terminal:
+   ```bash
+   xattr -rd com.apple.quarantine /Applications/Droppy.app
+   ```
+4. Open Droppy from your Applications folder
 
-> **Quarantine Issue?** Run: `xattr -d com.apple.quarantine /Applications/Droppy.app`
+> ⚠️ **"Droppy is damaged and can't be opened"?**
+> 
+> This happens because macOS quarantines apps downloaded from the internet. The `xattr` command above removes this flag. This is safe — Droppy is open source and you can verify the code yourself.
+>
+> Alternatively, use **Homebrew** which handles this automatically.
 
----
+
 
 ## 🕹️ How to Use
 
