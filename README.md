@@ -55,22 +55,22 @@ The essentials — what you see in the demo above:
 
 ---
 
-## � Full Capabilities
+## ⚡ Full Capabilities
 
 Everything Droppy can do:
 
 | | Feature | Description |
 |:--|:--------|:------------|
-| �📋 | **Clipboard Manager** | Full history with search, favorites, OCR text extraction, and drag-out support |
+| � | **Clipboard Manager** | Full history with search, favorites, OCR text extraction, and drag-out support |
 | 🎵 | **Media Player** | Now Playing controls in your notch with album art and seek slider |
 | 🔊 | **Custom HUDs** | Beautiful volume, brightness, battery, and Caps Lock overlays |
-|  | **Move To...** | Send files directly to saved folder locations like your NAS, cloud drives, or project folders |
-| 📉 | **Smart Compression** | Compress images, PDFs, and videos with auto or target size options — keeps originals if larger |
+| 📁 | **Move To...** | Send files directly to saved folder locations like your NAS, cloud drives, or project folders |
+| � | **Smart Compression** | Compress images, PDFs, and videos with auto or target size options — keeps originals if larger |
 | ✏️ | **Fast Actions** | Convert images, extract text (OCR), create ZIPs, rename — all from the shelf with one click |
 | 🙈 | **Auto-Hide Basket** | Basket slides to screen edge when idle, peeks out on hover for quick access |
 | 🖥️ | **Multi-Monitor** | Works on external displays with smart fullscreen detection and automatic positioning |
 | 🏝️ | **Dynamic Island** | Non-notch Macs get a beautiful floating pill interface that matches the notch experience |
-| 🔮 | **Alfred Integration** | Push files to Droppy from Alfred with a quick action |
+| 🔗 | **Alfred Integration** | Push files to Droppy from Alfred with a quick action |
 
 ---
 
@@ -131,10 +131,10 @@ Drag files out of the shelf and drop into any app. The file moves and vanishes f
 
 ## 🛠️ Pro Tips
 
-### 🔮 Alfred Integration
+### � Alfred Integration
 Push files from Finder to Droppy: **Settings** → **About** → **Install in Alfred**, then use Alfred's Universal Actions on any file.
 
-### 📉 Smart Compression
+### � Smart Compression
 - **Auto**: Balanced settings for most files
 - **Target Size**: Need under 2MB? Right-click → Compress → **Target Size...**
 - **Size Guard** 🛡️: If compression would make the file larger, Droppy keeps the original
