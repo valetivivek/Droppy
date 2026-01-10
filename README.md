@@ -91,12 +91,12 @@ Now Playing controls with album art, seek slider, and native Spotify integration
 | **Floating Basket** | Jiggle your cursor while dragging to summon a basket anywhere |
 | **Clipboard Manager** | Full history with search, favorites, OCR, and drag-out |
 | **Media Player** | Now Playing controls with album art and seek slider |
-| **Native Spotify** | Shuffle, repeat, and rock-solid playback timing |
+| <img src="https://upload.wikimedia.org/wikipedia/commons/8/84/Spotify_icon.svg" width="16"> **Native Spotify** | Shuffle, repeat, and rock-solid playback timing |
 | **Quick Actions** | Right-click for compress, convert, OCR, move, share |
 | **Custom HUDs** | Beautiful volume, brightness, battery overlays |
 | **OCR & Vision** | Extract text from any image instantly |
 | **Auto-Hide & Peek** | Basket slides to edge, peeks on hover |
-| **Alfred Integration** | Push files from Alfred workflows |
+| <img src="https://www.alfredapp.com/media/logo4@2x.png" width="16"> **Alfred Integration** | Push files from Alfred workflows |
 | **Dynamic Island** | Non-notch Macs get a beautiful pill interface |
 | **Multi-Monitor** | Works on external displays with fullscreen detection |
 
@@ -104,7 +104,7 @@ Now Playing controls with album art, seek slider, and native Spotify integration
 
 ## 📦 Installation
 
-### Homebrew (Recommended)
+### <img src="https://brew.sh/assets/img/homebrew-256x256.png" width="20"> Homebrew (Recommended)
 ```bash
 brew install --cask iordv/tap/droppy
 ```
