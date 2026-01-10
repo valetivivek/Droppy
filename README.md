@@ -11,6 +11,7 @@
 </p>
 
 <p align="center">
+    <a href="https://iordv.github.io/Droppy/"><img src="https://img.shields.io/badge/🌐_Website-Visit-blueviolet?style=flat-square" alt="Website"></a>
     <a href="https://github.com/iordv/Droppy/releases/latest"><img src="https://img.shields.io/github/v/release/iordv/Droppy?style=flat-square&color=007AFF" alt="Latest Release"></a>
     <a href="https://github.com/iordv/Droppy/releases/latest"><img src="https://img.shields.io/badge/⬇_Download-DMG-success?style=flat-square" alt="Download"></a>
     <img src="https://img.shields.io/badge/platform-macOS_14+-lightgrey?style=flat-square" alt="Platform">
@@ -18,6 +19,7 @@
 </p>
 
 <p align="center">
+  <a href="https://iordv.github.io/Droppy/">Website</a> •
   <a href="#-installation">Install</a> •
   <a href="#-core-features">Features</a> •
   <a href="#-how-to-use">Usage</a> •
