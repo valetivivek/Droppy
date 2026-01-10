@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Droppy — Download for Mac</title>
     <meta name="description" content="Download Droppy for Mac">
     <link rel="icon" href="https://i.postimg.cc/9FxZhRf3/1024-mac.webp">
@@ -30,6 +30,25 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
         rel="stylesheet">
 
+    <!-- Block copy/zoom keyboard shortcuts -->
+    <script>
+        document.addEventListener('keydown', function (e) {
+            if ((e.metaKey || e.ctrlKey) && (e.key === 'c' || e.key === 'a')) e.preventDefault();
+            if ((e.metaKey || e.ctrlKey) && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) e.preventDefault();
+        });
+        document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    </script>
+
+    <style>
+        /* Block text selection */
+        body {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+    </style>
+
     <style>
         @keyframes fadeIn {
             from {
@@ -55,32 +74,61 @@
             }
         }
 
+        @keyframes scaleOut {
+            from {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            to {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+        }
+
         .modal-backdrop {
             backdrop-filter: blur(8px);
+            transition: opacity 0.25s ease-out;
+        }
+
+        #modal {
+            transition: opacity 0.25s ease-out;
+        }
+
+        #modal.modal-closing {
+            opacity: 0;
+        }
+
+        .modal-closing .modal-backdrop {
+            opacity: 0;
+        }
+
+        .modal-closing .modal-cards {
+            animation: scaleOut 0.25s ease-out forwards;
         }
     </style>
 </head>
 
-<body class="font-sans antialiased bg-droppy-75 text-stone-800">
-    <section class="flex min-h-screen flex-col text-stone-800 dark:text-droppy-75">
+<body class="font-sans antialiased bg-slate-950 text-slate-100">
+    <section class="flex min-h-screen flex-col text-slate-100">
         <!-- Header (IDENTICAL to main page) -->
         <header
-            class="fixed top-0 z-40 flex w-full justify-center bg-droppy-75 px-8 py-5 outline outline-1 outline-droppy-400/0 duration-300 sm:py-7 dark:bg-droppy-950 transition-shadow"
+            class="fixed top-0 z-40 flex w-full justify-center bg-slate-950 px-8 py-5 outline outline-1 outline-droppy-400/0 duration-300 sm:py-7"
             id="header">
-            <div class="flex w-full max-w-screen-2xl justify-between">
-                <!-- Logo -->
+            <div class="flex w-full max-w-screen-2xl items-center justify-center">
+                <!-- Center: Logo -->
                 <div class="flex items-center opacity-100" style="animation: fadeIn 0.5s ease-out 0.1s both;">
                     <a href="/" class="group flex items-center outline-none" aria-label="Go home">
                         <div
-                            class="relative mr-3 h-10 w-10 overflow-hidden rounded-xl border-[2.5px] border-stone-800 dark:border-droppy-100 bg-stone-900">
+                            class="relative mr-3 h-10 w-10 overflow-hidden rounded-xl border-[2.5px] border-slate-500 bg-slate-800">
                             <!-- Overlay/Icon slides left -->
                             <div
-                                class="absolute inset-0.5 origin-center rounded-lg bg-droppy-25 dark:bg-droppy-950 transition delay-50 duration-300 ease-out group-hover:-translate-x-full group-hover:scale-x-50 group-hover:scale-y-75 group-hover:opacity-25 group-hover:delay-0">
+                                class="absolute inset-0.5 origin-center rounded-lg bg-slate-700 transition delay-50 duration-300 ease-out group-hover:-translate-x-full group-hover:scale-x-50 group-hover:scale-y-75 group-hover:opacity-25 group-hover:delay-0">
                                 <img src="https://i.postimg.cc/9FxZhRf3/1024-mac.webp" alt="Droppy"
                                     class="w-full h-full object-cover rounded-lg">
                             </div>
                             <!-- Arrow moves in from right -->
-                            <svg class="absolute -left-1 -top-1 h-11 w-11 fill-current text-white dark:text-droppy-75"
+                            <svg class="absolute -left-1 -top-1 h-11 w-11 fill-current text-slate-100"
                                 viewBox="0 0 36 36">
                                 <path
                                     class="ease absolute origin-right translate-x-0.5 scale-50 opacity-0 blur-xs transition duration-300 group-hover:translate-x-0 group-hover:scale-100 group-hover:opacity-100 group-hover:blur-none group-hover:delay-50"
@@ -90,26 +138,9 @@
                         <div class="text-2xl font-bold">Droppy</div>
                     </a>
                     <a href="https://github.com/iordv/Droppy/releases"
-                        class="group ml-2 mt-2.5 flex items-center justify-center self-start whitespace-nowrap rounded-lg border-[1.5px] border-droppy-950/15 bg-droppy-950/[0.03] px-1.5 py-0.5 text-center text-xs font-bold text-droppy-950/60 dark:border-droppy-75/10 dark:bg-droppy-75/[0.04] dark:text-droppy-75/50"
+                        class="group ml-2 mt-2.5 flex items-center justify-center self-start whitespace-nowrap rounded-lg border-[1.5px] border-slate-600 bg-slate-800 px-1.5 py-0.5 text-center text-xs font-bold text-slate-400"
                         target="_blank">
-                        v6.0
-                    </a>
-                </div>
-
-                <!-- Nav -->
-                <div class="flex items-center space-x-7 opacity-100" style="animation: fadeIn 0.5s ease-out 0.1s both;">
-                    <a class="group inline-flex items-center justify-center outline-none transition duration-300 hover:bg-droppy-950/5 rounded-2xl px-5 py-4 text-lg font-bold bg-stone-800 bg-opacity-5 sm:bg-opacity-0 dark:bg-droppy-75/5 dark:hover:bg-droppy-75/5"
-                        href="https://github.com/iordv/Droppy/issues" target="_blank">
-                        <svg class="size-[22px] origin-bottom fill-current transition duration-300 group-hover:-rotate-12 sm:mr-2"
-                            viewBox="0 0 28 28">
-                            <path
-                                d="M13.8906 26.9805C14.418 26.9805 14.9102 26.7578 15.3789 25.9492L17.5469 22.3281H21.4609C24.9531 22.3281 26.8281 20.3945 26.8281 16.9609V7.98438C26.8281 4.55078 24.9531 2.61719 21.4609 2.61719H6.36719C2.875 2.61719 1 4.53906 1 7.98438V16.9609C1 20.4062 2.875 22.3281 6.36719 22.3281H10.2344L12.4023 25.9492C12.8711 26.7578 13.3633 26.9805 13.8906 26.9805Z">
-                            </path>
-                            <path
-                                class="origin-top-left stroke-current stroke-2 text-droppy-75 transition duration-250 group-hover:-rotate-3 group-hover:text-[#f6e5d5] group-hover:delay-50 dark:text-stone-900 dark:group-hover:text-stone-900"
-                                d="M8 14H16M8 10H20.25" stroke-linecap="round"></path>
-                        </svg>
-                        <span class="hidden sm:block">Support</span>
+                        v6.1.1
                     </a>
                 </div>
             </div>
@@ -119,9 +150,9 @@
         <main class="flex flex-1 justify-center px-8 pb-16 pt-32 sm:pb-28 sm:pt-48 xl:px-36">
             <div class="w-full max-w-screen-md text-center">
                 <!-- Headline with Mac icon IN FRONT of Mac -->
-                <h1 class="mb-6 text-5xl font-bold tracking-tight sm:text-8xl"
+                <h1 class="mb-6 text-5xl font-bold tracking-tight sm:text-8xl whitespace-nowrap"
                     style="animation: fadeIn 0.6s ease-out 0.3s both;">
-                    Download for<br>
+                    Droppy for
                     <span class="relative inline-block">
                         <svg class="inline-block -mt-2 mr-1 size-10 fill-current sm:-mt-4 sm:mr-2 sm:size-20"
                             viewBox="0 0 24 24">
@@ -137,27 +168,28 @@
                 <!-- Instructions -->
                 <div class="mx-auto flex max-w-[30rem] flex-col items-center justify-center"
                     style="animation: fadeIn 0.6s ease-out 0.5s both;">
-                    <p class="mt-4 text-xl leading-normal sm:mt-6 text-stone-600">
-                        Install via <span class="font-semibold text-stone-800">Homebrew</span> for automatic updates.
+                    <p class="mt-4 text-xl leading-normal sm:mt-6 text-slate-400">
+                        Install via <span class="font-semibold text-slate-100">Homebrew</span> for automatic updates.
+                    </p>
                     </p>
 
                     <!-- Homebrew Card -->
                     <div
-                        class="my-8 flex w-full max-w-md flex-col items-center justify-center rounded-3xl border-2 border-droppy-950/5 bg-droppy-950/[0.025] pb-8 pt-6 sm:my-10">
+                        class="my-8 flex w-full max-w-md flex-col items-center justify-center rounded-[32px] bg-slate-800/50 pb-8 pt-6 sm:my-10">
                         <div class="mb-4 size-32">
                             <img src="https://brew.sh/assets/img/homebrew-256x256.png" alt="Homebrew"
                                 class="size-full select-none" draggable="false">
                         </div>
-                        <p class="text-2xl font-bold text-stone-800">Homebrew</p>
-                        <p class="text-base font-semibold text-droppy-950/60">Recommended Install</p>
-                        <p class="inline-flex items-center text-sm font-semibold text-droppy-950/40">
+                        <p class="text-2xl font-bold text-slate-100">Homebrew</p>
+                        <p class="text-base font-semibold text-slate-400">Recommended Install</p>
+                        <p class="inline-flex items-center text-sm font-semibold text-slate-500">
                             Auto-updates <span
-                                class="mx-1.5 mt-px inline-block size-[3px] rounded-full bg-droppy-950/40"></span> v6.0
+                                class="mx-1.5 mt-px inline-block size-[3px] rounded-full bg-slate-500"></span> v6.1.1
                         </p>
 
                         <!-- Command Box - Fully Clickable -->
                         <button onclick="openModal()"
-                            class="group mt-6 flex w-[calc(100%-2rem)] items-center justify-center gap-3 rounded-2xl bg-stone-800 px-5 py-3.5 text-droppy-75 transition-all duration-200 hover:bg-stone-700 hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
+                            class="group mt-6 flex w-[calc(100%-2rem)] items-center justify-center gap-3 rounded-[28px] bg-slate-800 px-5 py-3.5 text-droppy-75 transition-all duration-200 hover:bg-slate-700 hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
                             <code class="text-sm sm:text-base font-mono">brew install --cask iordv/tap/droppy</code>
                             <svg class="h-5 w-5 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,13 +201,13 @@
 
                     <!-- Divider -->
                     <div class="flex items-center gap-4 w-full max-w-xs mb-8">
-                        <div class="flex-1 h-px bg-droppy-950/10"></div>
-                        <span class="text-sm font-semibold text-droppy-950/40">or</span>
-                        <div class="flex-1 h-px bg-droppy-950/10"></div>
+                        <div class="flex-1 h-px bg-slate-700"></div>
+                        <span class="text-sm font-semibold text-slate-500">or</span>
+                        <div class="flex-1 h-px bg-slate-700"></div>
                     </div>
 
                     <!-- GitHub DMG Link -->
-                    <a class="group flex items-center gap-3 rounded-2xl border-2 border-droppy-950/5 px-6 py-4 text-lg font-bold text-droppy-950/65 transition-all duration-200 hover:bg-stone-800 hover:text-droppy-75 hover:scale-[1.02] active:scale-[0.98]"
+                    <a class="group flex items-center gap-3 rounded-[28px] bg-slate-800 px-6 py-4 text-lg font-bold text-slate-300 transition-all duration-200 hover:bg-slate-700 hover:text-slate-100 hover:scale-[1.02] active:scale-[0.98]"
                         href="https://github.com/iordv/Droppy/releases/latest" target="_blank">
                         <svg class="h-6 w-6 fill-current" viewBox="0 0 24 24">
                             <path fill-rule="evenodd"
@@ -185,11 +217,11 @@
                         Download from GitHub
                     </a>
 
-                    <p class="mt-6 text-sm text-droppy-950/40">Minimum macOS 14 Sonoma</p>
+                    <p class="mt-6 text-sm text-slate-500">Minimum macOS 14 Sonoma</p>
 
-                    <p class="mt-10 max-w-sm text-lg leading-normal text-stone-600">
+                    <p class="mt-10 max-w-sm text-lg leading-normal text-slate-400">
                         If you have any issues, please
-                        <a class="relative whitespace-nowrap font-medium text-stone-800 outline-none transition duration-200 after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-[0.125rem] after:bg-droppy-400 after:transition after:duration-200 after:content-[''] hover:text-droppy-500 after:hover:translate-y-px"
+                        <a class="relative whitespace-nowrap font-medium text-slate-100 outline-none transition duration-200 after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-[0.125rem] after:bg-droppy-400 after:transition after:duration-200 after:content-[''] hover:text-droppy-400 after:hover:translate-y-px"
                             href="https://github.com/iordv/Droppy/issues" target="_blank">open an issue</a>.
                     </p>
                 </div>
@@ -200,7 +232,7 @@
         <footer class="relative flex flex-col items-center justify-center px-8 pb-20 sm:pb-0"
             style="animation: fadeIn 0.6s ease-out 0.7s both;">
             <div class="flex items-center justify-center space-x-3">
-                <a class="group inline-flex items-center justify-center outline-none transition duration-300 hover:bg-droppy-950/5 rounded-xl bg-droppy-950/5 p-2 text-droppy-950/50 hover:text-droppy-950/75 size-10"
+                <a class="group inline-flex items-center justify-center outline-none transition duration-300 hover:bg-slate-800 rounded-xl bg-slate-800/50 p-2 text-slate-400 hover:text-slate-100 size-10"
                     href="https://github.com/iordv/Droppy" target="_blank">
                     <svg class="size-6 fill-current transition duration-300 ease-out group-hover:scale-105"
                         viewBox="0 0 24 24">
@@ -209,7 +241,7 @@
                             clip-rule="evenodd" />
                     </svg>
                 </a>
-                <a class="group inline-flex items-center justify-center outline-none transition duration-300 hover:bg-droppy-950/5 rounded-xl bg-droppy-950/5 p-2 text-droppy-950/50 hover:text-droppy-950/75 size-10"
+                <a class="group inline-flex items-center justify-center outline-none transition duration-300 hover:bg-slate-800 rounded-xl bg-slate-800/50 p-2 text-slate-400 hover:text-slate-100 size-10"
                     href="https://buymeacoffee.com/droppy" target="_blank">
                     <svg class="size-6 fill-current transition duration-300 ease-out group-hover:scale-105"
                         viewBox="0 0 24 24">
@@ -219,40 +251,61 @@
                 </a>
             </div>
             <div
-                class="pointer-events-none -mt-6 hidden select-none overflow-hidden bg-gradient-to-b from-droppy-950/10 from-25% to-droppy-950/0 bg-clip-text text-[14rem] font-black leading-none text-transparent sm:block sm:h-36 md:h-48 md:text-[18rem] lg:h-56 lg:text-[20rem]">
+                class="pointer-events-none -mt-6 hidden select-none overflow-hidden bg-gradient-to-b from-slate-100/10 from-25% to-slate-100/0 bg-clip-text text-[14rem] font-black leading-none text-transparent sm:block sm:h-36 md:h-48 md:text-[18rem] lg:h-56 lg:text-[20rem]">
                 Droppy</div>
         </footer>
     </section>
 
-    <!-- Installation Modal (Single Command) -->
-    <div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
-        <div class="absolute inset-0 bg-stone-900/50 modal-backdrop" onclick="closeModal()"></div>
-        <div class="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8"
-            style="animation: scaleIn 0.3s ease-out;">
-            <button onclick="closeModal()"
-                class="absolute top-4 right-4 p-2 rounded-full hover:bg-stone-100 transition-colors">
-                <svg class="h-6 w-6 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
+    <!-- Installation Modal -->
+    <div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 overflow-y-auto">
+        <div class="absolute inset-0 bg-black/70 modal-backdrop" onclick="closeModal()"></div>
 
-            <div class="flex items-center gap-4 mb-6">
-                <img src="https://brew.sh/assets/img/homebrew-256x256.png" class="size-14" alt="Homebrew">
-                <div>
-                    <h2 class="text-2xl font-bold text-stone-800">Install with Homebrew</h2>
-                    <p class="text-stone-500">Just 1 command</p>
+        <!-- Two Floating Cards Container -->
+        <div class="relative flex flex-col items-center gap-4 max-w-lg w-full py-8 modal-cards"
+            style="animation: scaleIn 0.3s ease-out;">
+
+            <!-- Step 1 Title (floating above card) -->
+            <h3 class="text-3xl font-bold text-slate-100 w-full text-left flex items-center gap-3">
+                <img src="https://brew.sh/assets/img/homebrew-256x256.png" class="size-8" alt="Homebrew">
+                Step 1
+            </h3>
+
+            <!-- Card 1: Install Homebrew -->
+            <div class="bg-slate-900 rounded-[32px] shadow-2xl w-full p-8">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-lg font-semibold text-slate-100">Install Homebrew</span>
+                    <span class="text-xs text-slate-500">Skip if already installed</span>
                 </div>
+                <p class="text-sm text-slate-400 mb-4">Homebrew is the free, open-source package manager for macOS. It
+                    handles installation and automatic updates.</p>
+                <button onclick="copyHomebrewCommand(this)"
+                    class="group flex items-center justify-between w-full bg-slate-800 rounded-[20px] px-4 py-3 text-slate-100 hover:bg-slate-700 transition-all duration-200 active:scale-[0.98]">
+                    <code
+                        class="text-xs font-mono text-slate-300 truncate mr-2">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code>
+                    <svg id="copyIconBrew" class="h-5 w-5 shrink-0 opacity-60 group-hover:opacity-100" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <svg id="checkIconBrew" class="h-5 w-5 shrink-0 text-green-400 hidden" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </button>
             </div>
 
-            <!-- Single Command -->
-            <div class="rounded-2xl bg-stone-50 p-4">
-                <div class="flex items-center gap-3 mb-3">
-                    <span
-                        class="flex items-center justify-center size-7 rounded-full bg-droppy-500 text-white text-sm font-bold">1</span>
-                    <span class="font-semibold text-stone-800">Run this in Terminal</span>
-                </div>
-                <button onclick="copyCommand()"
-                    class="group flex items-center justify-between w-full bg-stone-800 rounded-xl px-4 py-3 text-droppy-75 hover:bg-stone-700 transition-colors">
+            <!-- Step 2 Title (floating above card) -->
+            <h3 class="text-3xl font-bold text-slate-100 w-full text-left mt-4 flex items-center gap-3">
+                <img src="https://i.postimg.cc/9FxZhRf3/1024-mac.webp" class="size-8 rounded-lg" alt="Droppy">
+                Step 2
+            </h3>
+
+            <!-- Card 2: Install Droppy -->
+            <div class="bg-slate-900 rounded-[32px] shadow-2xl w-full p-8">
+                <span class="text-lg font-semibold text-slate-100 block mb-3">Install Droppy</span>
+                <p class="text-sm text-slate-400 mb-4">Run this command in Terminal. Updates are automatic!</p>
+                <button onclick="copyCommand(this)"
+                    class="group flex items-center justify-between w-full bg-slate-800 rounded-[20px] px-4 py-3 text-slate-100 hover:bg-slate-700 transition-all duration-200 active:scale-[0.98]">
                     <code class="text-sm font-mono">brew install --cask iordv/tap/droppy</code>
                     <svg id="copyIcon" class="h-5 w-5 shrink-0 opacity-60 group-hover:opacity-100" fill="none"
                         stroke="currentColor" viewBox="0 0 24 24">
@@ -264,23 +317,43 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>
                 </button>
+
+                <p class="mt-6 text-sm text-slate-500 text-center">
+                    Need help? <a href="https://brew.sh" target="_blank"
+                        class="font-medium text-droppy-400 hover:text-droppy-300 transition-colors">Visit brew.sh →</a>
+                </p>
             </div>
 
-            <p class="mt-6 text-sm text-stone-500 text-center">
-                Don't have Homebrew? <a href="https://brew.sh" target="_blank"
-                    class="font-medium text-droppy-500 hover:text-droppy-600 transition-colors">Install it first →</a>
-            </p>
         </div>
     </div>
 
     <script>
-        function openModal() { document.getElementById('modal').classList.remove('hidden'); document.getElementById('modal').classList.add('flex'); document.body.style.overflow = 'hidden'; }
-        function closeModal() { document.getElementById('modal').classList.add('hidden'); document.getElementById('modal').classList.remove('flex'); document.body.style.overflow = ''; }
+        function openModal() {
+            const modal = document.getElementById('modal');
+            modal.classList.remove('hidden', 'modal-closing');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeModal() {
+            const modal = document.getElementById('modal');
+            modal.classList.add('modal-closing');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex', 'modal-closing');
+                document.body.style.overflow = '';
+            }, 250);
+        }
         function copyCommand() {
             navigator.clipboard.writeText('brew install --cask iordv/tap/droppy');
             document.getElementById('copyIcon').classList.add('hidden');
             document.getElementById('checkIcon').classList.remove('hidden');
             setTimeout(() => { document.getElementById('copyIcon').classList.remove('hidden'); document.getElementById('checkIcon').classList.add('hidden'); }, 2000);
+        }
+        function copyHomebrewCommand() {
+            navigator.clipboard.writeText('/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"');
+            document.getElementById('copyIconBrew').classList.add('hidden');
+            document.getElementById('checkIconBrew').classList.remove('hidden');
+            setTimeout(() => { document.getElementById('copyIconBrew').classList.remove('hidden'); document.getElementById('checkIconBrew').classList.add('hidden'); }, 2000);
         }
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
