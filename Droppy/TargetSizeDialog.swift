@@ -70,9 +70,9 @@ struct TargetSizeDialogView: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(Color.white.opacity(0.05))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .stroke(
                                     Color.accentColor.opacity(0.8),
                                     style: StrokeStyle(
@@ -106,9 +106,9 @@ struct TargetSizeDialogView: View {
                         .padding(.vertical, 8)
                         .background(Color.white.opacity(isCancelButtonHovering ? 0.15 : 0.08))
                         .foregroundStyle(.primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
                         )
                 }
@@ -134,9 +134,9 @@ struct TargetSizeDialogView: View {
                     .padding(.vertical, 8)
                     .background(Color.blue.opacity(isCompressButtonHovering ? 1.0 : 0.8))
                     .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .stroke(Color.white.opacity(0.2), lineWidth: 1)
                     )
                 }

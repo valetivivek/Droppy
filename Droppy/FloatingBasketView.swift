@@ -32,7 +32,7 @@ struct FloatingBasketView: View {
     // Global rename state
     @State private var renamingItemId: UUID?
     
-    private let cornerRadius: CGFloat = 24
+    private let cornerRadius: CGFloat = 28
     
     // Each item is 76pt wide + 8pt spacing between = 84pt per item
     // For 4 items: 4 * 76 + 3 * 8 = 304 + 24 = 328, plus 24pt padding each side = 376
@@ -261,9 +261,9 @@ struct FloatingBasketView: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(Color.blue.opacity(isShelfButtonHovering ? 1.0 : 0.8))
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
                         )
                     }
@@ -285,9 +285,9 @@ struct FloatingBasketView: View {
                             .foregroundStyle(isClipboardButtonHovering ? .primary : .secondary)
                             .frame(width: 32, height: 32)
                             .background(Color.white.opacity(isClipboardButtonHovering ? 0.2 : 0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .stroke(Color.white.opacity(0.15), lineWidth: 1)
                             )
                     }
@@ -308,9 +308,9 @@ struct FloatingBasketView: View {
                         .foregroundStyle(isCloseButtonHovering ? .primary : .secondary)
                         .frame(width: 32, height: 32)
                         .background(Color.white.opacity(isCloseButtonHovering ? 0.2 : 0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
                         )
                 }
@@ -472,7 +472,7 @@ struct BasketItemView: View {
             .overlay(alignment: .center) {
                 if isShakeAnimating {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
                             .frame(width: 44, height: 44)
                             .shadow(radius: 4)
@@ -1000,10 +1000,10 @@ private struct BasketItemContent: View {
         VStack(spacing: 6) {
             ZStack(alignment: .topTrailing) {
                 // Thumbnail container
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(isSelected ? Color.blue.opacity(0.3) : Color.white.opacity(0.1))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
                     )
                     .frame(width: 60, height: 60)
@@ -1020,7 +1020,7 @@ private struct BasketItemContent: View {
                             }
                         }
                         .frame(width: 44, height: 44)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .opacity((isConverting || isExtractingText) ? 0.5 : 1.0)
                     }
                     .overlay {
@@ -1035,7 +1035,7 @@ private struct BasketItemContent: View {
                 if isHovering && !isPoofing && renamingItemId != item.id {
                     Button(action: onRemove) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .fill(Color.red.opacity(0.9))
                                 .frame(width: 20, height: 20)
                             Image(systemName: "xmark")
@@ -1070,20 +1070,20 @@ private struct BasketItemContent: View {
             } else {
                 Text(item.name)
                     .font(.system(size: 10, weight: isSelected ? .bold : .medium))
-                    .foregroundStyle(isSelected ? .white : .primary.opacity(0.85))
+                    .foregroundStyle(isSelected ? .white : .white.opacity(0.85))
                     .lineLimit(1)
                     .frame(width: 68)
                     .padding(.horizontal, 4)
                     .background(
                         isSelected ?
-                        RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.blue) :
-                        RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.clear)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.blue) :
+                        RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.clear)
                     )
             }
         }
         .padding(4)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(isHovering && !isSelected ? Color.white.opacity(0.1) : Color.clear)
         )
         .poofEffect(isPoofing: $isPoofing) {
@@ -1132,12 +1132,12 @@ private struct RenameTextField: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color.black.opacity(0.3))
         )
         // Animated dotted blue outline
         .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(
                     Color.accentColor.opacity(0.8),
                     style: StrokeStyle(

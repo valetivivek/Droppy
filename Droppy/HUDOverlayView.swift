@@ -258,7 +258,7 @@ struct MediaHUDView: View {
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
                             } else {
-                                RoundedRectangle(cornerRadius: 5)
+                                RoundedRectangle(cornerRadius: 4)
                                     .fill(Color.white.opacity(0.2))
                                     .overlay(
                                         Image(systemName: "music.note")
@@ -268,7 +268,7 @@ struct MediaHUDView: View {
                             }
                         }
                         .frame(width: 20, height: 20)
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
                         
                         Spacer()
                         
@@ -293,7 +293,7 @@ struct MediaHUDView: View {
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
                             } else {
-                                RoundedRectangle(cornerRadius: 6)
+                                RoundedRectangle(cornerRadius: 14)
                                     .fill(Color.white.opacity(0.2))
                                     .overlay(
                                         Image(systemName: "music.note")
@@ -303,7 +303,7 @@ struct MediaHUDView: View {
                             }
                         }
                         .frame(width: 26, height: 26)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                         .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
                         Spacer(minLength: 0)
                     }
@@ -572,15 +572,15 @@ struct HUDOverlayView: View {
     }
     
     private var hudBackground: some View {
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
             .fill(.ultraThinMaterial)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(Color.black.opacity(0.6))
             )
             // Specular rim lighting
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(
                         LinearGradient(
                             stops: [
@@ -659,7 +659,7 @@ class HUDStateManager {
         
         VStack {
             // Simulate notch background
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
                 .fill(Color.black)
                 .frame(width: 280, height: 90)
                 .overlay {
@@ -674,7 +674,7 @@ class HUDStateManager {
             
             Spacer().frame(height: 40)
             
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
                 .fill(Color.black)
                 .frame(width: 280, height: 90)
                 .overlay {

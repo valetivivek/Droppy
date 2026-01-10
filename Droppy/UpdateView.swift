@@ -26,7 +26,7 @@ struct UpdateView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 56, height: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(isUpToDate ? "Droppy is up to date!" : "Update Available")
@@ -98,9 +98,9 @@ struct UpdateView: View {
                             .padding(.vertical, 8)
                             .background(Color.blue.opacity(isOkHovering ? 1.0 : 0.8))
                             .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
                                     .stroke(Color.white.opacity(0.2), lineWidth: 1)
                             )
                     }
@@ -120,9 +120,9 @@ struct UpdateView: View {
                             .padding(.vertical, 8)
                             .background(Color.white.opacity(isLaterHovering ? 0.15 : 0.08))
                             .foregroundStyle(.primary)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
                                     .stroke(Color.white.opacity(0.2), lineWidth: 1)
                             )
                     }
@@ -151,9 +151,9 @@ struct UpdateView: View {
                         .padding(.vertical, 8)
                         .background(Color.blue.opacity(isUpdateHovering ? 1.0 : 0.8))
                         .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
                         )
                     }

@@ -182,9 +182,9 @@ struct ClipboardManagerView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.white.opacity(0.1), lineWidth: 1)
             )
             .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
@@ -268,11 +268,11 @@ struct ClipboardManagerView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(Color.black.opacity(0.3))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(
                             Color.accentColor.opacity(0.8),
                             style: StrokeStyle(
@@ -482,15 +482,15 @@ struct ClipboardManagerView: View {
                     .padding(.vertical, 4)
                     .frame(maxWidth: .infinity)
                     .background(Color.white.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
         }
         .padding(12)
         .background(Color.orange.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.orange.opacity(0.2), lineWidth: 1)
         )
         .padding(.horizontal, 20)
@@ -680,7 +680,7 @@ struct ClipboardItemRow: View {
         HStack(spacing: 10) {
             // Icon/Thumbnail - smaller and shows real image for images
             ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color.white.opacity(0.1))
                     .frame(width: 32, height: 32)
                 
@@ -690,7 +690,7 @@ struct ClipboardItemRow: View {
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: 32, height: 32)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 } else {
                     Image(systemName: iconName(for: item.type))
                         .foregroundStyle(.white)
@@ -754,19 +754,19 @@ struct ClipboardItemRow: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(isSelected 
                       ? Color.blue.opacity(isHovering ? 1.0 : 0.8) 
                       : Color.white.opacity(isHovering ? 0.15 : 0.08))
         )
         .foregroundStyle(isSelected ? .white : .primary)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
         )
         .overlay {
             if isRenaming {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(
                         Color.accentColor.opacity(0.8),
                         style: StrokeStyle(
@@ -1094,7 +1094,7 @@ struct ClipboardPreviewView: View {
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .frame(maxHeight: 220)
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             
                             // OCR Button
                             Button {
@@ -1133,9 +1133,9 @@ struct ClipboardPreviewView: View {
                                 .padding(.vertical, 6)
                                 .background(.ultraThinMaterial)
                                 .background(Color.black.opacity(0.4))
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
                                         .stroke(Color.white.opacity(0.25), lineWidth: 1)
                                 )
                                 .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
@@ -1173,11 +1173,11 @@ struct ClipboardPreviewView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(isEditing ? Color.black.opacity(0.3) : Color.white.opacity(0.05))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(
                         Color.accentColor.opacity(isEditing ? 0.8 : 0),
                         style: StrokeStyle(
@@ -1222,9 +1222,9 @@ struct ClipboardPreviewView: View {
                             .padding(.vertical, 12)
                             .background(Color.blue.opacity(isPasteHovering ? 1.0 : 0.8))
                             .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .stroke(Color.white.opacity(0.2), lineWidth: 1)
                             )
                     }
@@ -1255,9 +1255,9 @@ struct ClipboardPreviewView: View {
                         .padding(.vertical, 12)
                         .background(showCopySuccess ? Color.green.opacity(0.15) : Color.blue.opacity(isCopyHovering ? 1.0 : 0.8))
                         .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .stroke(showCopySuccess ? Color.green.opacity(0.5) : Color.white.opacity(0.2), lineWidth: 1)
                         )
                     }
@@ -1294,9 +1294,9 @@ struct ClipboardPreviewView: View {
                         .frame(width: 44, height: 44)
                         .background(showSaveSuccess ? Color.green.opacity(0.15) : (isDownloadHovering ? Color.white.opacity(0.15) : Color.clear))
                         .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .stroke(showSaveSuccess ? Color.green.opacity(0.5) : (isDownloadHovering ? Color.white.opacity(0.3) : Color.white.opacity(0.1)), lineWidth: 1)
                         )
                         .scaleEffect(isDownloadHovering || showSaveSuccess ? 1.08 : 1.0)
@@ -1332,7 +1332,7 @@ struct ClipboardPreviewView: View {
                 } label: {
                     ZStack {
                         // Background glow when favorited
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(Color.yellow.opacity(item.isFavorite ? 0.2 : 0))
                             .blur(radius: 8)
                             .scaleEffect(item.isFavorite ? 1.2 : 0.8)
@@ -1345,9 +1345,9 @@ struct ClipboardPreviewView: View {
                     .frame(width: 44, height: 44)
                     .background(isStarHovering ? Color.yellow.opacity(0.1) : Color.clear)
                     .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(isStarHovering ? Color.yellow.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1)
                     )
                     .scaleEffect(isStarHovering ? 1.08 : 1.0)
@@ -1374,9 +1374,9 @@ struct ClipboardPreviewView: View {
                             .frame(width: 44, height: 44)
                             .background(isEditHovering ? Color.white.opacity(0.15) : Color.clear)
                             .background(.ultraThinMaterial)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .stroke(isEditHovering ? Color.white.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1)
                             )
                             .scaleEffect(isEditHovering ? 1.08 : 1.0)
@@ -1405,7 +1405,7 @@ struct ClipboardPreviewView: View {
                             .padding(.vertical, 12)
                             .background(Color.green.opacity(isSaveHovering ? 1.0 : 0.8))
                             .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .matchedGeometryEffect(id: "PrimaryAction", in: animationNamespace)
@@ -1424,7 +1424,7 @@ struct ClipboardPreviewView: View {
                             .padding(.vertical, 12)
                             .background(Color.red.opacity(isCancelHovering ? 1.0 : 0.8))
                             .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .matchedGeometryEffect(id: "SecondaryAction", in: animationNamespace)
@@ -1442,9 +1442,9 @@ struct ClipboardPreviewView: View {
                         .frame(width: 44, height: 44)
                         .background(isTrashHovering ? Color.red.opacity(0.15) : Color.clear)
                         .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .stroke(isTrashHovering ? Color.red.opacity(0.4) : Color.white.opacity(0.1), lineWidth: 1)
                         )
                         .scaleEffect(isTrashHovering ? 1.08 : 1.0)
@@ -1645,9 +1645,9 @@ struct MultiSelectPreviewView: View {
                     .padding(.vertical, 12)
                     .background(Color.blue.opacity(isPasteHovering ? 1.0 : 0.8))
                     .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(Color.white.opacity(0.2), lineWidth: 1)
                     )
                 }
@@ -1670,9 +1670,9 @@ struct MultiSelectPreviewView: View {
                     .background(Color.white.opacity(isCopyHovering ? 0.2 : 0.1))
                     .foregroundStyle(.white)
                     .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(Color.white.opacity(0.1), lineWidth: 1)
                     )
                 }
@@ -1691,9 +1691,9 @@ struct MultiSelectPreviewView: View {
                         .frame(width: 44, height: 44)
                         .background(isDeleteHovering ? Color.red.opacity(0.15) : Color.clear)
                         .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .stroke(isDeleteHovering ? Color.red.opacity(0.4) : Color.white.opacity(0.1), lineWidth: 1)
                         )
                         .scaleEffect(isDeleteHovering ? 1.08 : 1.0)
@@ -1851,7 +1851,7 @@ struct URLPreviewCard: View {
                         }
                     }
                     .background(Color.black.opacity(0.2))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     
                     MetadataInfoStrip(
                         item: item,
@@ -1910,7 +1910,7 @@ struct MetadataInfoStrip: View {
                     }
                 }
                 .frame(width: 32, height: 32)
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 
                 VStack(alignment: .leading, spacing: 4) {
                     if let title = title {
@@ -1953,7 +1953,7 @@ struct MetadataInfoStrip: View {
         }
         .padding(16)
         .background(Color.white.opacity(0.03))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
@@ -1968,9 +1968,9 @@ struct URLTypeBadge: View {
             .padding(.vertical, 6)
             .background(.ultraThinMaterial)
             .background(Color.black.opacity(0.4))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .stroke(Color.white.opacity(0.25), lineWidth: 1)
             )
             .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)

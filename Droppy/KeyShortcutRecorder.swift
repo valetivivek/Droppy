@@ -39,9 +39,9 @@ struct KeyShortcutRecorder: View {
                 .padding(.horizontal, 12)
                 .background(Color.white.opacity(0.08))
                 .foregroundStyle(.primary)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(isRecording ? Color.blue : Color.white.opacity(0.1), lineWidth: isRecording ? 2 : 1)
                 )
             
@@ -60,9 +60,9 @@ struct KeyShortcutRecorder: View {
                     .padding(.vertical, 10)
                     .background((isRecording ? Color.red : Color.blue).opacity(isHovering ? 1.0 : 0.8))
                     .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(Color.white.opacity(0.2), lineWidth: 1)
                     )
                     .animation(.easeInOut(duration: 0.15), value: isHovering)

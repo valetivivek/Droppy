@@ -140,7 +140,7 @@ struct OnboardingView: View {
                             .padding(.vertical, 10)
                             .background(Color.white.opacity(isBackHovering ? 0.15 : 0.1))
                             .foregroundStyle(.secondary)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                         .buttonStyle(.plain)
                         .onHover { h in
@@ -194,9 +194,9 @@ struct OnboardingView: View {
                                 .opacity(isNextHovering ? 1.0 : 0.85)
                         )
                         .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
                         )
                     }
@@ -421,9 +421,9 @@ struct OnboardingView: View {
                             }
                             .frame(width: 100, height: 70)
                             .background(enableBasketAutoHide ? Color.orange.opacity(0.15) : Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12)
+                                RoundedRectangle(cornerRadius: 16)
                                     .stroke(enableBasketAutoHide ? Color.orange.opacity(0.5) : Color.clear, lineWidth: 1)
                             )
                         }
@@ -707,7 +707,7 @@ struct OnboardingView: View {
         } label: {
             VStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: 16)
                         .fill(isSelected ? Color.blue.opacity(0.25) : Color.white.opacity(0.08))
                         .frame(width: 120, height: 60)
                     
@@ -793,9 +793,9 @@ struct OnboardingView: View {
             .frame(width: 140)
             .padding(.vertical, 12)
             .background(Color.white.opacity(isOn.wrappedValue ? 0.1 : 0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(isOn.wrappedValue ? color.opacity(0.5) : Color.white.opacity(0.1), lineWidth: 1)
             )
             .scaleEffect(isOn.wrappedValue ? 1.0 : 0.98)
@@ -820,9 +820,9 @@ struct OnboardingView: View {
             }
             .frame(width: 100, height: 80)
             .background(Color.white.opacity(isOn.wrappedValue ? 0.1 : 0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(isOn.wrappedValue ? color.opacity(0.5) : Color.white.opacity(0.1), lineWidth: 1)
             )
             .scaleEffect(isOn.wrappedValue ? 1.0 : 0.98)
@@ -842,7 +842,7 @@ struct OnboardingView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 60, height: 60)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
             
             VStack(spacing: 8) {
@@ -872,9 +872,9 @@ struct OnboardingView: View {
                 .padding(.vertical, 12)
                 .background(Color.purple.opacity(0.8))
                 .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(Color.white.opacity(0.2), lineWidth: 1)
                 )
             }
@@ -965,9 +965,9 @@ struct OnboardingView: View {
         .padding(.vertical, 12)
         .frame(width: 180)
         .background(Color.white.opacity(enabled ? 0.08 : 0.04))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
     }

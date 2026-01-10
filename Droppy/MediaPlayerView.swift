@@ -98,7 +98,8 @@ struct MediaPlayerView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white.opacity(0.6))
                         .monospacedDigit()
-                        .frame(width: 40, alignment: .leading)
+                        .lineLimit(1)
+                        .frame(width: 56, alignment: .leading)
                     
                     Spacer().frame(width: 8)
                     
@@ -112,15 +113,15 @@ struct MediaPlayerView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white.opacity(0.6))
                         .monospacedDigit()
-                        .frame(width: 40, alignment: .trailing)
+                        .lineLimit(1)
+                        .frame(width: 56, alignment: .trailing)
                 }
                 
                 // MARK: - Bottom Row: Controls
                 controlsRow
             }
             .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 0)
+            .padding(.vertical, 12)
         }
     }
     
@@ -146,10 +147,10 @@ struct MediaPlayerView: View {
                 }
             }
             .frame(width: 64, height: 64)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             // Subtle border highlight
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
             )
             .shadow(color: .black.opacity(0.3), radius: 8, y: 4)

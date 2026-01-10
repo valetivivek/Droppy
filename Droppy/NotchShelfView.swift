@@ -322,14 +322,14 @@ struct NotchShelfView: View {
             ZStack {
                 // Dynamic Island shape (pill)
                 // When transparent DI is enabled, use glass material instead of black
-                DynamicIslandShape(cornerRadius: state.isExpanded ? 24 : 50)
+                DynamicIslandShape(cornerRadius: state.isExpanded ? 40 : 50)
                     .fill(shouldUseDynamicIslandTransparent ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
                     .shadow(color: Color.black.opacity(isDynamicIslandMode ? 0.4 : 0), radius: 8, x: 0, y: 4)
                     .opacity(isDynamicIslandMode ? 1 : 0)
                     .scaleEffect(isDynamicIslandMode ? 1 : 0.85)
                 
                 // Notch shape (U-shaped) - always black (physical notch is black)
-                NotchShape(bottomRadius: state.isExpanded ? 20 : (hudIsVisible ? 18 : 16))
+                NotchShape(bottomRadius: state.isExpanded ? 40 : (hudIsVisible ? 18 : 16))
                     .fill(Color.black)
                     .opacity(isDynamicIslandMode ? 0 : 1)
                     .scaleEffect(isDynamicIslandMode ? 0.85 : 1)
@@ -343,7 +343,7 @@ struct NotchShelfView: View {
                 // MORPH: Both outline shapes exist, crossfade for smooth transition
                 ZStack {
                     // Dynamic Island: Fully rounded outline
-                    DynamicIslandOutlineShape(cornerRadius: state.isExpanded ? 24 : 50)
+                    DynamicIslandOutlineShape(cornerRadius: state.isExpanded ? 40 : 50)
                         .stroke(
                             style: StrokeStyle(
                                 lineWidth: 2,
@@ -357,7 +357,7 @@ struct NotchShelfView: View {
                         .opacity(isDynamicIslandMode ? 1 : 0)
                     
                     // Notch mode: U-shaped outline (no top edge)
-                    NotchOutlineShape(bottomRadius: state.isExpanded ? 20 : 16)
+                    NotchOutlineShape(bottomRadius: state.isExpanded ? 40 : 16)
                         .trim(from: 0, to: 1)
                         .stroke(
                             style: StrokeStyle(
@@ -466,7 +466,7 @@ struct NotchShelfView: View {
                         .transition(.scale(scale: 0.85).combined(with: .opacity).animation(.spring(response: 0.3, dampingFraction: 0.8)))
                         .frame(width: expandedWidth, height: currentExpandedHeight)
                         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: currentExpandedHeight)
-                        .clipShape(isDynamicIslandMode ? AnyShape(DynamicIslandShape(cornerRadius: 24)) : AnyShape(NotchShape(bottomRadius: 20)))
+                        .clipShape(isDynamicIslandMode ? AnyShape(DynamicIslandShape(cornerRadius: 40)) : AnyShape(NotchShape(bottomRadius: 40)))
                         // Synchronize child view animations with the parent
                         .geometryGroup()
                         .zIndex(2)
@@ -1019,11 +1019,12 @@ struct NotchShelfView: View {
                         )
                     }
                 }
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 12)
                 .padding(.top, 8)
                 .padding(.bottom, 6)
             }
         }
+        .clipped() // Prevent hover effects from bleeding past shelf edges
         .contentShape(Rectangle())
         // Removed .onTapGesture from here to prevent swallowing touches on children
         .overlay(alignment: .topLeading) {
@@ -1190,7 +1191,7 @@ extension NotchShelfView {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(
                     state.isDropTargeted ? Color.blue : Color.white.opacity(0.2),
                     style: StrokeStyle(
@@ -1364,7 +1365,7 @@ struct NotchItemView: View {
                 if isShakeAnimating {
                     ZStack {
                         // NOTE: Part of shelf UI - always solid black
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(Color.black)
                             .frame(width: 44, height: 44)
                             .shadow(radius: 4)
@@ -1796,10 +1797,10 @@ struct NotchControlButton: View {
                 .foregroundStyle(isHovering ? .primary : .secondary)
                 .frame(width: 32, height: 32)
                 .background(Color.white.opacity(isHovering ? 0.2 : 0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
@@ -1845,10 +1846,10 @@ private struct NotchItemContent: View {
         VStack(spacing: 6) {
             ZStack(alignment: .topTrailing) {
                 // Thumbnail container
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(isSelected ? Color.blue.opacity(0.3) : Color.white.opacity(0.1))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
                     )
                     .frame(width: 60, height: 60)
@@ -1865,7 +1866,7 @@ private struct NotchItemContent: View {
                             }
                         }
                         .frame(width: 44, height: 44)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .opacity((isConverting || isExtractingText) ? 0.5 : 1.0)
                     }
                     .overlay {
@@ -1880,7 +1881,7 @@ private struct NotchItemContent: View {
                 if isHovering && !isPoofing && renamingItemId != item.id {
                     Button(action: onRemove) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .fill(Color.red.opacity(0.9))
                                 .frame(width: 20, height: 20)
                             Image(systemName: "xmark")
@@ -1921,14 +1922,14 @@ private struct NotchItemContent: View {
                     .padding(.horizontal, 4)
                     .background(
                         isSelected ?
-                        RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.blue) :
-                        RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.clear)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.blue) :
+                        RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.clear)
                     )
             }
         }
         .padding(4)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(isHovering && !isSelected ? Color.white.opacity(0.1) : Color.clear)
         )
         .poofEffect(isPoofing: $isPoofing) {
@@ -1962,12 +1963,12 @@ private struct RenameTextField: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color.black.opacity(0.3))
         )
         // Animated dotted blue outline
         .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(
                     Color.accentColor.opacity(0.8),
                     style: StrokeStyle(

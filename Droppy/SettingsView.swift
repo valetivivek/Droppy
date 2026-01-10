@@ -81,9 +81,9 @@ struct SettingsView: View {
                         .padding(.vertical, 10)
                         .background(Color.blue.opacity(isUpdateHovering ? 1.0 : 0.8))
                         .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
                         )
                     }
@@ -187,14 +187,14 @@ struct SettingsView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(selectedTab == tag 
                           ? Color.blue.opacity(isHovering.wrappedValue ? 1.0 : 0.8) 
                           : Color.white.opacity(isHovering.wrappedValue ? 0.15 : 0.08))
             )
             .foregroundStyle(selectedTab == tag ? .white : .primary)
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(Color.white.opacity(0.2), lineWidth: 1)
             )
         }
@@ -484,7 +484,7 @@ struct SettingsView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 44, height: 44)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Alfred Integration")
@@ -511,9 +511,9 @@ struct SettingsView: View {
                                 .padding(.vertical, 10)
                                 .background(Color.purple.opacity(isAlfredHovering ? 1.0 : 0.8))
                                 .foregroundStyle(.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                                         .stroke(Color.white.opacity(0.2), lineWidth: 1)
                                 )
                             }
@@ -543,7 +543,7 @@ struct SettingsView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 44, height: 44)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Finder Integration")
@@ -567,9 +567,9 @@ struct SettingsView: View {
                                 .padding(.vertical, 10)
                                 .background(Color.blue.opacity(isFinderHovering ? 1.0 : 0.8))
                                 .foregroundStyle(.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                                         .stroke(Color.white.opacity(0.2), lineWidth: 1)
                                 )
                             }
@@ -834,9 +834,9 @@ struct SettingsView: View {
                     .padding(.vertical, 8)
                     .background(Color.blue.opacity(isIntroHovering ? 1.0 : 0.8))
                     .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .stroke(Color.white.opacity(0.2), lineWidth: 1)
                     )
                 }
@@ -876,7 +876,7 @@ struct SettingsView: View {
                              Color.gray.opacity(0.3)
                         }
                         .frame(width: 44, height: 44) // Generic size container
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Support Development")
@@ -899,9 +899,9 @@ struct SettingsView: View {
                                 // BMC Yellow: #FFDD00
                                 .background(Color(red: 1.0, green: 0.867, blue: 0.0).opacity(isCoffeeHovering ? 1.0 : 0.9))
                                 .foregroundStyle(.black) // Black text for contrast on yellow
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                                         .stroke(Color.white.opacity(0.2), lineWidth: 1)
                                 )
                             }
@@ -1057,7 +1057,7 @@ struct SettingsView: View {
                         Image(nsImage: NSWorkspace.shared.icon(forFile: appPath.path))
                             .resizable()
                             .frame(width: 24, height: 24)
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     } else {
                         Image(systemName: "app.fill")
                             .font(.system(size: 20))
@@ -1138,7 +1138,7 @@ struct SettingsView: View {
                                     Image(nsImage: icon)
                                         .resizable()
                                         .frame(width: 28, height: 28)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                                 }
                                 
                                 VStack(alignment: .leading) {
@@ -1365,7 +1365,7 @@ struct FeaturePreviewImage: View {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             } else {
                 ProgressView()
                     .frame(height: 60)
@@ -1515,7 +1515,7 @@ struct DisplayModeButton<Icon: View>: View {
             VStack(spacing: 8) {
                 // Icon preview area
                 ZStack {
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(isSelected ? Color.blue.opacity(0.3) : Color.white.opacity(0.1))
                         .frame(width: 100, height: 50)
                     
@@ -1529,10 +1529,10 @@ struct DisplayModeButton<Icon: View>: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 16)
                     .fill(isSelected ? Color.blue.opacity(0.15) : Color.clear)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 16)
                             .strokeBorder(
                                 isSelected ? Color.blue.opacity(0.5) : 
                                     (isHovering ? Color.white.opacity(0.3) : Color.white.opacity(0.1)),
@@ -1785,9 +1785,9 @@ struct ClipboardPreview: View {
             .frame(width: 90)
         }
         .background(Color.black)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
         )
         .frame(width: 200, height: 120)
@@ -2039,7 +2039,7 @@ struct FloatingBasketPreview: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(Color.blue.opacity(0.85))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         
                         // Clear button
                         Image(systemName: "eraser.fill")
@@ -2047,7 +2047,7 @@ struct FloatingBasketPreview: View {
                             .foregroundStyle(.secondary)
                             .frame(width: 24, height: 24)
                             .background(Color.white.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     
                     Spacer(minLength: 0)
@@ -2095,7 +2095,7 @@ struct PeekPreview: View {
     var body: some View {
         ZStack {
             // Container representing the screen
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color.gray.opacity(0.12))
                 .overlay(
                     Text("Screen")
@@ -2118,9 +2118,9 @@ struct PeekPreview: View {
                 .animation(.easeInOut(duration: isPeeking ? 0.55 : 0.25), value: isPeeking)
         }
         .frame(width: containerWidth, height: containerHeight)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
         .frame(maxWidth: .infinity)
@@ -2150,7 +2150,7 @@ struct PeekPreview: View {
             RoundedRectangle(cornerRadius: 20 * miniBasketScale, style: .continuous)
                 .fill(Color.black)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10 * miniBasketScale, style: .continuous)
+                    RoundedRectangle(cornerRadius: 12 * miniBasketScale, style: .continuous)
                         .stroke(
                             Color.white.opacity(0.2),
                             style: StrokeStyle(
@@ -2185,7 +2185,7 @@ struct PeekPreview: View {
                     .padding(.horizontal, 6 * miniBasketScale)
                     .padding(.vertical, 4 * miniBasketScale)
                     .background(Color.blue.opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 6 * miniBasketScale, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 16 * miniBasketScale, style: .continuous))
                     
                     // Clear button
                     Image(systemName: "eraser.fill")
@@ -2193,7 +2193,7 @@ struct PeekPreview: View {
                         .foregroundStyle(.secondary)
                         .frame(width: 16 * miniBasketScale, height: 16 * miniBasketScale)
                         .background(Color.white.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 5 * miniBasketScale, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 14 * miniBasketScale, style: .continuous))
                 }
                 
                 Spacer(minLength: 0)
@@ -2285,7 +2285,7 @@ private struct MiniFileItem: View {
                 .foregroundStyle(color)
                 .frame(width: 44 * scale, height: 44 * scale)
                 .background(Color.white.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 8 * scale, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 14 * scale, style: .continuous))
             
             Text(name)
                 .font(.system(size: 7 * scale))
@@ -2308,7 +2308,7 @@ private struct MockFileItem: View {
                 .foregroundStyle(color)
                 .frame(width: 44, height: 44)
                 .background(Color.white.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             
             Text(name)
                 .font(.system(size: 7))
@@ -2415,7 +2415,7 @@ private struct MockShelfItem: View {
             .foregroundStyle(color)
             .frame(width: 36, height: 36)
             .background(Color.white.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 

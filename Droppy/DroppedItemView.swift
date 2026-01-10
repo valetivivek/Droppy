@@ -31,11 +31,11 @@ struct DroppedItemView: View {
             // Thumbnail/Icon with glass container
             ZStack(alignment: .topTrailing) {
                 // Glass card background
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(.ultraThinMaterial)
                     .frame(width: 64, height: 64)
                     .overlay {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .strokeBorder(.white.opacity(0.2), lineWidth: 0.5)
                     }
                     .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
@@ -53,14 +53,14 @@ struct DroppedItemView: View {
                     }
                 }
                 .frame(width: 48, height: 48)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .frame(width: 64, height: 64)
                 
                 // Remove button with animation
                 if showRemoveButton {
                     Button(action: onRemove) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .fill(.ultraThinMaterial)
                                 .frame(width: 20, height: 20)
                             
@@ -86,10 +86,10 @@ struct DroppedItemView: View {
         .padding(8)
         .background {
             // Selection/hover background
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(backgroundColor)
                 .overlay {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .strokeBorder(borderColor, lineWidth: isSelected ? 2 : 1)
                 }
         }
