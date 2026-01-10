@@ -37,40 +37,30 @@ function initDemo() {
 }
 
 /**
- * Setup the hover trigger button with glow animation
+ * Setup the hover trigger button with water fill animation
  */
 function setupDemoTrigger() {
     let hoverTimer = null;
-    let glowInterval = null;
-    let glowIntensity = 0;
+    const triggerFill = document.getElementById('triggerFill');
+    const dropletContainer = document.getElementById('dropletContainer');
 
     demoTrigger.addEventListener('mouseenter', () => {
         if (demoRunning) return;
         // Skip hover trigger on mobile - only tap works
         if (window.innerWidth < 768) return;
 
-        // Start glow animation (faster)
-        glowIntensity = 0;
-        glowInterval = setInterval(() => {
-            glowIntensity += 0.2; // Faster glow buildup
-            if (triggerGlow) {
-                triggerGlow.style.opacity = '1';
-                triggerGlow.style.boxShadow = `0 0 ${20 * glowIntensity}px ${10 * glowIntensity}px rgba(59, 130, 246, ${0.3 + glowIntensity * 0.3})`;
-            }
-            if (triggerInner) {
-                triggerInner.style.transform = `scale(${1 + glowIntensity * 0.05})`;
-                triggerInner.style.backgroundColor = `rgba(0, 0, 0, ${0.8 - glowIntensity * 0.2})`;
-            }
-        }, 100);
+        // Start water fill animation
+        if (triggerFill) {
+            triggerFill.style.transform = 'scaleY(1)';
+        }
 
-        // Start demo after 500ms hover (faster)
+        // When fill completes (400ms), trigger droplet and start demo
         hoverTimer = setTimeout(() => {
             if (!demoRunning) {
-                clearInterval(glowInterval);
-                triggerConfetti();
-                setTimeout(() => startDemo(), 200);
+                triggerDroplet();
+                setTimeout(() => startDemo(), 400);
             }
-        }, 500);
+        }, 400);
     });
 
     demoTrigger.addEventListener('mouseleave', () => {
@@ -81,13 +71,9 @@ function setupDemoTrigger() {
             clearTimeout(hoverTimer);
             hoverTimer = null;
         }
-        if (glowInterval) {
-            clearInterval(glowInterval);
-            glowInterval = null;
-        }
 
-        // Reset glow
-        resetTriggerGlow();
+        // Reset water fill
+        resetTriggerFill();
     });
 
     // Click to quit demo (or start on mobile)
@@ -95,27 +81,74 @@ function setupDemoTrigger() {
         if (demoRunning) {
             stopDemo();
         } else {
-            // Mobile: start on tap
+            // Mobile: start on tap with fill animation
             if (window.innerWidth < 768) {
-                triggerConfetti();
-                setTimeout(() => startDemo(), 200);
+                if (triggerFill) triggerFill.style.transform = 'scaleY(1)';
+                setTimeout(() => {
+                    triggerDroplet();
+                    setTimeout(() => startDemo(), 400);
+                }, 300);
             }
         }
     });
 }
 
 /**
- * Reset the trigger glow effect
+ * Reset the trigger fill effect
  */
-function resetTriggerGlow() {
+function resetTriggerFill() {
+    const triggerFill = document.getElementById('triggerFill');
+    if (triggerFill) {
+        triggerFill.style.transform = 'scaleY(0)';
+    }
     if (triggerGlow) {
         triggerGlow.style.opacity = '0';
         triggerGlow.style.boxShadow = '0 0 0px 0px rgba(59, 130, 246, 0)';
     }
     if (triggerInner) {
         triggerInner.style.transform = 'scale(1)';
-        triggerInner.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
     }
+}
+
+/**
+ * Trigger droplet animation that flies up to notch
+ */
+function triggerDroplet() {
+    const dropletContainer = document.getElementById('dropletContainer');
+    const notch = document.getElementById('notch');
+    if (!dropletContainer || !notch) return;
+
+    // Get positions
+    const triggerRect = demoTrigger.getBoundingClientRect();
+    const notchRect = notch.getBoundingClientRect();
+
+    // Create subtle droplet
+    const droplet = document.createElement('div');
+    droplet.style.cssText = `
+        position: absolute;
+        width: 12px;
+        height: 16px;
+        left: 50%;
+        top: 0;
+        transform: translateX(-50%);
+        background: linear-gradient(to bottom, rgba(255,255,255,0.8), rgba(100,180,255,0.6));
+        border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+        box-shadow: 0 0 8px rgba(255,255,255,0.4);
+        opacity: 1;
+        transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.6s ease-out;
+    `;
+    dropletContainer.appendChild(droplet);
+
+    // Calculate distance to notch (negative = upward)
+    const deltaY = notchRect.bottom - triggerRect.top - 20;
+
+    // Animate droplet flying UP (force reflow first)
+    droplet.offsetHeight;
+    droplet.style.transform = `translateX(-50%) translateY(${deltaY}px)`;
+    droplet.style.opacity = '0';
+
+    // Remove after animation
+    setTimeout(() => droplet.remove(), 700);
 }
 
 /**
@@ -171,7 +204,7 @@ function startDemo() {
     demoRunning = true;
 
     // Reset trigger glow
-    resetTriggerGlow();
+    resetTriggerFill();
 
     // Enable theatre mode
     enableTheatreMode();
@@ -338,10 +371,6 @@ function resetAllDemoElements() {
         notchBar.style.width = '200px';
         notchBar.style.borderRadius = '0 0 20px 20px';
     }
-
-    // Reset camera dot
-    const cameraDot = document.getElementById('cameraDot');
-    if (cameraDot) cameraDot.style.opacity = '1';
 }
 
 /**
@@ -357,22 +386,38 @@ function setupShelfEvents() {
 }
 
 /**
- * Open the shelf panel
+ * Open the shelf panel with grow animation from notch
  */
 function openShelf() {
+    // Start from small scale (as if emerging from notch)
+    shelf.style.transition = 'none';
+    shelf.style.transform = 'translateX(-50%) scaleX(0.3) scaleY(0.1)';
     shelf.style.opacity = '1';
-    shelf.style.pointerEvents = 'none';
-    shelf.style.transform = 'translateX(-50%) scale(1)';
+    shelf.style.transformOrigin = 'top center';
+
+    // Hide notch bar
     notchBar.style.opacity = '0';
+
+    // Force reflow to apply initial state
+    shelf.offsetHeight;
+
+    // Animate to full size with spring-like easing
+    shelf.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+    shelf.style.transform = 'translateX(-50%) scaleX(1) scaleY(1)';
+    shelf.style.pointerEvents = 'none';
 }
 
 /**
- * Close the shelf panel and stop demo
+ * Close the shelf panel and stop demo - shrinks back into notch
  */
 function closeShelf() {
+    // Shrink back into notch (reverse of grow)
+    shelf.style.transition = 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-out';
+    shelf.style.transform = 'translateX(-50%) scaleX(0.3) scaleY(0.1)';
     shelf.style.opacity = '0';
     shelf.style.pointerEvents = 'none';
-    shelf.style.transform = 'translateX(-50%) scale(0.95)';
+
+    // Show notch bar
     notchBar.style.opacity = '1';
 
     // Stop demo and reset
@@ -385,7 +430,7 @@ function closeShelf() {
     const dragCursor = document.getElementById('dragCursor');
     if (basket) {
         basket.style.opacity = '0';
-        basket.style.transform = 'scale(0.9)';
+        basket.style.transform = 'scale(0.8)';
     }
     if (dragCursor) {
         dragCursor.style.opacity = '0';

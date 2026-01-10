@@ -120,16 +120,28 @@ function animateJiggle(element, baseX, callback) {
 }
 
 /**
- * Show the basket at position with targeted state
+ * Show the basket at position with targeted state and grow animation
  */
 function showBasket(x, y) {
     const basket = document.getElementById('basket');
     if (!basket) return;
 
+    // Position basket
     basket.style.left = (x - 188) + 'px';
     basket.style.top = (y - 88) + 'px';
-    basket.style.opacity = '1';
+
+    // Start small and grow (like shelf)
+    basket.style.transition = 'none';
+    basket.style.transform = 'scale(0.5)';
+    basket.style.opacity = '0';
+
+    // Force reflow
+    basket.offsetHeight;
+
+    // Animate to full size with spring-like easing
+    basket.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease-out';
     basket.style.transform = 'scale(1)';
+    basket.style.opacity = '1';
 
     // Change border to blue (targeted state)
     const basketBorder = document.getElementById('basketBorder');

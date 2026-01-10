@@ -20,7 +20,6 @@ function startMediaDemo() {
  */
 function showSmallMediaPlayer() {
     const notchBar = document.getElementById('notchBar');
-    const cameraDot = document.getElementById('cameraDot');
     const notchMediaContent = document.getElementById('notchMediaContent');
 
     if (!notchBar || !notchMediaContent) {
@@ -38,8 +37,7 @@ function showSmallMediaPlayer() {
     notchBar.style.borderRadius = '0 0 20px 20px';
     notchBar.style.width = '280px';
 
-    // Hide camera dot, show media content
-    if (cameraDot) cameraDot.style.opacity = '0';
+    // Show media content
     notchMediaContent.style.opacity = '1';
 
     // Start visualizer animation
@@ -94,7 +92,6 @@ function showHoverState() {
 function showExpandedPlayer() {
     const shelf = document.getElementById('shelf');
     const notchBar = document.getElementById('notchBar');
-    const cameraDot = document.getElementById('cameraDot');
     const notchMediaContent = document.getElementById('notchMediaContent');
     const scrollingTitle = document.getElementById('scrollingTitle');
     const mediaPlayer = document.getElementById('mediaPlayer');
@@ -116,20 +113,30 @@ function showExpandedPlayer() {
     }
     if (notchMediaContent) notchMediaContent.style.opacity = '0';
 
-    // Show shelf with media player content
-    if (shelf) {
-        shelf.style.opacity = '1';
-        shelf.style.pointerEvents = 'none';
-        shelf.style.transform = 'translateX(-50%) scale(1)';
-        shelf.style.borderRadius = '0 0 28px 28px';
-    }
-
     // Hide file grid and shelf header, show media player
     if (fileGrid) fileGrid.style.display = 'none';
     if (shelfHeader) shelfHeader.style.display = 'none';
     if (mediaPlayer) {
         mediaPlayer.style.display = 'flex';
         mediaPlayer.style.opacity = '1';
+    }
+
+    // Show shelf with grow animation from notch
+    if (shelf) {
+        // Start from small scale (as if emerging from notch)
+        shelf.style.transition = 'none';
+        shelf.style.transform = 'translateX(-50%) scaleX(0.3) scaleY(0.1)';
+        shelf.style.opacity = '1';
+        shelf.style.transformOrigin = 'top center';
+        shelf.style.borderRadius = '0 0 28px 28px';
+        shelf.style.pointerEvents = 'none';
+
+        // Force reflow
+        shelf.offsetHeight;
+
+        // Animate to full size with spring-like easing
+        shelf.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        shelf.style.transform = 'translateX(-50%) scaleX(1) scaleY(1)';
     }
 
     // Start progress bar and visualizer animation
@@ -178,7 +185,6 @@ function animatePlayPause() {
 function closeMediaDemo() {
     const shelf = document.getElementById('shelf');
     const notchBar = document.getElementById('notchBar');
-    const cameraDot = document.getElementById('cameraDot');
     const mediaPlayer = document.getElementById('mediaPlayer');
     const fileGrid = document.getElementById('fileGrid');
     const notchMediaContent = document.getElementById('notchMediaContent');
@@ -198,7 +204,6 @@ function closeMediaDemo() {
         notchBar.style.borderRadius = '0 0 20px 20px';
         notchBar.style.width = '200px';
     }
-    if (cameraDot) cameraDot.style.opacity = '1';
     if (notchMediaContent) notchMediaContent.style.opacity = '0';
     if (scrollingTitle) {
         scrollingTitle.style.opacity = '0';
@@ -273,13 +278,14 @@ function showFeatureShowcase() {
         }, 400 + (index * 60));
     });
 
-    // Hold for 2.5s then shrink back and loop
+    // Hold for 4s then shrink back and loop
     demoTimeout = setTimeout(() => {
         if (!demoRunning) return;
 
-        // Shrink back into notch (like shelf closing)
+        // Shrink back into notch (matching shelf close animation)
+        showcase.style.transition = 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-out';
+        showcase.style.transform = 'translateX(-50%) scaleX(0.3) scaleY(0.1)';
         showcase.style.opacity = '0';
-        showcase.style.transform = 'translateX(-50%) scale(0.4)';
 
         setTimeout(() => {
             showcase.style.display = 'none';
@@ -296,7 +302,7 @@ function showFeatureShowcase() {
                 startShelfDemo();
             }
         }, 500);
-    }, 2500);
+    }, 4000);
 }
 
 // Visualizer animation state
