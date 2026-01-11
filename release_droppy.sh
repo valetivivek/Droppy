@@ -72,6 +72,10 @@ if [ -n "$NOTES_FILE" ] && [ -f "$NOTES_FILE" ]; then
     step "Updating README.md Changelog..."
     # Update README with perl to handle multiline
     perl -0777 -i -pe 's/(<!-- CHANGELOG_START -->)(.*?)(<!-- CHANGELOG_END -->)/$1\n$ENV{NEW_NOTES}\n$3/s' README.md
+    
+    step "Updating Website Version to $VERSION..."
+    # Update DROPPY_VERSION in docs/download.html
+    sed -i '' "s/const DROPPY_VERSION = '[^']*';/const DROPPY_VERSION = '$VERSION';/" docs/download.html
 else
     warning "No valid notes file provided. Skipping doc updates."
 fi
