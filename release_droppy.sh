@@ -135,7 +135,7 @@ DMG_BACKGROUND="$MAIN_REPO/assets/dmg/background.png"
 
 if [ -f "$DMG_BACKGROUND" ] && command -v create-dmg &> /dev/null; then
     # Beautiful DMG with custom background
-    create-dmg \
+    if create-dmg \
         --volname "Droppy" \
         --background "$DMG_BACKGROUND" \
         --window-pos 200 120 \
@@ -146,8 +146,19 @@ if [ -f "$DMG_BACKGROUND" ] && command -v create-dmg &> /dev/null; then
         --app-drop-link 505 170 \
         --no-internet-enable \
         "$DMG_NAME" \
-        "$APP_PATH" || error "create-dmg failed"
-    success "$DMG_NAME created (beautiful installer)"
+        "$APP_PATH" 2>/dev/null; then
+        success "$DMG_NAME created (beautiful installer)"
+    else
+        # Fallback if create-dmg fails (AppleScript timeout)
+        warning "create-dmg failed, using fallback method"
+        rm -f "$DMG_NAME" rw.*.dmg 2>/dev/null
+        mkdir -p dmg_root
+        cp -R "$APP_PATH" dmg_root/
+        ln -s /Applications dmg_root/Applications
+        hdiutil create -volname Droppy -srcfolder dmg_root -ov -format UDZO "$DMG_NAME" -quiet || error "DMG creation failed"
+        rm -rf dmg_root
+        success "$DMG_NAME created (basic)"
+    fi
 else
     # Fallback to basic DMG creation
     warning "create-dmg not found or background missing, using fallback"
