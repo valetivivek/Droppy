@@ -206,21 +206,74 @@
                         <div class="flex-1 h-px bg-slate-700"></div>
                     </div>
 
-                    <!-- GitHub DMG Link -->
-                    <a class="group flex items-center gap-3 rounded-[28px] bg-slate-800 px-6 py-4 text-lg font-bold text-slate-300 transition-all duration-200 hover:bg-slate-700 hover:text-slate-100 hover:scale-[1.02] active:scale-[0.98]"
-                        href="https://github.com/iordv/Droppy/releases/latest" target="_blank">
-                        <svg class="h-6 w-6 fill-current" viewBox="0 0 24 24">
-                            <path fill-rule="evenodd"
-                                d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
-                                clip-rule="evenodd" />
-                        </svg>
-                        Download from GitHub
-                    </a>
-                    <p class="mt-4 text-xs text-slate-500 text-center max-w-xs">After downloading, run <code
-                            class="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">xattr -rd com.apple.quarantine ~/Downloads/Droppy-*.dmg</code>
-                        before opening.</p>
+                    <!-- Manual Download Card -->
+                    <div
+                        class="flex w-full max-w-md flex-col items-center justify-center rounded-[32px] bg-slate-800/50 pb-8 pt-6">
+                        <!-- macOS Disk Icon -->
+                        <div class="mb-4 size-32 relative">
+                            <svg class="size-full" viewBox="0 0 120 120" fill="none">
+                                <!-- Disk base -->
+                                <rect x="10" y="25" width="100" height="70" rx="8" fill="#3B82F6" />
+                                <!-- Disk shine gradient -->
+                                <rect x="10" y="25" width="100" height="70" rx="8" fill="url(#diskGradient)" />
+                                <!-- Disk label area -->
+                                <rect x="20" y="35" width="80" height="40" rx="4" fill="#1E3A5F" />
+                                <!-- Droppy icon in center -->
+                                <image href="https://i.postimg.cc/9FxZhRf3/1024-mac.webp" x="42" y="40" width="36"
+                                    height="36" clip-path="url(#iconClip)" />
+                                <!-- Disk bottom edge -->
+                                <rect x="10" y="85" width="100" height="10" rx="0 0 8 8" fill="#2563EB" />
+                                <defs>
+                                    <linearGradient id="diskGradient" x1="60" y1="25" x2="60" y2="95"
+                                        gradientUnits="userSpaceOnUse">
+                                        <stop offset="0%" stop-color="#60A5FA" stop-opacity="0.4" />
+                                        <stop offset="100%" stop-color="#1E40AF" stop-opacity="0.2" />
+                                    </linearGradient>
+                                    <clipPath id="iconClip">
+                                        <rect x="42" y="40" width="36" height="36" rx="8" />
+                                    </clipPath>
+                                </defs>
+                            </svg>
+                        </div>
+                        <p class="text-2xl font-bold text-slate-100">Direct Download</p>
+                        <p class="text-base font-semibold text-slate-400">Manual Install</p>
+                        <p class="inline-flex items-center text-sm font-semibold text-slate-500">
+                            DMG Installer <span
+                                class="mx-1.5 mt-px inline-block size-[3px] rounded-full bg-slate-500"></span> v6.2.1
+                        </p>
 
-                    <p class="mt-6 text-sm text-slate-500">Minimum macOS 14 Sonoma</p>
+                        <!-- Download Button -->
+                        <a href="https://github.com/iordv/Droppy/releases/latest/download/Droppy-6.2.1.dmg"
+                            class="group mt-6 flex w-[calc(100%-2rem)] items-center justify-center gap-3 rounded-[28px] bg-blue-600 px-5 py-3.5 text-white font-bold transition-all duration-200 hover:bg-blue-500 hover:scale-[1.02] active:scale-[0.98]">
+                            <svg class="h-5 w-5 fill-current" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd"
+                                    d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            Download Droppy.dmg
+                        </a>
+
+                        <!-- Quarantine Command -->
+                        <p class="mt-6 text-xs text-slate-400 text-center px-4">Before opening, run this in Terminal:
+                        </p>
+                        <button onclick="copyQuarantineCommand(this)"
+                            class="group mt-2 flex w-[calc(100%-2rem)] items-center justify-between rounded-[20px] bg-slate-800 px-4 py-3 text-slate-300 hover:bg-slate-700 transition-all duration-200 active:scale-[0.98]">
+                            <code
+                                class="text-xs font-mono truncate mr-2">xattr -rd com.apple.quarantine ~/Downloads/Droppy-*.dmg</code>
+                            <svg id="copyIconQuarantine" class="h-5 w-5 shrink-0 opacity-60 group-hover:opacity-100"
+                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            <svg id="checkIconQuarantine" class="h-5 w-5 shrink-0 text-green-400 hidden" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 13l4 4L19 7" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <p class="mt-8 text-sm text-slate-500">Minimum macOS 14 Sonoma</p>
 
                     <p class="mt-10 max-w-sm text-lg leading-normal text-slate-400">
                         If you have any issues, please
@@ -357,6 +410,12 @@
             document.getElementById('copyIconBrew').classList.add('hidden');
             document.getElementById('checkIconBrew').classList.remove('hidden');
             setTimeout(() => { document.getElementById('copyIconBrew').classList.remove('hidden'); document.getElementById('checkIconBrew').classList.add('hidden'); }, 2000);
+        }
+        function copyQuarantineCommand() {
+            navigator.clipboard.writeText('xattr -rd com.apple.quarantine ~/Downloads/Droppy-*.dmg');
+            document.getElementById('copyIconQuarantine').classList.add('hidden');
+            document.getElementById('checkIconQuarantine').classList.remove('hidden');
+            setTimeout(() => { document.getElementById('copyIconQuarantine').classList.remove('hidden'); document.getElementById('checkIconQuarantine').classList.add('hidden'); }, 2000);
         }
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
