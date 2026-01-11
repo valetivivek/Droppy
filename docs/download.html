@@ -242,15 +242,27 @@
                                 class="mx-1.5 mt-px inline-block size-[3px] rounded-full bg-slate-500"></span> v6.2.1
                         </p>
 
-                        <!-- Download Button -->
+                        <!-- Download Button - matching main page style -->
                         <a href="https://github.com/iordv/Droppy/releases/latest/download/Droppy-6.2.1.dmg"
-                            class="group mt-6 flex w-[calc(100%-2rem)] items-center justify-center gap-3 rounded-[28px] bg-blue-600 px-5 py-3.5 text-white font-bold transition-all duration-200 hover:bg-blue-500 hover:scale-[1.02] active:scale-[0.98]">
-                            <svg class="h-5 w-5 fill-current" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd"
-                                    d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                                    clip-rule="evenodd" />
-                            </svg>
-                            Download Droppy.dmg
+                            class="group relative mt-6 flex w-[calc(100%-2rem)] max-h-[3.75rem] items-center justify-center rounded-[28px] px-5 py-4 text-lg font-bold outline-none transition duration-300 bg-slate-100 text-slate-900 shadow-xl shadow-black/30 hover:bg-white pl-[3.25rem]">
+                            <div
+                                class="ease absolute left-5 translate-x-0 opacity-100 transition duration-300 group-hover:-translate-x-full group-hover:scale-x-50 group-hover:opacity-0 group-hover:blur-sm">
+                                <!-- macOS Disk Icon -->
+                                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
+                                    <path
+                                        d="M20 6H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 10H4V8h16v8zM6 10h2v4H6v-4z" />
+                                </svg>
+                            </div>
+                            <div class="ease translate-x-0 transition duration-300 group-hover:-translate-x-8">Download
+                                <span>Droppy.dmg</span>
+                            </div>
+                            <div
+                                class="ease absolute right-5 translate-x-full scale-x-50 opacity-0 blur-sm transition duration-300 group-hover:translate-x-0 group-hover:scale-x-100 group-hover:opacity-100 group-hover:blur-none">
+                                <svg class="h-6 w-6 fill-transparent stroke-current stroke-2" viewBox="0 0 24 24"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75" />
+                                </svg>
+                            </div>
                         </a>
 
                         <!-- Quarantine Command -->
