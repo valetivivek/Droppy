@@ -128,12 +128,37 @@ fi
 info "Packaging DMG"
 cd "$MAIN_REPO" || exit
 rm -f Droppy*.dmg
-mkdir -p dmg_root
-cp -R "$APP_BUILD_PATH/Build/Products/Release/Droppy.app" dmg_root/
-ln -s /Applications dmg_root/Applications
-hdiutil create -volname Droppy -srcfolder dmg_root -ov -format UDZO "$DMG_NAME" -quiet || error "DMG creation failed"
-rm -rf dmg_root build
-success "$DMG_NAME created"
+
+# Use create-dmg for a beautiful installer with custom background
+APP_PATH="$APP_BUILD_PATH/Build/Products/Release/Droppy.app"
+DMG_BACKGROUND="$MAIN_REPO/assets/dmg/background.png"
+
+if [ -f "$DMG_BACKGROUND" ] && command -v create-dmg &> /dev/null; then
+    # Beautiful DMG with custom background
+    create-dmg \
+        --volname "Droppy" \
+        --background "$DMG_BACKGROUND" \
+        --window-pos 200 120 \
+        --window-size 660 400 \
+        --icon-size 128 \
+        --icon "Droppy.app" 155 170 \
+        --hide-extension "Droppy.app" \
+        --app-drop-link 505 170 \
+        --no-internet-enable \
+        "$DMG_NAME" \
+        "$APP_PATH" || error "create-dmg failed"
+    success "$DMG_NAME created (beautiful installer)"
+else
+    # Fallback to basic DMG creation
+    warning "create-dmg not found or background missing, using fallback"
+    mkdir -p dmg_root
+    cp -R "$APP_PATH" dmg_root/
+    ln -s /Applications dmg_root/Applications
+    hdiutil create -volname Droppy -srcfolder dmg_root -ov -format UDZO "$DMG_NAME" -quiet || error "DMG creation failed"
+    rm -rf dmg_root
+    success "$DMG_NAME created (basic)"
+fi
+rm -rf build
 
 # Checksum
 info "Generating Integrity Checksum"
