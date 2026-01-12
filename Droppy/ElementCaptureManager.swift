@@ -271,8 +271,15 @@ final class ElementCaptureManager: ObservableObject {
         
         let quartzPoint = convertToQuartzCoordinates(mouseLocation, screen: screen)
         
-        // Get element at position
-        guard let elementFrame = getElementFrameAtPosition(quartzPoint) else {
+        // Try Accessibility API first, fall back to window detection
+        let elementFrame: CGRect
+        if let axFrame = getElementFrameAtPosition(quartzPoint) {
+            elementFrame = axFrame
+        } else if let windowFrame = getWindowFrameAtPosition(quartzPoint) {
+            // Fallback: Use window frame for apps that don't expose Accessibility elements
+            // (Electron apps like Spotify, Discord, Zen browser, etc.)
+            elementFrame = windowFrame
+        } else {
             hideHighlight()
             return
         }
@@ -368,6 +375,47 @@ final class ElementCaptureManager: ObservableObject {
         }
         
         return CGRect(origin: position, size: size)
+    }
+    
+    // MARK: - Window Fallback Detection
+    
+    /// Fallback: Get window frame at position when Accessibility API fails
+    /// Works for ALL apps including Electron (Spotify, Discord, Zen browser)
+    private func getWindowFrameAtPosition(_ point: CGPoint) -> CGRect? {
+        // Get all on-screen windows
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            return nil
+        }
+        
+        // Find the topmost window containing the point
+        for windowInfo in windowList {
+            guard let boundsDict = windowInfo[kCGWindowBounds as String] as? [String: CGFloat],
+                  let x = boundsDict["X"],
+                  let y = boundsDict["Y"],
+                  let width = boundsDict["Width"],
+                  let height = boundsDict["Height"] else {
+                continue
+            }
+            
+            let windowFrame = CGRect(x: x, y: y, width: width, height: height)
+            
+            // Check if point is inside this window
+            if windowFrame.contains(point) {
+                // Skip windows that are too small (likely decorations) or our own overlay
+                guard width > 50 && height > 50 else { continue }
+                
+                // Skip Droppy's own windows
+                if let ownerName = windowInfo[kCGWindowOwnerName as String] as? String,
+                   ownerName == "Droppy" {
+                    continue
+                }
+                
+                return windowFrame
+            }
+        }
+        
+        return nil
     }
     
     // MARK: - Event Tap (Click Interception)
