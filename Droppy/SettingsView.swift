@@ -2648,7 +2648,6 @@ struct AIExtensionIcon: View {
 
 struct AIBackgroundRemovalCard: View {
     @ObservedObject private var manager = AIInstallManager.shared
-    @State private var isHoveringAction = false
     @State private var showInstallSheet = false
     
     var body: some View {
@@ -2687,61 +2686,28 @@ struct AIBackgroundRemovalCard: View {
             
             Spacer(minLength: 8)
             
-            // Status & Action
-            HStack {
-                // Status indicator
-                if manager.isInstalled {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 6, height: 6)
-                        Text("Installed")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.green)
-                    }
-                } else {
-                    Text("~400MB")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+            // Status only - no action button
+            if manager.isInstalled {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 6, height: 6)
+                    Text("Installed")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.green)
                 }
-                
-                Spacer()
-                
-                // Action button
-                Button {
-                    showInstallSheet = true
-                } label: {
-                    HStack(spacing: 4) {
-                        if manager.isInstalled {
-                            Text("Manage")
-                                .font(.caption.weight(.medium))
-                        } else {
-                            Image(systemName: "arrow.down.circle.fill")
-                                .font(.system(size: 10))
-                            Text("Install")
-                                .font(.caption.weight(.semibold))
-                        }
-                    }
-                    .foregroundStyle(manager.isInstalled ? Color.secondary : Color.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(manager.isInstalled 
-                                  ? Color.white.opacity(isHoveringAction ? 0.15 : 0.08)
-                                  : Color.blue.opacity(isHoveringAction ? 1.0 : 0.85))
-                    )
-                }
-                .buttonStyle(.plain)
-                .onHover { hovering in
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        isHoveringAction = hovering
-                    }
-                }
+            } else {
+                Text("One-click install")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
         }
         .frame(minHeight: 160)
         .aiExtensionCardStyle()
+        .contentShape(Rectangle())
+        .onTapGesture {
+            showInstallSheet = true
+        }
         .sheet(isPresented: $showInstallSheet) {
             AIInstallView()
         }
