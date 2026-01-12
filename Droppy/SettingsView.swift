@@ -2855,8 +2855,8 @@ struct FinderExtensionCard: View {
                 
                 Spacer()
                 
-                // Built-in badge
-                Text("Built-in")
+                // Clean grey badge
+                Text("Productivity")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
