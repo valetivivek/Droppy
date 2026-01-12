@@ -112,13 +112,11 @@
         /* Extension card hover glow */
         .extension-card {
             transition: all 0.3s ease-out;
-            border: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .extension-card:hover {
             transform: translateY(-4px);
             box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.4);
-            border-color: rgba(255, 255, 255, 0.1);
         }
 
         /* Category section styling */
@@ -179,9 +177,8 @@
         .search-morph-input {
             width: 100%;
             padding: 16px 24px 16px 52px;
-            background: rgba(30, 41, 59, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 32px;
             color: white;
             font-size: 18px;
             font-weight: 500;
@@ -267,9 +264,8 @@
 
         /* Featured Cards */
         .featured-card {
-            background: rgba(15, 23, 42, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 20px;
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 32px;
             padding: 32px;
             text-align: center;
             transition: all 0.3s ease-out;
@@ -278,7 +274,6 @@
 
         .featured-card:hover {
             transform: translateY(-6px);
-            border-color: rgba(255, 255, 255, 0.15);
             box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
         }
 
@@ -447,7 +442,7 @@
                     style="animation: fadeIn 0.6s ease-out 0.55s both;">
                     <!-- AI Background Removal -->
                     <button onclick="openExtensionModal('ai-bg')"
-                        class="extension-card extension-item group p-6 rounded-2xl bg-slate-900/50 hover:bg-slate-800/60 text-left cursor-pointer"
+                        class="extension-card extension-item group p-6 rounded-[32px] bg-slate-800/50 hover:bg-slate-800/60 text-left cursor-pointer"
                         data-name="ai background removal" data-category="ai">
                         <div
                             class="h-12 w-12 rounded-xl bg-gradient-to-br from-fuchsia-400 to-purple-600 flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110">
@@ -462,7 +457,7 @@
                     </button>
                     <!-- Alfred Workflow -->
                     <button onclick="openExtensionModal('alfred')"
-                        class="extension-card extension-item group p-6 rounded-2xl bg-slate-900/50 hover:bg-slate-800/60 text-left cursor-pointer"
+                        class="extension-card extension-item group p-6 rounded-[32px] bg-slate-800/50 hover:bg-slate-800/60 text-left cursor-pointer"
                         data-name="alfred workflow" data-category="productivity">
                         <img src="assets/images/alfred_icon.png" alt="Alfred"
                             class="h-12 w-12 rounded-xl mb-4 transition-transform duration-300 group-hover:scale-110">
@@ -471,7 +466,7 @@
                     </button>
                     <!-- Finder Services -->
                     <button onclick="openExtensionModal('finder')"
-                        class="extension-card extension-item group p-6 rounded-2xl bg-slate-900/50 hover:bg-slate-800/60 text-left cursor-pointer"
+                        class="extension-card extension-item group p-6 rounded-[32px] bg-slate-800/50 hover:bg-slate-800/60 text-left cursor-pointer"
                         data-name="finder services" data-category="productivity">
                         <div
                             class="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-400 to-cyan-600 flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110">
@@ -488,7 +483,7 @@
                     </button>
                     <!-- Element Capture -->
                     <button onclick="openExtensionModal('element-capture')"
-                        class="extension-card extension-item group p-6 rounded-2xl bg-slate-900/50 hover:bg-slate-800/60 text-left cursor-pointer"
+                        class="extension-card extension-item group p-6 rounded-[32px] bg-slate-800/50 hover:bg-slate-800/60 text-left cursor-pointer"
                         data-name="element capture" data-category="productivity">
                         <div
                             class="h-12 w-12 rounded-xl bg-gradient-to-br from-orange-400 to-amber-600 flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110">
@@ -503,7 +498,7 @@
                     </button>
                     <!-- Spotify Integration -->
                     <button onclick="openExtensionModal('spotify')"
-                        class="extension-card extension-item group p-6 rounded-2xl bg-slate-900/50 hover:bg-slate-800/60 text-left cursor-pointer"
+                        class="extension-card extension-item group p-6 rounded-[32px] bg-slate-800/50 hover:bg-slate-800/60 text-left cursor-pointer"
                         data-name="spotify integration" data-category="media">
                         <div
                             class="h-12 w-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110">
@@ -568,7 +563,7 @@
         class="extension-modal fixed inset-0 z-50 hidden items-center justify-center p-4 overflow-y-auto">
         <div class="absolute inset-0 bg-black/80 modal-backdrop" onclick="closeExtensionModal('ai-bg')"></div>
         <div class="relative max-w-xl w-full py-8 modal-card" style="animation: scaleIn 0.3s ease-out;">
-            <div class="bg-slate-900 rounded-[32px] shadow-2xl w-full p-8">
+            <div class="bg-slate-800/80 rounded-[32px] shadow-2xl w-full p-8">
                 <div class="flex items-center gap-5 mb-6">
                     <div
                         class="h-16 w-16 rounded-2xl bg-gradient-to-br from-fuchsia-400 to-purple-600 flex items-center justify-center flex-shrink-0">
@@ -627,7 +622,7 @@
         class="extension-modal fixed inset-0 z-50 hidden items-center justify-center p-4 overflow-y-auto">
         <div class="absolute inset-0 bg-black/80 modal-backdrop" onclick="closeExtensionModal('alfred')"></div>
         <div class="relative max-w-xl w-full py-8 modal-card" style="animation: scaleIn 0.3s ease-out;">
-            <div class="bg-slate-900 rounded-[32px] shadow-2xl w-full p-8">
+            <div class="bg-slate-800/80 rounded-[32px] shadow-2xl w-full p-8">
                 <div class="flex items-center gap-5 mb-6">
                     <img src="assets/images/alfred_icon.png" alt="Alfred" class="h-16 w-16 rounded-2xl flex-shrink-0">
                     <div>
@@ -682,7 +677,7 @@
         class="extension-modal fixed inset-0 z-50 hidden items-center justify-center p-4 overflow-y-auto">
         <div class="absolute inset-0 bg-black/80 modal-backdrop" onclick="closeExtensionModal('finder')"></div>
         <div class="relative max-w-xl w-full py-8 modal-card" style="animation: scaleIn 0.3s ease-out;">
-            <div class="bg-slate-900 rounded-[32px] shadow-2xl w-full p-8">
+            <div class="bg-slate-800/80 rounded-[32px] shadow-2xl w-full p-8">
                 <div class="flex items-center gap-5 mb-6">
                     <div
                         class="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-400 to-cyan-600 flex items-center justify-center flex-shrink-0">
@@ -742,7 +737,7 @@
         class="extension-modal fixed inset-0 z-50 hidden items-center justify-center p-4 overflow-y-auto">
         <div class="absolute inset-0 bg-black/80 modal-backdrop" onclick="closeExtensionModal('element-capture')"></div>
         <div class="relative max-w-xl w-full py-8 modal-card" style="animation: scaleIn 0.3s ease-out;">
-            <div class="bg-slate-900 rounded-[32px] shadow-2xl w-full p-8">
+            <div class="bg-slate-800/80 rounded-[32px] shadow-2xl w-full p-8">
                 <div class="flex items-center gap-5 mb-6">
                     <div
                         class="h-16 w-16 rounded-2xl bg-gradient-to-br from-orange-400 to-amber-600 flex items-center justify-center flex-shrink-0">
@@ -800,7 +795,7 @@
         class="extension-modal fixed inset-0 z-50 hidden items-center justify-center p-4 overflow-y-auto">
         <div class="absolute inset-0 bg-black/80 modal-backdrop" onclick="closeExtensionModal('spotify')"></div>
         <div class="relative max-w-xl w-full py-8 modal-card" style="animation: scaleIn 0.3s ease-out;">
-            <div class="bg-slate-900 rounded-[32px] shadow-2xl w-full p-8">
+            <div class="bg-slate-800/80 rounded-[32px] shadow-2xl w-full p-8">
                 <div class="flex items-center gap-5 mb-6">
                     <div
                         class="h-16 w-16 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center flex-shrink-0">
