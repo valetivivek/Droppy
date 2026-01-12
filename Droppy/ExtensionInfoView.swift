@@ -11,17 +11,22 @@ import AppKit
 // MARK: - Extension Type
 
 enum ExtensionType: String, CaseIterable, Identifiable {
+    case aiBackgroundRemoval
     case alfred
     case finder
     case spotify
     case elementCapture
     
+    /// URL-safe ID for deep links
+    case finderServices  // Alias for finder
+    
     var id: String { rawValue }
     
     var title: String {
         switch self {
+        case .aiBackgroundRemoval: return "AI Background Removal"
         case .alfred: return "Alfred Workflow"
-        case .finder: return "Finder Services"
+        case .finder, .finderServices: return "Finder Services"
         case .spotify: return "Spotify Integration"
         case .elementCapture: return "Element Capture"
         }
@@ -29,8 +34,9 @@ enum ExtensionType: String, CaseIterable, Identifiable {
     
     var subtitle: String {
         switch self {
+        case .aiBackgroundRemoval: return "One-click install"
         case .alfred: return "Requires Powerpack"
-        case .finder: return "One-time setup"
+        case .finder, .finderServices: return "One-time setup"
         case .spotify: return "No setup needed"
         case .elementCapture: return "Keyboard shortcuts"
         }
@@ -38,7 +44,8 @@ enum ExtensionType: String, CaseIterable, Identifiable {
     
     var category: String {
         switch self {
-        case .alfred, .finder, .elementCapture: return "Productivity"
+        case .aiBackgroundRemoval: return "AI"
+        case .alfred, .finder, .finderServices, .elementCapture: return "Productivity"
         case .spotify: return "Media"
         }
     }
@@ -46,8 +53,9 @@ enum ExtensionType: String, CaseIterable, Identifiable {
     // Colors matching the extension card accent colors
     var categoryColor: Color {
         switch self {
+        case .aiBackgroundRemoval: return .pink
         case .alfred: return .purple
-        case .finder: return .blue
+        case .finder, .finderServices: return .blue
         case .spotify: return .green
         case .elementCapture: return .orange
         }
@@ -55,9 +63,11 @@ enum ExtensionType: String, CaseIterable, Identifiable {
     
     var description: String {
         switch self {
+        case .aiBackgroundRemoval:
+            return "Remove backgrounds from images instantly using local AI. No internet required, your images stay private. One-click install gets you started in seconds."
         case .alfred:
             return "Push any selected file or folder to Droppy instantly with a customizable Alfred hotkey. Perfect for power users who prefer keyboard-driven workflows."
-        case .finder:
+        case .finder, .finderServices:
             return "Right-click any file in Finder to instantly add it to Droppy. No extra apps needed—it's built right into macOS."
         case .spotify:
             return "Control Spotify playback directly from the notch. See album art, track info, and use play/pause controls without switching apps."
@@ -68,6 +78,13 @@ enum ExtensionType: String, CaseIterable, Identifiable {
     
     var features: [(icon: String, text: String)] {
         switch self {
+        case .aiBackgroundRemoval:
+            return [
+                ("cpu", "Runs entirely on-device"),
+                ("lock.shield", "Private—images never leave your Mac"),
+                ("bolt.fill", "Fast InSPyReNet AI engine"),
+                ("arrow.down.circle", "One-click install")
+            ]
         case .alfred:
             return [
                 ("keyboard", "Customizable keyboard shortcuts"),
@@ -75,7 +92,7 @@ enum ExtensionType: String, CaseIterable, Identifiable {
                 ("folder.fill", "Works with files and folders"),
                 ("arrow.right.circle", "Opens workflow in Alfred")
             ]
-        case .finder:
+        case .finder, .finderServices:
             return [
                 ("cursorarrow.click.2", "Right-click context menu"),
                 ("bolt.fill", "Instant integration"),
@@ -102,6 +119,9 @@ enum ExtensionType: String, CaseIterable, Identifiable {
     @ViewBuilder
     var iconView: some View {
         switch self {
+        case .aiBackgroundRemoval:
+            // Same as AIBackgroundRemovalCard - uses AIExtensionIcon
+            AIExtensionIcon(size: 64)
         case .alfred:
             // Same as AlfredExtensionCard
             ZStack {
@@ -113,7 +133,7 @@ enum ExtensionType: String, CaseIterable, Identifiable {
                     .padding(4)
             }
             .frame(width: 64, height: 64)
-        case .finder:
+        case .finder, .finderServices:
             // Same as FinderExtensionCard - official Finder icon
             Image(nsImage: NSWorkspace.shared.icon(forFile: "/System/Library/CoreServices/Finder.app"))
                 .resizable()

@@ -15,10 +15,27 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     
     /// Shows the settings window, creating it if necessary
     func showSettings() {
+        showSettings(openingExtension: nil)
+    }
+    
+    /// Extension type to open when settings loads (cleared after use)
+    private(set) var pendingExtensionToOpen: ExtensionType?
+    
+    /// Shows the settings window with optional extension sheet
+    /// - Parameter extensionType: If provided, will navigate to Extensions and open this extension's info sheet
+    func showSettings(openingExtension extensionType: ExtensionType?) {
+        // Store the pending extension before potentially creating the window
+        pendingExtensionToOpen = extensionType
+        
         // If window already exists, just bring it to front
         if let window = window {
             NSApp.activate(ignoringOtherApps: true)
             window.makeKeyAndOrderFront(nil)
+            
+            // Post notification so SettingsView can handle the extension
+            if extensionType != nil {
+                NotificationCenter.default.post(name: .openExtensionFromDeepLink, object: extensionType)
+            }
             return
         }
         
@@ -63,7 +80,17 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         DispatchQueue.main.async {
             NSApp.activate(ignoringOtherApps: true)
             newWindow.makeKeyAndOrderFront(nil)
+            
+            // Post notification after window is ready
+            if extensionType != nil {
+                NotificationCenter.default.post(name: .openExtensionFromDeepLink, object: extensionType)
+            }
         }
+    }
+    
+    /// Clears the pending extension (called after SettingsView consumes it)
+    func clearPendingExtension() {
+        pendingExtensionToOpen = nil
     }
     
     // MARK: - NSWindowDelegate
@@ -71,4 +98,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         window = nil
     }
+}
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    /// Posted when a deep link requests opening a specific extension
+    static let openExtensionFromDeepLink = Notification.Name("openExtensionFromDeepLink")
 }

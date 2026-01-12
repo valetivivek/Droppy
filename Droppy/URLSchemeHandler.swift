@@ -12,6 +12,7 @@ import SwiftUI
 /// URL Format:
 /// - droppy://add?target=shelf&path=/path/to/file1&path=/path/to/file2
 /// - droppy://add?target=basket&path=/path/to/file
+/// - droppy://extension/{id} - Opens extension info sheet (ai-bg, alfred, finder, element-capture, spotify)
 ///
 /// Parameters:
 /// - target: "shelf" or "basket" - where to add the files
@@ -35,6 +36,9 @@ struct URLSchemeHandler {
         case "spotify-callback":
             // Handle Spotify OAuth callback
             handleSpotifyCallback(url: url)
+        case "extension":
+            // Open extension info sheet from website
+            handleExtensionAction(url: url)
         default:
             print("⚠️ URLSchemeHandler: Unknown action '\(host)'")
         }
@@ -109,6 +113,53 @@ struct URLSchemeHandler {
             print("✅ URLSchemeHandler: Spotify authentication successful")
         } else {
             print("⚠️ URLSchemeHandler: Spotify authentication failed")
+        }
+    }
+    
+    /// Handles extension deep links from the website
+    /// URL Format: droppy://extension/{id}
+    /// Supported IDs: ai-bg, alfred, finder, element-capture, spotify
+    private static func handleExtensionAction(url: URL) {
+        // Extract extension ID from path (e.g., "/ai-bg" -> "ai-bg")
+        let pathComponents = url.pathComponents.filter { $0 != "/" }
+        guard let extensionId = pathComponents.first else {
+            print("⚠️ URLSchemeHandler: No extension ID in URL path")
+            return
+        }
+        
+        print("🧩 URLSchemeHandler: Opening extension '\(extensionId)'")
+        
+        // Map URL ID to ExtensionType
+        let extensionType: ExtensionType?
+        switch extensionId.lowercased() {
+        case "ai-bg", "ai", "background-removal":
+            extensionType = .aiBackgroundRemoval
+        case "alfred", "alfred-workflow":
+            extensionType = .alfred
+        case "finder", "finder-services":
+            extensionType = .finderServices
+        case "element-capture", "element", "capture":
+            extensionType = .elementCapture
+        case "spotify", "spotify-integration":
+            extensionType = .spotify
+        default:
+            print("⚠️ URLSchemeHandler: Unknown extension ID '\(extensionId)'")
+            extensionType = nil
+        }
+        
+        // Open Settings window and show the extension sheet
+        DispatchQueue.main.async {
+            // Bring app to front
+            NSApp.activate(ignoringOtherApps: true)
+            
+            // Open Settings to Extensions tab with the specific extension sheet
+            if let type = extensionType {
+                SettingsWindowController.shared.showSettings(openingExtension: type)
+                print("✅ URLSchemeHandler: Opened extension info sheet for '\(extensionId)'")
+            } else {
+                // Just open Settings to Extensions tab
+                SettingsWindowController.shared.showSettings()
+            }
         }
     }
 }

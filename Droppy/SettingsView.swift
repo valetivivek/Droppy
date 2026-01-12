@@ -49,6 +49,9 @@ struct SettingsView: View {
     @State private var isIntroHovering = false
     @State private var scrollOffset: CGFloat = 0
     
+    /// Extension to open from deep link (e.g., droppy://extension/ai-bg)
+    @State private var deepLinkedExtension: ExtensionType?
+    
     /// Detects if the current screen has a physical notch
     private var hasPhysicalNotch: Bool {
         guard let screen = NSScreen.main else { return false }
@@ -168,6 +171,24 @@ struct SettingsView: View {
         // Force complete view rebuild when transparency mode changes
         // This fixes the issue where background doesn't update immediately
         .id(useTransparentBackground)
+        // Handle deep links to open specific extensions
+        .onAppear {
+            // Check if there's a pending extension from a deep link
+            if let pending = SettingsWindowController.shared.pendingExtensionToOpen {
+                selectedTab = "Extensions"
+                deepLinkedExtension = pending
+                SettingsWindowController.shared.clearPendingExtension()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openExtensionFromDeepLink)) { notification in
+            if let extensionType = notification.object as? ExtensionType {
+                selectedTab = "Extensions"
+                // Small delay to allow tab switch animation
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    deepLinkedExtension = extensionType
+                }
+            }
+        }
     }
     
     // MARK: - Sidebar Button Helper
@@ -487,6 +508,29 @@ struct SettingsView: View {
     
     private var integrationsSettings: some View {
         ExtensionsShopView()
+            .sheet(item: $deepLinkedExtension) { extensionType in
+                // AI Background Removal has its own view
+                if extensionType == .aiBackgroundRemoval {
+                    AIInstallView()
+                } else {
+                    // All other extensions use ExtensionInfoView
+                    ExtensionInfoView(extensionType: extensionType) {
+                        // Handle action based on type
+                        switch extensionType {
+                        case .alfred:
+                            if let workflowPath = Bundle.main.path(forResource: "Droppy", ofType: "alfredworkflow") {
+                                NSWorkspace.shared.open(URL(fileURLWithPath: workflowPath))
+                            }
+                        case .finder, .finderServices:
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+                        case .spotify:
+                            SpotifyAuthManager.shared.startAuth()
+                        case .elementCapture, .aiBackgroundRemoval:
+                            break // No action needed
+                        }
+                    }
+                }
+            }
     }
 
     
