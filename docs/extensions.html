@@ -151,39 +151,51 @@
         /* Morphing search bar */
         .search-morph-container {
             position: relative;
-            display: inline-flex;
+            display: flex;
             align-items: center;
-            gap: 12px;
+            justify-content: center;
+            min-height: 60px;
         }
 
         .search-morph-title {
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .search-morph-wrapper {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
         }
 
         .search-morph-input {
-            position: absolute;
-            right: 0;
-            width: 0;
-            opacity: 0;
-            padding: 12px 20px 12px 48px;
-            background: rgba(30, 41, 59, 0.8);
+            width: 100%;
+            padding: 16px 24px 16px 52px;
+            background: rgba(30, 41, 59, 0.9);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
+            border-radius: 20px;
             color: white;
-            font-size: 16px;
+            font-size: 18px;
+            font-weight: 500;
             outline: none;
             backdrop-filter: blur(20px);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .search-morph-input::placeholder {
-            color: rgba(148, 163, 184, 0.8);
+            color: rgba(148, 163, 184, 0.6);
         }
 
         .search-morph-icon {
             position: absolute;
-            left: 16px;
+            left: 18px;
             top: 50%;
             transform: translateY(-50%);
             opacity: 0;
@@ -195,12 +207,12 @@
         .search-morph-container:hover .search-morph-title,
         .search-morph-container:focus-within .search-morph-title {
             opacity: 0;
-            transform: translateX(-20px);
+            transform: scale(0.95);
         }
 
-        .search-morph-container:hover .search-morph-input,
-        .search-morph-container:focus-within .search-morph-input {
-            width: 320px;
+        .search-morph-container:hover .search-morph-wrapper,
+        .search-morph-container:focus-within .search-morph-wrapper {
+            width: 420px;
             opacity: 1;
         }
 
@@ -255,21 +267,26 @@
             <div class="w-full max-w-screen-xl">
                 <!-- Morphing Search Header -->
                 <div class="text-center mb-16" style="animation: fadeIn 0.6s ease-out 0.3s both;">
-                    <div class="search-morph-container justify-center w-full">
-                        <svg class="w-12 h-12 sm:w-14 sm:h-14 text-slate-100 flex-shrink-0" fill="currentColor"
-                            viewBox="0 0 20 20">
-                            <path
-                                d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H6a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H4a1 1 0 001-1V6a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
-                        </svg>
-                        <h1 class="search-morph-title text-5xl sm:text-6xl font-bold tracking-tight">Extension Store
+                    <div class="search-morph-container">
+                        <!-- Title with icon - fades out on hover -->
+                        <h1 class="search-morph-title text-5xl sm:text-6xl font-bold tracking-tight">
+                            <svg class="w-12 h-12 sm:w-14 sm:h-14 text-slate-100" fill="currentColor"
+                                viewBox="0 0 20 20">
+                                <path
+                                    d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H6a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H4a1 1 0 001-1V6a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
+                            </svg>
+                            Extension Store
                         </h1>
-                        <svg class="search-morph-icon w-5 h-5 text-slate-400" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        <input type="text" class="search-morph-input" placeholder="Search extensions..."
-                            id="extensionSearch" oninput="filterExtensions(this.value)">
+                        <!-- Search wrapper - fades in centered on hover -->
+                        <div class="search-morph-wrapper">
+                            <svg class="search-morph-icon w-5 h-5 text-slate-400" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <input type="text" class="search-morph-input" placeholder="Search extensions..."
+                                id="extensionSearch" oninput="filterExtensions(this.value)">
+                        </div>
                     </div>
                     <p class="text-xl text-slate-400 mt-6 max-w-xl mx-auto">
                         Powerful integrations that extend Droppy's capabilities.
