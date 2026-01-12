@@ -104,19 +104,12 @@ Now Playing controls with album art, seek slider, and native Spotify integration
 ## 🧩 Extension Store
 
 <p align="center">
-  <em>Supercharge Droppy with powerful add-ons — all built-in, no downloads required.</em>
+  <img src="docs/assets/extension-store.png" width="100%" alt="Extension Store">
 </p>
 
-Access the Extension Store in **Settings → Extensions** to discover and enable features:
-
-| Extension | What it Does |
-|:---|:---|
-| 🤖 **AI Background Removal** | Remove backgrounds from images locally using on-device AI. Works in bulk! |
-| 📸 **Element Capture** | Screenshot any UI element with a custom keyboard shortcut — auto-copies to clipboard |
-| <img src="https://www.alfredapp.com/media/logo4@2x.png" width="16"> **Alfred Workflow** | Push files from Alfred to your Shelf or Basket instantly |
-| 🎵 **Spotify Integration** | Deep native integration with shuffle, repeat, and precise seek |
-
-> 💡 **All extensions are free and built-in.** Just toggle them on in Settings!
+<p align="center">
+  <em>Supercharge Droppy with powerful add-ons — all built-in and free. Toggle them on in Settings → Extensions.</em>
+</p>
 
 ---
 
