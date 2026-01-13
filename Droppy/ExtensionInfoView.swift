@@ -282,6 +282,10 @@ struct ExtensionInfoView: View {
                                 .padding(10)
                                 .background(Color.white.opacity(0.05))
                                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                )
                                 .lineLimit(2...4)
                             
                             Button {
@@ -553,12 +557,15 @@ struct ExtensionInfoView: View {
 
 struct ElementCaptureInfoView: View {
     @Binding var currentShortcut: SavedShortcut?
+    var installCount: Int?
+    var rating: AnalyticsService.ExtensionRating?
     
     @Environment(\.dismiss) private var dismiss
     @State private var isHoveringAction = false
     @State private var isHoveringClose = false
     @State private var isRecording = false
     @State private var recordMonitor: Any?
+    @State private var showReviewsSheet = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -587,6 +594,9 @@ struct ElementCaptureInfoView: View {
         .onDisappear {
             stopRecording()
         }
+        .sheet(isPresented: $showReviewsSheet) {
+            ExtensionReviewsSheet(extensionType: .elementCapture)
+        }
     }
     
     private var headerSection: some View {
@@ -606,7 +616,41 @@ struct ElementCaptureInfoView: View {
                 .font(.title2.bold())
                 .foregroundStyle(.white)
             
-            HStack(spacing: 8) {
+            // Stats row: installs + rating + category badge
+            HStack(spacing: 12) {
+                // Installs
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.system(size: 12))
+                    Text("\(installCount ?? 0)")
+                        .font(.caption.weight(.medium))
+                }
+                .foregroundStyle(.secondary)
+                
+                // Rating (clickable)
+                Button {
+                    showReviewsSheet = true
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.yellow)
+                        if let r = rating, r.ratingCount > 0 {
+                            Text(String(format: "%.1f", r.averageRating))
+                                .font(.caption.weight(.medium))
+                            Text("(\(r.ratingCount))")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        } else {
+                            Text("–")
+                                .font(.caption.weight(.medium))
+                        }
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                
+                // Category badge
                 Text("Productivity")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.orange)
@@ -616,11 +660,11 @@ struct ElementCaptureInfoView: View {
                         Capsule()
                             .fill(Color.orange.opacity(0.15))
                     )
-                
-                Text("Keyboard shortcuts")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
             }
+            
+            Text("Keyboard shortcuts")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
         .padding(.top, 24)
         .padding(.bottom, 20)

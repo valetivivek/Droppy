@@ -1347,6 +1347,16 @@
                         valueEl.textContent = count;
                     }
                 });
+
+                // Also update modal stats
+                document.querySelectorAll('.modal-stats[data-extension]').forEach(el => {
+                    const extId = el.dataset.extension;
+                    const count = countMap[extId] || 0;
+                    const countEl = el.querySelector('.modal-count');
+                    if (countEl) {
+                        countEl.textContent = count;
+                    }
+                });
             } catch (error) {
                 console.log('Could not fetch extension counts:', error);
             }
@@ -1376,6 +1386,15 @@
                         if (ratingEl && item.rating_count > 0) {
                             ratingEl.textContent = parseFloat(item.average_rating).toFixed(1);
                             ratingEl.classList.remove('text-slate-500');
+                        }
+                    });
+
+                    // Also update modal stats
+                    const modalStats = document.querySelectorAll(`.modal-stats[data-extension="${item.extension_id}"]`);
+                    modalStats.forEach(el => {
+                        const ratingEl = el.querySelector('.modal-rating');
+                        if (ratingEl && item.rating_count > 0) {
+                            ratingEl.textContent = parseFloat(item.average_rating).toFixed(1);
                         }
                     });
                 });

@@ -3253,7 +3253,7 @@ struct ElementCaptureCard: View {
             loadShortcut()
         }
         .sheet(isPresented: $showInfoSheet) {
-            ElementCaptureInfoView(currentShortcut: $currentShortcut)
+            ElementCaptureInfoView(currentShortcut: $currentShortcut, installCount: installCount, rating: rating)
         }
     }
     
