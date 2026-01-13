@@ -421,26 +421,23 @@ struct OnboardingView: View {
                     delay: 0.24
                 )
                 
-                // Extensions - special gradient icon
+                // Extensions - droplet puzzle icon
                 HStack(spacing: 16) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [.purple.opacity(0.3), .blue.opacity(0.3)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
+                    AsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/extensions.png")) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().aspectRatio(contentMode: .fit)
+                        default:
+                            Image(systemName: "puzzlepiece.extension.fill")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.purple, .blue],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
                                 )
-                            )
-                        Image(systemName: "puzzlepiece.extension.fill")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.purple, .blue],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                        }
                     }
                     .frame(width: 44, height: 44)
                     
@@ -657,24 +654,21 @@ struct OnboardingView: View {
                 }
             } label: {
                 HStack(spacing: 14) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [.purple.opacity(0.3), .blue.opacity(0.3)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
+                    AsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/extensions.png")) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().aspectRatio(contentMode: .fit)
+                        default:
+                            Image(systemName: "puzzlepiece.extension.fill")
+                                .font(.system(size: 22, weight: .medium))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.purple, .blue],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
                                 )
-                            )
-                        Image(systemName: "puzzlepiece.extension.fill")
-                            .font(.system(size: 22, weight: .medium))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.purple, .blue],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                        }
                     }
                     .frame(width: 48, height: 48)
                     
