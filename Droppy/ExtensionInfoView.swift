@@ -116,6 +116,23 @@ enum ExtensionType: String, CaseIterable, Identifiable {
         }
     }
     
+    /// Screenshot URL loaded from web (keeps app size minimal)
+    var screenshotURL: URL? {
+        let baseURL = "https://iordv.github.io/Droppy/assets/images/"
+        switch self {
+        case .aiBackgroundRemoval:
+            return URL(string: baseURL + "ai-bg-screenshot.png")
+        case .alfred:
+            return URL(string: baseURL + "alfred-screenshot.png")
+        case .finder, .finderServices:
+            return URL(string: baseURL + "finder-screenshot.png")
+        case .spotify:
+            return URL(string: baseURL + "spotify-screenshot.jpg")
+        case .elementCapture:
+            return URL(string: baseURL + "element-capture-screenshot.png")
+        }
+    }
+    
     @ViewBuilder
     var iconView: some View {
         switch self {
@@ -193,7 +210,7 @@ struct ExtensionInfoView: View {
             // Buttons
             buttonSection
         }
-        .frame(width: 340)
+        .frame(width: 510)
         .fixedSize(horizontal: false, vertical: true)
         .background(Color.black)
         .clipped()
@@ -245,6 +262,34 @@ struct ExtensionInfoView: View {
             
             ForEach(Array(extensionType.features.enumerated()), id: \.offset) { _, feature in
                 featureRow(icon: feature.icon, text: feature.text)
+            }
+            
+            // Screenshot preview loaded from web (keeps app size minimal)
+            if let screenshotURL = extensionType.screenshotURL {
+                AsyncImage(url: screenshotURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+                            )
+                            .padding(.top, 8)
+                    case .failure:
+                        EmptyView() // Silently fail if network unavailable
+                    case .empty:
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.white.opacity(0.05))
+                            .frame(height: 150)
+                            .overlay(ProgressView().scaleEffect(0.8))
+                            .padding(.top, 8)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
             }
         }
         .padding(.horizontal, 24)
@@ -373,7 +418,7 @@ struct ElementCaptureInfoView: View {
             // Buttons
             buttonSection
         }
-        .frame(width: 340)
+        .frame(width: 510)
         .fixedSize(horizontal: false, vertical: true)
         .background(Color.black)
         .clipped()
@@ -431,6 +476,32 @@ struct ElementCaptureInfoView: View {
             featureRow(icon: "rectangle.dashed", text: "Select screen regions")
             featureRow(icon: "doc.on.clipboard", text: "Copy to clipboard")
             featureRow(icon: "plus.circle", text: "Add directly to Droppy")
+            
+            // Screenshot loaded from web (keeps app size minimal)
+            AsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/images/element-capture-screenshot.png")) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+                        )
+                        .padding(.top, 8)
+                case .failure:
+                    EmptyView()
+                case .empty:
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.05))
+                        .frame(height: 150)
+                        .overlay(ProgressView().scaleEffect(0.8))
+                        .padding(.top, 8)
+                @unknown default:
+                    EmptyView()
+                }
+            }
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 20)

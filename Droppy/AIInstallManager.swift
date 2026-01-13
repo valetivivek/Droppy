@@ -19,15 +19,31 @@ final class AIInstallManager: ObservableObject {
     @Published var installProgress: String = ""
     @Published var installError: String?
     
+    private let installedCacheKey = "aiBackgroundRemovalInstalled"
+    
     private init() {
-        checkInstallationStatus()
+        // Load cached status immediately for instant UI response
+        isInstalled = UserDefaults.standard.bool(forKey: installedCacheKey)
+        
+        // Verify in background (only if cached as installed to avoid slow startup)
+        if isInstalled {
+            Task {
+                let actuallyInstalled = await checkTransparentBackgroundInstalled()
+                if actuallyInstalled != isInstalled {
+                    isInstalled = actuallyInstalled
+                    UserDefaults.standard.set(actuallyInstalled, forKey: installedCacheKey)
+                }
+            }
+        }
     }
     
     // MARK: - Installation Check
     
     func checkInstallationStatus() {
         Task {
-            isInstalled = await checkTransparentBackgroundInstalled()
+            let installed = await checkTransparentBackgroundInstalled()
+            isInstalled = installed
+            UserDefaults.standard.set(installed, forKey: installedCacheKey)
         }
     }
     

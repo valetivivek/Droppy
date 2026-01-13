@@ -25,6 +25,7 @@ struct SettingsView: View {
     @AppStorage("enableBatteryHUD") private var enableBatteryHUD = true  // Enabled by default
     @AppStorage("enableCapsLockHUD") private var enableCapsLockHUD = true  // Caps Lock indicator
     @AppStorage("enableAirPodsHUD") private var enableAirPodsHUD = true  // AirPods connection HUD
+    @AppStorage("enableLockScreenHUD") private var enableLockScreenHUD = true  // Lock/Unlock HUD
     @AppStorage("showMediaPlayer") private var showMediaPlayer = true
     @AppStorage("autoFadeMediaHUD") private var autoFadeMediaHUD = true
     @AppStorage("debounceMediaChanges") private var debounceMediaChanges = false  // Delay media HUD for rapid changes
@@ -492,6 +493,23 @@ struct SettingsView: View {
                         } else {
                             AirPodsManager.shared.stopMonitoring()
                             if !enableNotchShelf && !enableHUDReplacement && !showMediaPlayer && !enableBatteryHUD && !enableCapsLockHUD {
+                                NotchWindowController.shared.closeWindow()
+                            }
+                        }
+                    }
+                    
+                    // Lock Screen HUD
+                    HUDToggleButton(
+                        title: "Lock Screen",
+                        icon: "lock.fill",
+                        isEnabled: $enableLockScreenHUD,
+                        color: .purple
+                    )
+                    .onChange(of: enableLockScreenHUD) { _, newValue in
+                        if newValue {
+                            NotchWindowController.shared.setupNotchWindow()
+                        } else {
+                            if !enableNotchShelf && !enableHUDReplacement && !showMediaPlayer && !enableBatteryHUD && !enableCapsLockHUD && !enableAirPodsHUD {
                                 NotchWindowController.shared.closeWindow()
                             }
                         }

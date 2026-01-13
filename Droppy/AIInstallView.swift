@@ -74,7 +74,7 @@ struct AIInstallView: View {
                     .allowsHitTesting(false)
             }
         }
-        .frame(width: 340)
+        .frame(width: 510)
         .fixedSize(horizontal: false, vertical: true)
         .background(Color.black)
         .clipped()
@@ -198,6 +198,32 @@ struct AIInstallView: View {
             featureRow(icon: "bolt.fill", text: "Works offline after install")
             featureRow(icon: "lock.fill", text: "100% on-device processing")
             featureRow(icon: "arrow.down.circle", text: "One-time download (~400MB)")
+            
+            // Screenshot loaded from web (keeps app size minimal)
+            AsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/images/ai-bg-screenshot.png")) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+                        )
+                        .padding(.top, 8)
+                case .failure:
+                    EmptyView()
+                case .empty:
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.05))
+                        .frame(height: 150)
+                        .overlay(ProgressView().scaleEffect(0.8))
+                        .padding(.top, 8)
+                @unknown default:
+                    EmptyView()
+                }
+            }
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 20)

@@ -73,6 +73,7 @@ struct NotchShelfView: View {
     @AppStorage("enableBatteryHUD") private var enableBatteryHUD = true  // Battery charging/low battery HUD
     @AppStorage("enableCapsLockHUD") private var enableCapsLockHUD = true  // Caps Lock ON/OFF HUD
     @AppStorage("enableAirPodsHUD") private var enableAirPodsHUD = true  // AirPods connection HUD
+    @AppStorage("enableLockScreenHUD") private var enableLockScreenHUD = true  // Lock/Unlock HUD
     @AppStorage("showMediaPlayer") private var showMediaPlayer = true
     @AppStorage("autoFadeMediaHUD") private var autoFadeMediaHUD = true
     @AppStorage("debounceMediaChanges") private var debounceMediaChanges = false  // Delay media HUD for rapid changes
@@ -92,6 +93,7 @@ struct NotchShelfView: View {
     @ObservedObject private var capsLockManager = CapsLockManager.shared
     @ObservedObject private var musicManager = MusicManager.shared
     var airPodsManager = AirPodsManager.shared  // @Observable - no wrapper needed
+    @ObservedObject private var lockScreenManager = LockScreenManager.shared
     @State private var showVolumeHUD = false
     @State private var showBrightnessHUD = false
     @State private var hudWorkItem: DispatchWorkItem?
@@ -104,6 +106,8 @@ struct NotchShelfView: View {
     @State private var capsLockHUDWorkItem: DispatchWorkItem?  // Timer for Caps Lock HUD auto-hide
     @State private var airPodsHUDIsVisible = false  // AirPods connection HUD visibility
     @State private var airPodsHUDWorkItem: DispatchWorkItem?  // Timer for AirPods HUD auto-hide
+    @State private var lockScreenHUDIsVisible = false  // Lock/Unlock HUD visibility
+    @State private var lockScreenHUDWorkItem: DispatchWorkItem?  // Timer for Lock Screen HUD auto-hide
     @State private var mediaHUDFadedOut = false  // Tracks if media HUD has auto-faded
     @State private var mediaFadeWorkItem: DispatchWorkItem?
     @State private var autoShrinkWorkItem: DispatchWorkItem?  // Timer for auto-shrinking shelf
@@ -239,6 +243,8 @@ struct NotchShelfView: View {
             return expandedWidth
         } else if hudIsVisible {
             return volumeHudWidth  // Volume/Brightness HUD needs wider wings
+        } else if lockScreenHUDIsVisible && enableLockScreenHUD {
+            return batteryHudWidth  // Lock Screen HUD uses same width as battery HUD
         } else if airPodsHUDIsVisible && enableAirPodsHUD {
             return hudWidth  // AirPods HUD uses same width as Media HUD
         } else if batteryHUDIsVisible && enableBatteryHUD {
@@ -261,6 +267,8 @@ struct NotchShelfView: View {
         } else if hudIsVisible {
             // Dynamic Island: keep compact height matching media HUD
             return isDynamicIslandMode ? notchHeight : hudHeight
+        } else if lockScreenHUDIsVisible && enableLockScreenHUD {
+            return notchHeight  // Lock Screen HUD just uses notch height
         } else if airPodsHUDIsVisible && enableAirPodsHUD {
             // AirPods HUD stays at notch height like media player (horizontal expansion only)
             return notchHeight
@@ -337,6 +345,8 @@ struct NotchShelfView: View {
             if batteryHUDIsVisible && enableBatteryHUD { return true }
             // Show when caps lock HUD is visible
             if capsLockHUDIsVisible && enableCapsLockHUD { return true }
+            // Show when lock screen HUD is visible
+            if lockScreenHUDIsVisible && enableLockScreenHUD { return true }
             // Otherwise hide - Dynamic Island is invisible when idle
             return false
         }
@@ -522,12 +532,27 @@ struct NotchShelfView: View {
                     .zIndex(6)  // Highest priority - connection events
                 }
                 
+                // MARK: - Lock Screen HUD (lock/unlock animation)
+                // Shows when MacBook lid opens/closes or screen locks/unlocks
+                // Highest priority - hides all other HUDs
+                if lockScreenHUDIsVisible && enableLockScreenHUD && !hudIsVisible && !state.isExpanded {
+                    LockScreenHUDView(
+                        lockScreenManager: lockScreenManager,
+                        notchWidth: notchWidth,
+                        notchHeight: notchHeight,
+                        hudWidth: batteryHudWidth  // Same width as battery/caps lock HUD
+                    )
+                    .frame(width: batteryHudWidth, height: notchHeight)
+                    .transition(.scale(scale: 0.8).combined(with: .opacity).animation(.spring(response: 0.25, dampingFraction: 0.8)))
+                    .zIndex(7)  // Higher than AirPods HUD
+                }
+                
                 // MARK: - Media Player HUD (when music is playing)
                 // Only show if we have valid song info (not just isPlaying)
                 // Hide during song transitions for collapse-expand effect
                 // Hide when battery/caps lock/airpods HUD is visible (they take priority briefly)
                 // Debounce check only applies when setting is enabled
-                if showMediaPlayer && musicManager.isPlaying && !musicManager.songTitle.isEmpty && !hudIsVisible && !batteryHUDIsVisible && !capsLockHUDIsVisible && !airPodsHUDIsVisible && !state.isExpanded && !(autoFadeMediaHUD && mediaHUDFadedOut) && !isSongTransitioning && (!debounceMediaChanges || isMediaStable) {
+                if showMediaPlayer && musicManager.isPlaying && !musicManager.songTitle.isEmpty && !hudIsVisible && !batteryHUDIsVisible && !capsLockHUDIsVisible && !airPodsHUDIsVisible && !lockScreenHUDIsVisible && !state.isExpanded && !(autoFadeMediaHUD && mediaHUDFadedOut) && !isSongTransitioning && (!debounceMediaChanges || isMediaStable) {
                     MediaHUDView(musicManager: musicManager, isHovered: $mediaHUDIsHovered, notchWidth: notchWidth, notchHeight: notchHeight, hudWidth: hudWidth)
                         .frame(width: hudWidth, alignment: .top)
                         // Match other HUD transitions for consistent morphing
@@ -594,6 +619,10 @@ struct NotchShelfView: View {
         .onChange(of: airPodsManager.lastConnectionAt) { _, _ in
             guard enableAirPodsHUD, !state.isExpanded else { return }
             triggerAirPodsHUD()
+        }
+        .onChange(of: lockScreenManager.lastChangeAt) { _, _ in
+            guard enableLockScreenHUD, !state.isExpanded else { return }
+            triggerLockScreenHUD()
         }
         // MARK: - Media HUD Auto-Fade
         .onChange(of: musicManager.songTitle) { oldTitle, newTitle in
@@ -761,6 +790,21 @@ struct NotchShelfView: View {
         }
         airPodsHUDWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + airPodsManager.visibleDuration, execute: workItem)
+    }
+    
+    private func triggerLockScreenHUD() {
+        lockScreenHUDWorkItem?.cancel()
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            lockScreenHUDIsVisible = true
+        }
+        
+        let workItem = DispatchWorkItem { [self] in
+            withAnimation(.easeOut(duration: 0.3)) {
+                lockScreenHUDIsVisible = false
+            }
+        }
+        lockScreenHUDWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + lockScreenManager.visibleDuration, execute: workItem)
     }
     
     private func startMediaFadeTimer() {

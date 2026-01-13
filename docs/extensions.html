@@ -109,61 +109,6 @@
             animation: scaleOut 0.25s ease-out forwards;
         }
 
-        /* Carousel styles */
-        .carousel {
-            position: relative;
-            touch-action: pan-x;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .carousel-slides {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .carousel-slide {
-            display: none;
-            opacity: 0;
-            transition: opacity 0.3s ease-out;
-        }
-
-        .carousel-slide.active {
-            display: block;
-            opacity: 1;
-        }
-
-        .carousel-dots {
-            position: absolute;
-            bottom: 12px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            justify-content: center;
-            gap: 6px;
-            padding: 4px 8px;
-            background: rgba(0, 0, 0, 0.4);
-            border-radius: 10px;
-        }
-
-        .carousel-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.4);
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            padding: 0;
-        }
-
-        .carousel-dot:hover {
-            background: rgba(255, 255, 255, 0.6);
-        }
-
-        .carousel-dot.active {
-            background: rgba(255, 255, 255, 0.9);
-        }
-
         /* Extension card hover glow */
         .extension-card {
             transition: all 0.3s ease-out;
@@ -657,22 +602,9 @@
                 <p class="text-slate-300 mb-6 leading-relaxed">Remove backgrounds from images instantly using local AI
                     processing. No internet connection required—all processing happens on your Mac using the InSPyReNet
                     neural network.</p>
-                <div class="relative rounded-2xl bg-slate-800/50 border border-slate-700/50 overflow-hidden mb-6">
-                    <div class="carousel" data-carousel="ai-bg">
-                        <div class="carousel-slides">
-                            <img src="assets/images/ai-bg-screenshot-1.png" alt="AI Background Removal - Shelf view"
-                                class="w-full h-auto carousel-slide active">
-                            <img src="assets/images/ai-bg-screenshot-2.png" alt="AI Background Removal - Context menu"
-                                class="w-full h-auto carousel-slide">
-                            <img src="assets/images/ai-bg-screenshot-3.png" alt="AI Background Removal - Result"
-                                class="w-full h-auto carousel-slide">
-                        </div>
-                        <div class="carousel-dots">
-                            <button class="carousel-dot active" data-index="0"></button>
-                            <button class="carousel-dot" data-index="1"></button>
-                            <button class="carousel-dot" data-index="2"></button>
-                        </div>
-                    </div>
+                <div class="rounded-2xl bg-slate-800/50 border border-slate-700/50 overflow-hidden mb-6">
+                    <img src="assets/images/ai-bg-screenshot.png" alt="AI Background Removal screenshot"
+                        class="w-full h-auto">
                 </div>
                 <div class="space-y-3 mb-6">
                     <div class="flex items-center gap-3 text-slate-300">
@@ -794,19 +726,9 @@
                 </div>
                 <p class="text-slate-300 mb-6 leading-relaxed">Access Droppy's power directly from Finder's right-click
                     menu. Add selected files to the Shelf or Basket without switching apps.</p>
-                <div class="relative rounded-2xl bg-slate-800/50 border border-slate-700/50 overflow-hidden mb-6">
-                    <div class="carousel" data-carousel="finder">
-                        <div class="carousel-slides">
-                            <img src="assets/images/finder-screenshot-1.png" alt="Finder Services - Shelf view"
-                                class="w-full h-auto carousel-slide active">
-                            <img src="assets/images/finder-screenshot-2.png" alt="Finder Services - Context menu"
-                                class="w-full h-auto carousel-slide">
-                        </div>
-                        <div class="carousel-dots">
-                            <button class="carousel-dot active" data-index="0"></button>
-                            <button class="carousel-dot" data-index="1"></button>
-                        </div>
-                    </div>
+                <div class="rounded-2xl bg-slate-800/50 border border-slate-700/50 overflow-hidden mb-6">
+                    <img src="assets/images/finder-screenshot.png" alt="Finder Services screenshot"
+                        class="w-full h-auto">
                 </div>
                 <div class="space-y-3 mb-6">
                     <div class="flex items-center gap-3 text-slate-300">
@@ -865,19 +787,9 @@
                 </div>
                 <p class="text-slate-300 mb-6 leading-relaxed">Capture specific screen elements and copy them to
                     clipboard or add to Droppy. Perfect for grabbing UI components, icons, or any visual element.</p>
-                <div class="relative rounded-2xl bg-slate-800/50 border border-slate-700/50 overflow-hidden mb-6">
-                    <div class="carousel" data-carousel="element-capture">
-                        <div class="carousel-slides">
-                            <img src="assets/images/element-capture-screenshot-1.png" alt="Element Capture - Result"
-                                class="w-full h-auto carousel-slide active">
-                            <img src="assets/images/element-capture-screenshot-2.png" alt="Element Capture - Selection"
-                                class="w-full h-auto carousel-slide">
-                        </div>
-                        <div class="carousel-dots">
-                            <button class="carousel-dot active" data-index="0"></button>
-                            <button class="carousel-dot" data-index="1"></button>
-                        </div>
-                    </div>
+                <div class="rounded-2xl bg-slate-800/50 border border-slate-700/50 overflow-hidden mb-6">
+                    <img src="assets/images/element-capture-screenshot.png" alt="Element Capture screenshot"
+                        class="w-full h-auto">
                 </div>
                 <div class="space-y-3 mb-6">
                     <div class="flex items-center gap-3 text-slate-300">
@@ -1096,46 +1008,6 @@
                     }, 60);
                 }, 400);
             }, 1500);
-
-            // Initialize carousels
-            document.querySelectorAll('.carousel').forEach(carousel => {
-                const slides = carousel.querySelectorAll('.carousel-slide');
-                const dots = carousel.querySelectorAll('.carousel-dot');
-                let currentIndex = 0;
-                let touchStartX = 0;
-                let touchEndX = 0;
-
-                function goToSlide(index) {
-                    if (index < 0) index = slides.length - 1;
-                    if (index >= slides.length) index = 0;
-                    currentIndex = index;
-
-                    slides.forEach(slide => slide.classList.remove('active'));
-                    slides[index].classList.add('active');
-
-                    dots.forEach(d => d.classList.remove('active'));
-                    dots[index].classList.add('active');
-                }
-
-                // Dot click navigation
-                dots.forEach((dot, index) => {
-                    dot.addEventListener('click', () => goToSlide(index));
-                });
-
-                // Touch/swipe navigation
-                carousel.addEventListener('touchstart', e => {
-                    touchStartX = e.changedTouches[0].screenX;
-                });
-
-                carousel.addEventListener('touchend', e => {
-                    touchEndX = e.changedTouches[0].screenX;
-                    const diff = touchStartX - touchEndX;
-                    if (Math.abs(diff) > 50) {
-                        if (diff > 0) goToSlide(currentIndex + 1); // Swipe left
-                        else goToSlide(currentIndex - 1); // Swipe right
-                    }
-                });
-            });
         });
     </script>
 </body>
