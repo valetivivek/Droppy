@@ -14,8 +14,6 @@ struct VoiceTranscribeInfoView: View {
     @State private var isHoveringCancel = false
     @State private var showReviewsSheet = false
     @State private var isDownloading = false
-    @State private var isSettingUpShortcut = false
-    @State private var currentShortcut: SavedShortcut?
     
     var installCount: Int?
     var rating: AnalyticsService.ExtensionRating?
@@ -43,9 +41,6 @@ struct VoiceTranscribeInfoView: View {
         .clipped()
         .sheet(isPresented: $showReviewsSheet) {
             ExtensionReviewsSheet(extensionType: .voiceTranscribe)
-        }
-        .onAppear {
-            loadShortcut()
         }
     }
     
@@ -264,61 +259,10 @@ struct VoiceTranscribeInfoView: View {
             .background(Color.white.opacity(0.03))
             .clipShape(RoundedRectangle(cornerRadius: 12))
             
-            // Step 3: Keyboard Shortcut
+            // Step 3: Enable Menu Bar
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    stepBadge(number: 3, completed: currentShortcut != nil)
-                    Text("Set Keyboard Shortcut")
-                        .font(.headline)
-                    Spacer()
-                }
-                
-                HStack {
-                    if let shortcut = currentShortcut {
-                        HStack(spacing: 8) {
-                            Text(shortcut.description)
-                                .font(.system(.callout, design: .monospaced))
-                                .foregroundStyle(.primary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.white.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                            
-                            Button {
-                                currentShortcut = nil
-                                UserDefaults.standard.removeObject(forKey: "voiceTranscribeShortcut")
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    } else {
-                        Text("Not configured")
-                            .font(.callout)
-                            .foregroundStyle(.tertiary)
-                    }
-                    
-                    Spacer()
-                    
-                    Button {
-                        isSettingUpShortcut = true
-                    } label: {
-                        Text(currentShortcut == nil ? "Set Shortcut" : "Change")
-                            .font(.callout.weight(.medium))
-                            .foregroundStyle(.blue)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(16)
-            .background(Color.white.opacity(0.03))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            
-            // Step 4: Enable Menu Bar
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    stepBadge(number: 4, completed: manager.isMenuBarEnabled)
+                    stepBadge(number: 3, completed: manager.isMenuBarEnabled)
                     Text("Enable Menu Bar Icon")
                         .font(.headline)
                     Spacer()
@@ -341,16 +285,6 @@ struct VoiceTranscribeInfoView: View {
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 20)
-        .sheet(isPresented: $isSettingUpShortcut) {
-            ShortcutRecorderSheet(
-                title: "Voice Transcribe Shortcut",
-                description: "Press the keys you want to use to start/stop recording",
-                currentShortcut: $currentShortcut
-            ) { newShortcut in
-                currentShortcut = newShortcut
-                saveShortcut(newShortcut)
-            }
-        }
     }
     
     private func stepBadge(number: Int, completed: Bool) -> some View {
@@ -400,9 +334,7 @@ struct VoiceTranscribeInfoView: View {
             Button {
                 // Track activation if model is downloaded
                 if manager.isModelDownloaded {
-                    Task {
-                        await AnalyticsService.shared.trackExtensionActivation(.voiceTranscribe)
-                    }
+                    AnalyticsService.shared.trackExtensionActivation(extensionId: "voiceTranscribe")
                 }
                 dismiss()
             } label: {
@@ -427,22 +359,6 @@ struct VoiceTranscribeInfoView: View {
             }
         }
         .padding(16)
-    }
-    
-    // MARK: - Shortcuts
-    
-    private func loadShortcut() {
-        if let data = UserDefaults.standard.data(forKey: "voiceTranscribeShortcut"),
-           let decoded = try? JSONDecoder().decode(SavedShortcut.self, from: data) {
-            currentShortcut = decoded
-        }
-    }
-    
-    private func saveShortcut(_ shortcut: SavedShortcut) {
-        if let encoded = try? JSONEncoder().encode(shortcut) {
-            UserDefaults.standard.set(encoded, forKey: "voiceTranscribeShortcut")
-        }
-    }
 }
 
 #Preview {
