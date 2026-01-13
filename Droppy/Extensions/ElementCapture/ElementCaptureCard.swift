@@ -18,15 +18,24 @@ struct ElementCaptureCard: View {
         VStack(alignment: .leading, spacing: 12) {
             // Header with icon, stats, and badge
             HStack(alignment: .top) {
-                // Icon with dark squircle background (consistent with all extensions)
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color(white: 0.15))
-                    Image(systemName: "viewfinder")
-                        .font(.system(size: 22, weight: .medium))
-                        .foregroundStyle(.orange)
+                // Icon from remote URL (keeps app binary small)
+                AsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/element-capture.jpg")) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    case .failure:
+                        Image(systemName: "viewfinder")
+                            .font(.system(size: 22, weight: .medium))
+                            .foregroundStyle(.blue)
+                    default:
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color(white: 0.2))
+                    }
                 }
                 .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 
                 Spacer()
                 

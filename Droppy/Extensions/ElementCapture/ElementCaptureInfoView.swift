@@ -54,16 +54,25 @@ struct ElementCaptureInfoView: View {
     
     private var headerSection: some View {
         VStack(spacing: 12) {
-            // Icon - with dark squircle background matching all extensions
-            ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(white: 0.15))
-                Image(systemName: "viewfinder")
-                    .font(.system(size: 32, weight: .medium))
-                    .foregroundStyle(.orange)
+            // Icon from remote URL
+            AsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/element-capture.jpg")) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .failure:
+                    Image(systemName: "viewfinder")
+                        .font(.system(size: 32, weight: .medium))
+                        .foregroundStyle(.blue)
+                default:
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color(white: 0.2))
+                }
             }
             .frame(width: 64, height: 64)
-            .shadow(color: Color.orange.opacity(0.3), radius: 8, y: 4)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: Color.blue.opacity(0.3), radius: 8, y: 4)
             
             Text("Element Capture")
                 .font(.title2.bold())
@@ -106,12 +115,12 @@ struct ElementCaptureInfoView: View {
                 // Category badge
                 Text("Productivity")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.blue)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(
                         Capsule()
-                            .fill(Color.orange.opacity(0.15))
+                            .fill(Color.blue.opacity(0.15))
                     )
             }
             
@@ -170,7 +179,7 @@ struct ElementCaptureInfoView: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.orange)
+                .foregroundStyle(.blue)
                 .frame(width: 24)
             
             Text(text)
@@ -217,7 +226,7 @@ struct ElementCaptureInfoView: View {
                 .frame(maxWidth: .infinity)
                 .background(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(isRecording ? Color.red.opacity(0.85) : (currentShortcut != nil ? Color.white.opacity(0.1) : Color.orange.opacity(0.85)))
+                        .fill(isRecording ? Color.red.opacity(0.85) : (currentShortcut != nil ? Color.white.opacity(0.1) : Color.blue.opacity(0.85)))
                 )
             }
             .buttonStyle(.plain)

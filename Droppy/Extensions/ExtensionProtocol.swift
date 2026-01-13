@@ -60,7 +60,7 @@ enum ExtensionType: String, CaseIterable, Identifiable {
         case .alfred: return .purple
         case .finder, .finderServices: return .blue
         case .spotify: return .green
-        case .elementCapture: return .orange
+        case .elementCapture: return .blue
         case .windowSnap: return .cyan
         }
     }
@@ -190,14 +190,18 @@ enum ExtensionType: String, CaseIterable, Identifiable {
             .frame(width: 64, height: 64)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         case .elementCapture:
-            ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(white: 0.15))
-                Image(systemName: "viewfinder")
-                    .font(.system(size: 32, weight: .medium))
-                    .foregroundStyle(.orange)
+            AsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/element-capture.jpg")) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().aspectRatio(contentMode: .fill)
+                case .failure:
+                    Image(systemName: "viewfinder").font(.system(size: 32, weight: .medium)).foregroundStyle(.blue)
+                default:
+                    RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(white: 0.2))
+                }
             }
             .frame(width: 64, height: 64)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         case .windowSnap:
             AsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/window-snap.jpg")) { phase in
                 switch phase {
