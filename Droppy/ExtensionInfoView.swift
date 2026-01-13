@@ -266,6 +266,7 @@ struct ExtensionInfoView: View {
         case .spotify: return "Connect"
         case .elementCapture: return "Configure Shortcut"
         case .windowSnap: return "Configure Shortcuts"
+        case .voiceTranscribe: return "Configure"
         }
     }
     
@@ -277,6 +278,7 @@ struct ExtensionInfoView: View {
         case .spotify: return "link"
         case .elementCapture: return "keyboard"
         case .windowSnap: return "keyboard"
+        case .voiceTranscribe: return "mic.fill"
         }
     }
 }
