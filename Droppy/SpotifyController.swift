@@ -89,9 +89,9 @@ final class SpotifyController {
         guard isSpotifyRunning else { return }
         
         // Track Spotify integration activation (only once per user)
-        if !UserDefaults.standard.bool(forKey: "spotifyIntegrationTracked") {
+        if !UserDefaults.standard.bool(forKey: "spotifyTracked") {
             AnalyticsService.shared.trackExtensionActivation(extensionId: "spotify")
-            UserDefaults.standard.set(true, forKey: "spotifyIntegrationTracked")
+            // Note: AnalyticsService.trackExtensionActivation also sets this key
         }
         
         // Fetch shuffle and repeat state
