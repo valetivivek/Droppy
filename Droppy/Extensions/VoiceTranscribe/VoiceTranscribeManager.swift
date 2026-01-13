@@ -8,15 +8,16 @@
 import SwiftUI
 import AVFoundation
 import Combine
+import WhisperKit
 
 // MARK: - Transcription Model
 
 enum WhisperModel: String, CaseIterable, Identifiable {
-    case tiny = "tiny"
-    case base = "base"
-    case small = "small"
-    case medium = "medium"
-    case large = "large-v3"
+    case tiny = "openai_whisper-tiny"
+    case base = "openai_whisper-base"
+    case small = "openai_whisper-small"
+    case medium = "openai_whisper-medium"
+    case large = "openai_whisper-large-v3"
     
     var id: String { rawValue }
     
@@ -84,6 +85,7 @@ final class VoiceTranscribeManager: ObservableObject {
             // TODO: Show/hide menu bar item
         }
     }
+    @Published var isDownloading: Bool = false
     
     // MARK: - Private Properties
     
@@ -91,6 +93,7 @@ final class VoiceTranscribeManager: ObservableObject {
     private var recordingTimer: Timer?
     private var levelTimer: Timer?
     private var recordingURL: URL?
+    private var whisperKit: WhisperKit?
     
     // Model storage directory
     private var modelsDirectory: URL {
@@ -135,8 +138,8 @@ final class VoiceTranscribeManager: ObservableObject {
     
     private init() {
         try? FileManager.default.createDirectory(at: recordingsDirectory, withIntermediateDirectories: true)
-        checkModelStatus()
         loadPreferences()
+        checkModelStatus()
     }
     
     // MARK: - Public Methods
@@ -201,21 +204,42 @@ final class VoiceTranscribeManager: ObservableObject {
         NSPasteboard.general.setString(transcriptionResult, forType: .string)
     }
     
-    /// Download the selected model
+    /// Download and initialize the selected model
     func downloadModel() async {
+        guard !isDownloading else { return }
+        
+        isDownloading = true
         downloadProgress = 0
         
-        // TODO: Implement WhisperKit model download
-        // WhisperKit handles model downloading automatically when you call WhisperKit()
-        // For now, simulate download progress
-        
-        for i in 0..<100 {
-            try? await Task.sleep(nanoseconds: 30_000_000) // 30ms
-            downloadProgress = Double(i + 1) / 100.0
+        do {
+            // WhisperKit downloads and loads the model automatically
+            // We use the modelFolder to specify our custom location
+            whisperKit = try await WhisperKit(
+                model: selectedModel.rawValue,
+                modelFolder: modelsDirectory.path,
+                computeOptions: ModelComputeOptions(
+                    audioEncoderCompute: .cpuAndNeuralEngine,
+                    textDecoderCompute: .cpuAndNeuralEngine
+                ),
+                verbose: false,
+                logLevel: .none,
+                prewarm: true,
+                load: true,
+                download: true
+            )
+            
+            downloadProgress = 1.0
+            isModelDownloaded = true
+            savePreferences()
+            
+            print("VoiceTranscribe: Model \(selectedModel.rawValue) loaded successfully")
+            
+        } catch {
+            print("VoiceTranscribe: Failed to load model: \(error)")
+            state = .error("Failed to download model: \(error.localizedDescription)")
         }
         
-        isModelDownloaded = true
-        savePreferences()
+        isDownloading = false
     }
     
     // MARK: - Private Methods
@@ -272,28 +296,81 @@ final class VoiceTranscribeManager: ObservableObject {
             return
         }
         
-        // TODO: Implement actual WhisperKit transcription
-        // This is where we'll integrate WhisperKit
-        //
-        // Example WhisperKit usage:
-        // let whisper = try await WhisperKit(model: selectedModel.rawValue)
-        // let result = try await whisper.transcribe(audioPath: url.path)
-        // transcriptionResult = result.text
+        // Ensure we have a loaded model
+        if whisperKit == nil {
+            do {
+                whisperKit = try await WhisperKit(
+                    model: selectedModel.rawValue,
+                    modelFolder: modelsDirectory.path,
+                    verbose: false,
+                    logLevel: .none
+                )
+            } catch {
+                state = .error("Failed to load model: \(error.localizedDescription)")
+                return
+            }
+        }
         
-        // For now, simulate processing
-        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+        guard let whisper = whisperKit else {
+            state = .error("Model not initialized")
+            return
+        }
         
-        transcriptionResult = "[WhisperKit integration pending - audio recorded successfully at \(url.lastPathComponent)]"
-        state = .complete
+        do {
+            // Configure transcription options
+            var options = DecodingOptions()
+            
+            // Set language if not auto
+            if selectedLanguage != "auto" {
+                options.language = selectedLanguage
+            }
+            
+            // Transcribe the audio file
+            let results = try await whisper.transcribe(audioPath: url.path, decodeOptions: options)
+            
+            // Extract text from results
+            if let result = results.first {
+                transcriptionResult = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                state = .complete
+                
+                print("VoiceTranscribe: Transcription complete - \(result.text.count) chars")
+            } else {
+                transcriptionResult = ""
+                state = .complete
+            }
+            
+        } catch {
+            print("VoiceTranscribe: Transcription error: \(error)")
+            state = .error("Transcription failed: \(error.localizedDescription)")
+        }
         
         // Clean up recording file
         try? FileManager.default.removeItem(at: url)
     }
     
     private func checkModelStatus() {
-        // Check if model files exist
+        // Check if model files exist in our models directory
         let modelPath = modelsDirectory.appendingPathComponent(selectedModel.rawValue)
-        isModelDownloaded = FileManager.default.fileExists(atPath: modelPath.path)
+        let exists = FileManager.default.fileExists(atPath: modelPath.path)
+        isModelDownloaded = exists
+        
+        // If model exists, try to load it
+        if exists && whisperKit == nil {
+            Task {
+                do {
+                    whisperKit = try await WhisperKit(
+                        model: selectedModel.rawValue,
+                        modelFolder: modelsDirectory.path,
+                        verbose: false,
+                        logLevel: .none,
+                        download: false
+                    )
+                    print("VoiceTranscribe: Loaded existing model \(selectedModel.rawValue)")
+                } catch {
+                    print("VoiceTranscribe: Failed to load existing model: \(error)")
+                }
+            }
+        }
     }
     
     private func loadPreferences() {
@@ -323,3 +400,4 @@ extension VoiceTranscribeManager {
         return String(format: "%d:%02d.%d", minutes, seconds, tenths)
     }
 }
+
