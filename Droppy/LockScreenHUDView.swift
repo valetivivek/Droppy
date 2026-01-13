@@ -81,35 +81,54 @@ struct LockScreenHUDView: View {
         }
     }
     
-    /// The animated lock icon view
+    /// The animated lock icon view with realistic unlock physics
     private var lockIconView: some View {
         ZStack {
-            // Unlocked state (lock.open.fill) - fades in
+            // Unlocked state (lock.open.fill) - swoops in from above
             Image(systemName: "lock.open.fill")
                 .font(.system(size: isDynamicIslandMode ? 18 : 18, weight: .semibold))
                 .foregroundStyle(.white)
                 .opacity(showUnlockAnim ? 1 : 0)
-                .scaleEffect(showUnlockAnim ? 1.0 : 0.8)
+                .scaleEffect(showUnlockAnim ? 1.0 : 0.6)
+                .offset(y: showUnlockAnim ? 0 : -4)
+                .rotationEffect(.degrees(showUnlockAnim ? 0 : -15))
             
-            // Locked state (lock.fill) - fades out
+            // Locked state (lock.fill) - shrinks and fades as it "unlocks"
             Image(systemName: "lock.fill")
                 .font(.system(size: isDynamicIslandMode ? 18 : 18, weight: .semibold))
                 .foregroundStyle(.white)
-                .opacity(showUnlockAnim ? 0 : 1)
-                .scaleEffect(showUnlockAnim ? 1.2 : 1.0)
+                .opacity(showUnlockAnim ? 0 : lockOpacity)
+                .scaleEffect(showUnlockAnim ? 0.7 : lockScale)
+                .rotationEffect(.degrees(showUnlockAnim ? 10 : 0))
         }
         .frame(width: isDynamicIslandMode ? 20 : 26, height: isDynamicIslandMode ? 20 : 26)
         .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
     }
     
-    /// Trigger the smooth unlock animation
+    /// Trigger the smooth multi-phase unlock animation
     private func triggerUnlockAnimation() {
-        // Reset state
+        // Reset all states
         showUnlockAnim = false
+        lockScale = 1.0
+        lockOpacity = 1.0
         
-        // Short delay then animate unlock
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+        // Phase 1: Quick "trying to unlock" shake (subtle)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.easeInOut(duration: 0.08)) {
+                lockScale = 1.05
+            }
+        }
+        
+        // Phase 2: Return and slight compress (like pressing)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.13) {
+            withAnimation(.easeInOut(duration: 0.06)) {
+                lockScale = 0.95
+            }
+        }
+        
+        // Phase 3: The unlock! Smooth spring transition
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.65, blendDuration: 0)) {
                 showUnlockAnim = true
             }
         }

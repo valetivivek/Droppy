@@ -70,7 +70,7 @@ Droppy packs a lot into a tiny package:
 
 ---
 
-## Extension Store
+## 🧩 Extension Store
 
 <p align="center">
   <img src="docs/assets/extension-store.png" width="100%" alt="Extension Store">
