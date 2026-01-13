@@ -63,7 +63,7 @@ Droppy packs a lot into a tiny package:
 | **Clipboard Manager** | Full history, search, favorites, OCR text extraction, drag-out |
 | **Now Playing** | Album art, playback controls, seek slider, lyrics (needs Spotify extension) |
 | **Quick Actions** | Right-click to compress, convert formats, extract text, move, share |
-| **Custom HUDs** | Volume, brightness, battery, caps lock — beautiful replacements for system overlays |
+| **Custom HUDs** | Volume, brightness, battery, caps lock, unlock — beautiful replacements for system overlays |
 | **AirPods HUD** | Battery levels and connection status when your AirPods connect |
 | **Auto-Hide & Peek** | Basket slides to the edge when idle, peeks when you hover |
 | **Multi-Monitor** | Works on external displays with smart fullscreen detection |
