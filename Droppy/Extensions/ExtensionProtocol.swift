@@ -17,6 +17,7 @@ enum ExtensionType: String, CaseIterable, Identifiable {
     case spotify
     case elementCapture
     case windowSnap
+    case voiceTranscribe
     
     /// URL-safe ID for deep links
     case finderServices  // Alias for finder
@@ -31,6 +32,7 @@ enum ExtensionType: String, CaseIterable, Identifiable {
         case .spotify: return "Spotify Integration"
         case .elementCapture: return "Element Capture"
         case .windowSnap: return "Window Snap"
+        case .voiceTranscribe: return "Voice Transcribe"
         }
     }
     
@@ -42,6 +44,7 @@ enum ExtensionType: String, CaseIterable, Identifiable {
         case .spotify: return "No setup needed"
         case .elementCapture: return "Keyboard shortcuts"
         case .windowSnap: return "Keyboard shortcuts"
+        case .voiceTranscribe: return "Model download"
         }
     }
     
@@ -50,6 +53,7 @@ enum ExtensionType: String, CaseIterable, Identifiable {
         case .aiBackgroundRemoval: return "AI"
         case .alfred, .finder, .finderServices, .elementCapture, .windowSnap: return "Productivity"
         case .spotify: return "Media"
+        case .voiceTranscribe: return "AI"
         }
     }
     
@@ -62,6 +66,7 @@ enum ExtensionType: String, CaseIterable, Identifiable {
         case .spotify: return .blue
         case .elementCapture: return .blue
         case .windowSnap: return .cyan
+        case .voiceTranscribe: return .blue
         }
     }
     
@@ -79,6 +84,8 @@ enum ExtensionType: String, CaseIterable, Identifiable {
             return "Capture specific screen elements and copy them to clipboard or add to Droppy. Perfect for grabbing UI components, icons, or any visual element."
         case .windowSnap:
             return "Snap windows to screen positions using keyboard shortcuts. Halves, quarters, thirds, maximize, and center—all at your fingertips."
+        case .voiceTranscribe:
+            return "Record audio and transcribe instantly using local AI. 100% on-device—your voice stays private. Supports 99+ languages."
         }
     }
     
@@ -126,6 +133,13 @@ enum ExtensionType: String, CaseIterable, Identifiable {
                 ("arrow.up.left.and.arrow.down.right", "Maximize and restore"),
                 ("display", "Multi-monitor support")
             ]
+        case .voiceTranscribe:
+            return [
+                ("mic.fill", "One-tap recording"),
+                ("cpu", "100% on-device AI"),
+                ("globe", "99+ languages"),
+                ("lock.fill", "Private—audio never leaves Mac")
+            ]
         }
     }
     
@@ -145,6 +159,8 @@ enum ExtensionType: String, CaseIterable, Identifiable {
             return URL(string: baseURL + "element-capture-screenshot.png")
         case .windowSnap:
             return URL(string: baseURL + "window-snap-screenshot.png")
+        case .voiceTranscribe:
+            return URL(string: baseURL + "voice-transcribe-screenshot.png")
         }
     }
     
@@ -223,6 +239,19 @@ enum ExtensionType: String, CaseIterable, Identifiable {
                     image.resizable().aspectRatio(contentMode: .fill)
                 case .failure:
                     Image(systemName: "rectangle.split.2x2").font(.system(size: 32, weight: .medium)).foregroundStyle(.cyan)
+                default:
+                    RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(white: 0.2))
+                }
+            }
+            .frame(width: 64, height: 64)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        case .voiceTranscribe:
+            AsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/voice-transcribe.jpg")) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().aspectRatio(contentMode: .fill)
+                case .failure:
+                    Image(systemName: "waveform.and.mic").font(.system(size: 32, weight: .medium)).foregroundStyle(.blue)
                 default:
                     RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(white: 0.2))
                 }

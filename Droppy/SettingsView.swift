@@ -2601,6 +2601,14 @@ struct ExtensionsShopView: View {
                     rating: extensionRatings["windowSnap"]
                 )
             }
+            
+            // Voice Transcribe
+            if shouldShow(category: .ai, isInstalled: VoiceTranscribeManager.shared.isModelDownloaded) {
+                VoiceTranscribeCard(
+                    installCount: extensionCounts["voiceTranscribe"],
+                    rating: extensionRatings["voiceTranscribe"]
+                )
+            }
         }
     }
 }
