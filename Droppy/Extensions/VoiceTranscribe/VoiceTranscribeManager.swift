@@ -78,6 +78,12 @@ final class VoiceTranscribeManager: ObservableObject {
     @Published var recordingDuration: TimeInterval = 0
     @Published var audioLevel: Float = 0
     @Published var selectedLanguage: String = "auto"
+    @Published var isMenuBarEnabled: Bool = false {
+        didSet {
+            UserDefaults.standard.set(isMenuBarEnabled, forKey: "voiceTranscribeMenuBarEnabled")
+            // TODO: Show/hide menu bar item
+        }
+    }
     
     // MARK: - Private Properties
     
@@ -298,6 +304,7 @@ final class VoiceTranscribeManager: ObservableObject {
         if let lang = UserDefaults.standard.string(forKey: "voiceTranscribeLanguage") {
             selectedLanguage = lang
         }
+        isMenuBarEnabled = UserDefaults.standard.bool(forKey: "voiceTranscribeMenuBarEnabled")
     }
     
     private func savePreferences() {

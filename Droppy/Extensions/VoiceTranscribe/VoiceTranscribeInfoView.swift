@@ -2,7 +2,7 @@
 //  VoiceTranscribeInfoView.swift
 //  Droppy
 //
-//  Voice Transcribe extension info sheet with recording UI
+//  Voice Transcribe extension setup and configuration view
 //
 
 import SwiftUI
@@ -13,7 +13,9 @@ struct VoiceTranscribeInfoView: View {
     @State private var isHoveringAction = false
     @State private var isHoveringCancel = false
     @State private var showReviewsSheet = false
-    @State private var showModelPicker = false
+    @State private var isDownloading = false
+    @State private var isSettingUpShortcut = false
+    @State private var currentShortcut: SavedShortcut?
     
     var installCount: Int?
     var rating: AnalyticsService.ExtensionRating?
@@ -26,8 +28,8 @@ struct VoiceTranscribeInfoView: View {
             Divider()
                 .padding(.horizontal, 20)
             
-            // Content
-            contentSection
+            // Content - Setup flow
+            setupContent
             
             Divider()
                 .padding(.horizontal, 20)
@@ -42,42 +44,33 @@ struct VoiceTranscribeInfoView: View {
         .sheet(isPresented: $showReviewsSheet) {
             ExtensionReviewsSheet(extensionType: .voiceTranscribe)
         }
+        .onAppear {
+            loadShortcut()
+        }
     }
     
     // MARK: - Header
     
     private var headerSection: some View {
         VStack(spacing: 12) {
-            // Icon with recording animation
-            ZStack {
-                // Pulse animation while recording
-                if case .recording = manager.state {
-                    Circle()
-                        .fill(Color.red.opacity(0.3))
-                        .frame(width: 80, height: 80)
-                        .scaleEffect(CGFloat(manager.audioLevel) + 0.8)
-                        .animation(.easeOut(duration: 0.1), value: manager.audioLevel)
+            // Icon
+            AsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/voice-transcribe.jpg")) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().aspectRatio(contentMode: .fill)
+                case .failure:
+                    Image(systemName: "waveform.and.mic").font(.system(size: 32)).foregroundStyle(.blue)
+                default:
+                    RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(white: 0.2))
                 }
-                
-                // Main icon
-                AsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/voice-transcribe.jpg")) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    case .failure:
-                        Image(systemName: "waveform.and.mic").font(.system(size: 32)).foregroundStyle(.blue)
-                    default:
-                        RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(white: 0.2))
-                    }
-                }
-                .frame(width: 64, height: 64)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .shadow(color: stateColor.opacity(0.4), radius: 8, y: 4)
             }
+            .frame(width: 64, height: 64)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: .blue.opacity(0.4), radius: 8, y: 4)
             
-            Text(stateTitle)
+            Text("Voice Transcribe")
                 .font(.title2.bold())
-                .foregroundStyle(stateColor)
+                .foregroundStyle(.white)
             
             // Stats row
             HStack(spacing: 12) {
@@ -89,6 +82,7 @@ struct VoiceTranscribeInfoView: View {
                 }
                 .foregroundStyle(.secondary)
                 
+                // Reviews button
                 Button {
                     showReviewsSheet = true
                 } label: {
@@ -116,7 +110,7 @@ struct VoiceTranscribeInfoView: View {
                     .background(Capsule().fill(Color.blue.opacity(0.15)))
             }
             
-            Text("Transcribe audio using local AI")
+            Text("Record and transcribe audio using local AI")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -124,228 +118,257 @@ struct VoiceTranscribeInfoView: View {
         .padding(.bottom, 20)
     }
     
-    private var stateTitle: String {
-        switch manager.state {
-        case .idle: return "Voice Transcribe"
-        case .recording: return "Recording..."
-        case .processing: return "Transcribing..."
-        case .complete: return "Transcription Complete"
-        case .error: return "Error"
-        }
-    }
+    // MARK: - Setup Content
     
-    private var stateColor: Color {
-        switch manager.state {
-        case .idle: return .white
-        case .recording: return .red
-        case .processing: return .orange
-        case .complete: return .green
-        case .error: return .red
-        }
-    }
-    
-    // MARK: - Content
-    
-    private var contentSection: some View {
-        VStack(spacing: 16) {
-            switch manager.state {
-            case .idle:
-                idleContent
-            case .recording:
-                recordingContent
-            case .processing:
-                processingContent
-            case .complete:
-                completeContent
-            case .error(let message):
-                errorContent(message)
+    private var setupContent: some View {
+        VStack(spacing: 20) {
+            // Step 1: Model Selection & Download
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    stepBadge(number: 1, completed: manager.isModelDownloaded)
+                    Text("Choose & Download Model")
+                        .font(.headline)
+                    Spacer()
+                }
+                
+                HStack {
+                    Text("Model")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    
+                    Spacer()
+                    
+                    Menu {
+                        ForEach(WhisperModel.allCases) { model in
+                            Button {
+                                manager.selectedModel = model
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(model.displayName)
+                                        Text(model.sizeDescription)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    if manager.selectedModel == model {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(manager.selectedModel.displayName)
+                                .font(.callout.weight(.medium))
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 10))
+                        }
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .menuStyle(.borderlessButton)
+                }
+                
+                // Download button
+                if !manager.isModelDownloaded {
+                    Button {
+                        isDownloading = true
+                        Task {
+                            await manager.downloadModel()
+                            isDownloading = false
+                        }
+                    } label: {
+                        HStack {
+                            if isDownloading {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                    .frame(width: 16, height: 16)
+                                Text("Downloading... \(Int(manager.downloadProgress * 100))%")
+                            } else {
+                                Image(systemName: "arrow.down.circle.fill")
+                                Text("Download Model")
+                            }
+                        }
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.blue)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDownloading)
+                } else {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("Model ready")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
+            .padding(16)
+            .background(Color.white.opacity(0.03))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            
+            // Step 2: Language
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    stepBadge(number: 2, completed: true)
+                    Text("Select Language")
+                        .font(.headline)
+                    Spacer()
+                }
+                
+                HStack {
+                    Text("Language")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    
+                    Spacer()
+                    
+                    Menu {
+                        ForEach(manager.supportedLanguages, id: \.code) { lang in
+                            Button {
+                                manager.selectedLanguage = lang.code
+                            } label: {
+                                HStack {
+                                    Text(lang.name)
+                                    if manager.selectedLanguage == lang.code {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(manager.supportedLanguages.first { $0.code == manager.selectedLanguage }?.name ?? "Auto")
+                                .font(.callout.weight(.medium))
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 10))
+                        }
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .menuStyle(.borderlessButton)
+                }
+            }
+            .padding(16)
+            .background(Color.white.opacity(0.03))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            
+            // Step 3: Keyboard Shortcut
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    stepBadge(number: 3, completed: currentShortcut != nil)
+                    Text("Set Keyboard Shortcut")
+                        .font(.headline)
+                    Spacer()
+                }
+                
+                HStack {
+                    if let shortcut = currentShortcut {
+                        HStack(spacing: 8) {
+                            Text(shortcut.description)
+                                .font(.system(.callout, design: .monospaced))
+                                .foregroundStyle(.primary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.white.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            
+                            Button {
+                                currentShortcut = nil
+                                UserDefaults.standard.removeObject(forKey: "voiceTranscribeShortcut")
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else {
+                        Text("Not configured")
+                            .font(.callout)
+                            .foregroundStyle(.tertiary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button {
+                        isSettingUpShortcut = true
+                    } label: {
+                        Text(currentShortcut == nil ? "Set Shortcut" : "Change")
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(.blue)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(16)
+            .background(Color.white.opacity(0.03))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            
+            // Step 4: Enable Menu Bar
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    stepBadge(number: 4, completed: manager.isMenuBarEnabled)
+                    Text("Enable Menu Bar Icon")
+                        .font(.headline)
+                    Spacer()
+                    
+                    Toggle("", isOn: Binding(
+                        get: { manager.isMenuBarEnabled },
+                        set: { manager.isMenuBarEnabled = $0 }
+                    ))
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                }
+                
+                Text("Click the menu bar icon to start/stop recording")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(16)
+            .background(Color.white.opacity(0.03))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 20)
-    }
-    
-    private var idleContent: some View {
-        VStack(spacing: 16) {
-            // Model selector
-            HStack {
-                Text("Model")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                
-                Spacer()
-                
-                Menu {
-                    ForEach(WhisperModel.allCases) { model in
-                        Button {
-                            manager.selectedModel = model
-                        } label: {
-                            HStack {
-                                Text(model.displayName)
-                                if manager.selectedModel == model {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(manager.selectedModel.displayName)
-                            .font(.callout.weight(.medium))
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 10))
-                    }
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-                .menuStyle(.borderlessButton)
+        .sheet(isPresented: $isSettingUpShortcut) {
+            ShortcutRecorderSheet(
+                title: "Voice Transcribe Shortcut",
+                description: "Press the keys you want to use to start/stop recording",
+                currentShortcut: $currentShortcut
+            ) { newShortcut in
+                currentShortcut = newShortcut
+                saveShortcut(newShortcut)
             }
-            
-            // Language selector
-            HStack {
-                Text("Language")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                
-                Spacer()
-                
-                Menu {
-                    ForEach(manager.supportedLanguages, id: \.code) { lang in
-                        Button {
-                            manager.selectedLanguage = lang.code
-                        } label: {
-                            HStack {
-                                Text(lang.name)
-                                if manager.selectedLanguage == lang.code {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(manager.supportedLanguages.first { $0.code == manager.selectedLanguage }?.name ?? "Auto")
-                            .font(.callout.weight(.medium))
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 10))
-                    }
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-                .menuStyle(.borderlessButton)
-            }
-            
-            // Features
-            VStack(alignment: .leading, spacing: 8) {
-                featureRow(icon: "cpu", text: "100% on-device processing")
-                featureRow(icon: "lock.fill", text: "Audio never leaves your Mac")
-                featureRow(icon: "globe", text: "99+ languages supported")
-            }
-            .padding(.top, 8)
         }
     }
     
-    private func featureRow(icon: String, text: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.blue)
-                .frame(width: 20)
+    private func stepBadge(number: Int, completed: Bool) -> some View {
+        ZStack {
+            Circle()
+                .fill(completed ? Color.green : Color.white.opacity(0.2))
+                .frame(width: 24, height: 24)
             
-            Text(text)
-                .font(.callout)
-                .foregroundStyle(.primary)
-        }
-    }
-    
-    private var recordingContent: some View {
-        VStack(spacing: 16) {
-            // Duration
-            Text(manager.formattedDuration)
-                .font(.system(size: 48, weight: .medium, design: .monospaced))
-                .foregroundStyle(.red)
-            
-            // Waveform visualization
-            HStack(spacing: 3) {
-                ForEach(0..<20, id: \.self) { i in
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.red)
-                        .frame(width: 4)
-                        .frame(height: CGFloat.random(in: 10...40) * CGFloat(manager.audioLevel + 0.3))
-                        .animation(.easeOut(duration: 0.1), value: manager.audioLevel)
-                }
+            if completed {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+            } else {
+                Text("\(number)")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
             }
-            .frame(height: 50)
-            
-            Text("Tap Stop when finished")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
-    }
-    
-    private var processingContent: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .scaleEffect(1.5)
-            
-            Text("Transcribing audio...")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-        .frame(height: 120)
-    }
-    
-    private var completeContent: some View {
-        VStack(spacing: 12) {
-            // Transcription result
-            ScrollView {
-                Text(manager.transcriptionResult)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-            }
-            .frame(height: 150)
-            .background(Color.white.opacity(0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            
-            // Copy button
-            Button {
-                manager.copyToClipboard()
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "doc.on.doc")
-                    Text("Copy to Clipboard")
-                }
-                .font(.callout.weight(.medium))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(Color.blue)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            .buttonStyle(.plain)
-        }
-    }
-    
-    private func errorContent(_ message: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 40))
-                .foregroundStyle(.red)
-            
-            Text(message)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(height: 120)
     }
     
     // MARK: - Buttons
@@ -373,24 +396,30 @@ struct VoiceTranscribeInfoView: View {
             
             Spacer()
             
-            // Main action button
+            // Done button
             Button {
-                manager.toggleRecording()
+                // Track activation if model is downloaded
+                if manager.isModelDownloaded {
+                    Task {
+                        await AnalyticsService.shared.trackExtensionActivation(.voiceTranscribe)
+                    }
+                }
+                dismiss()
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: actionIcon)
+                    Image(systemName: manager.isModelDownloaded ? "checkmark.circle.fill" : "arrow.down.circle")
                         .font(.system(size: 12, weight: .semibold))
-                    Text(actionTitle)
+                    Text(manager.isModelDownloaded ? "Done" : "Download Model First")
                 }
                 .fontWeight(.semibold)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
-                .background(actionColor.opacity(isHoveringAction ? 1.0 : 0.85))
+                .background(manager.isModelDownloaded ? Color.green.opacity(isHoveringAction ? 1.0 : 0.85) : Color.gray.opacity(0.5))
                 .foregroundStyle(.white)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
-            .disabled(case: manager.state, is: .processing)
+            .disabled(!manager.isModelDownloaded)
             .onHover { h in
                 withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
                     isHoveringAction = h
@@ -400,46 +429,23 @@ struct VoiceTranscribeInfoView: View {
         .padding(16)
     }
     
-    private var actionIcon: String {
-        switch manager.state {
-        case .idle: return "mic.fill"
-        case .recording: return "stop.fill"
-        case .processing: return "hourglass"
-        case .complete, .error: return "arrow.counterclockwise"
+    // MARK: - Shortcuts
+    
+    private func loadShortcut() {
+        if let data = UserDefaults.standard.data(forKey: "voiceTranscribeShortcut"),
+           let decoded = try? JSONDecoder().decode(SavedShortcut.self, from: data) {
+            currentShortcut = decoded
         }
     }
     
-    private var actionTitle: String {
-        switch manager.state {
-        case .idle: return "Start Recording"
-        case .recording: return "Stop"
-        case .processing: return "Processing..."
-        case .complete, .error: return "New Recording"
+    private func saveShortcut(_ shortcut: SavedShortcut) {
+        if let encoded = try? JSONEncoder().encode(shortcut) {
+            UserDefaults.standard.set(encoded, forKey: "voiceTranscribeShortcut")
         }
-    }
-    
-    private var actionColor: Color {
-        switch manager.state {
-        case .idle: return .blue
-        case .recording: return .red
-        case .processing: return .gray
-        case .complete: return .blue
-        case .error: return .orange
-        }
-    }
-}
-
-// Helper for disabled button
-extension View {
-    func disabled(case state: VoiceRecordingState, is targetState: VoiceRecordingState) -> some View {
-        self.disabled({
-            if case targetState = state { return true }
-            return false
-        }())
     }
 }
 
 #Preview {
     VoiceTranscribeInfoView()
-        .frame(height: 500)
+        .frame(height: 600)
 }
