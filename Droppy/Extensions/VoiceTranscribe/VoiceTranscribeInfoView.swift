@@ -119,20 +119,18 @@ struct VoiceTranscribeInfoView: View {
     // MARK: - Setup Content
     
     private var setupContent: some View {
-        VStack(spacing: 20) {
-            // Step 1: Model Selection & Download
-            VStack(alignment: .leading, spacing: 12) {
+        VStack(spacing: 16) {
+            // Configuration Card
+            VStack(spacing: 0) {
+                // Model Selection Row
                 HStack {
-                    stepBadge(number: 1, completed: manager.isModelDownloaded)
-                    Text("Choose & Download Model")
-                        .font(.headline)
-                    Spacer()
-                }
-                
-                HStack {
-                    Text("Model")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Model")
+                            .font(.callout.weight(.medium))
+                        Text(manager.selectedModel.sizeDescription)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                     
                     Spacer()
                     
@@ -142,12 +140,7 @@ struct VoiceTranscribeInfoView: View {
                                 manager.selectedModel = model
                             } label: {
                                 HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(model.displayName)
-                                        Text(model.sizeDescription)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
+                                    Text(model.displayName)
                                     if manager.selectedModel == model {
                                         Image(systemName: "checkmark")
                                     }
@@ -169,63 +162,19 @@ struct VoiceTranscribeInfoView: View {
                     }
                     .menuStyle(.borderlessButton)
                 }
+                .padding(16)
                 
-                // Download button
-                if !manager.isModelDownloaded {
-                    Button {
-                        isDownloading = true
-                        Task {
-                            await manager.downloadModel()
-                            isDownloading = false
-                        }
-                    } label: {
-                        HStack {
-                            if isDownloading {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                                    .frame(width: 16, height: 16)
-                                Text("Downloading... \(Int(manager.downloadProgress * 100))%")
-                            } else {
-                                Image(systemName: "arrow.down.circle.fill")
-                                Text("Download Model")
-                            }
-                        }
-                        .font(.callout.weight(.medium))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.blue)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isDownloading)
-                } else {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                        Text("Model ready")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .padding(16)
-            .background(Color.white.opacity(0.03))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            
-            // Step 2: Language
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    stepBadge(number: 2, completed: true)
-                    Text("Select Language")
-                        .font(.headline)
-                    Spacer()
-                }
+                Divider().padding(.horizontal, 16)
                 
+                // Language Row
                 HStack {
-                    Text("Language")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Language")
+                            .font(.callout.weight(.medium))
+                        Text("Auto-detect recommended")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                     
                     Spacer()
                     
@@ -257,17 +206,20 @@ struct VoiceTranscribeInfoView: View {
                     }
                     .menuStyle(.borderlessButton)
                 }
-            }
-            .padding(16)
-            .background(Color.white.opacity(0.03))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            
-            // Step 3: Enable Menu Bar
-            VStack(alignment: .leading, spacing: 12) {
+                .padding(16)
+                
+                Divider().padding(.horizontal, 16)
+                
+                // Menu Bar Toggle Row
                 HStack {
-                    stepBadge(number: 3, completed: manager.isMenuBarEnabled)
-                    Text("Enable Menu Bar Icon")
-                        .font(.headline)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Menu Bar Icon")
+                            .font(.callout.weight(.medium))
+                        Text("Quick access to record")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    
                     Spacer()
                     
                     Toggle("", isOn: Binding(
@@ -277,35 +229,56 @@ struct VoiceTranscribeInfoView: View {
                     .toggleStyle(.switch)
                     .labelsHidden()
                 }
-                
-                Text("Click the menu bar icon to start/stop recording")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .padding(16)
             }
-            .padding(16)
             .background(Color.white.opacity(0.03))
             .clipShape(RoundedRectangle(cornerRadius: 12))
+            
+            // Download/Status Section
+            if !manager.isModelDownloaded {
+                Button {
+                    isDownloading = true
+                    Task {
+                        await manager.downloadModel()
+                        isDownloading = false
+                    }
+                } label: {
+                    HStack {
+                        if manager.isDownloading {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                                .frame(width: 16, height: 16)
+                            Text("Downloading...")
+                        } else {
+                            Image(systemName: "arrow.down.circle.fill")
+                            Text("Download Model")
+                        }
+                    }
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.blue)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+                .disabled(manager.isDownloading)
+            } else {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("Model ready")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(16)
+                .background(Color.white.opacity(0.03))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 20)
-    }
-    
-    private func stepBadge(number: Int, completed: Bool) -> some View {
-        ZStack {
-            Circle()
-                .fill(completed ? Color.green : Color.white.opacity(0.2))
-                .frame(width: 24, height: 24)
-            
-            if completed {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.white)
-            } else {
-                Text("\(number)")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.white)
-            }
-        }
     }
     
     // MARK: - Buttons

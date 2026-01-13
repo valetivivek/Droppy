@@ -10,6 +10,8 @@
 		BA001A022F11D6E10041AAAA /* mediaremote-adapter.pl in Resources */ = {isa = PBXBuildFile; fileRef = BA001A052F11D6E10041AAAA /* mediaremote-adapter.pl */; };
 		BA001A032F11D6E10041AAAA /* MediaRemoteAdapter.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BA001A062F11D6E10041AAAA /* MediaRemoteAdapter.framework */; };
 		BA001A042F11D6E10041AAAA /* MediaRemoteAdapter.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = BA001A062F11D6E10041AAAA /* MediaRemoteAdapter.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		BAA56D992F16F4D90041C83B /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = BAA56D982F16F4D90041C83B /* WhisperKit */; };
+		BAA56D9B2F16F4D90041C83B /* whisperkit-cli in Frameworks */ = {isa = PBXBuildFile; productRef = BAA56D9A2F16F4D90041C83B /* whisperkit-cli */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -45,7 +47,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BAA56D992F16F4D90041C83B /* WhisperKit in Frameworks */,
 				BA001A032F11D6E10041AAAA /* MediaRemoteAdapter.framework in Frameworks */,
+				BAA56D9B2F16F4D90041C83B /* whisperkit-cli in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -99,6 +103,8 @@
 			);
 			name = Droppy;
 			packageProductDependencies = (
+				BAA56D982F16F4D90041C83B /* WhisperKit */,
+				BAA56D9A2F16F4D90041C83B /* whisperkit-cli */,
 			);
 			productName = Droppy;
 			productReference = BAC4596C2F07C2D10041BC3E /* Droppy.app */;
@@ -128,6 +134,9 @@
 			);
 			mainGroup = BAC459632F07C2D10041BC3E;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				BAA56D972F16F4D90041C83B /* XCRemoteSwiftPackageReference "WhisperKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BAC4596D2F07C2D10041BC3E /* Products */;
 			projectDirPath = "";
@@ -396,6 +405,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		BAA56D972F16F4D90041C83B /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/WhisperKit.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BAA56D982F16F4D90041C83B /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BAA56D972F16F4D90041C83B /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = WhisperKit;
+		};
+		BAA56D9A2F16F4D90041C83B /* whisperkit-cli */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BAA56D972F16F4D90041C83B /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = "whisperkit-cli";
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = BAC459642F07C2D10041BC3E /* Project object */;
 }
