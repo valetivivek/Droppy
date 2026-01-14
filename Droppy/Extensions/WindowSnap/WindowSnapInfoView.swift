@@ -22,17 +22,23 @@ struct WindowSnapInfoView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
+            // Header (centered, stays on top)
             headerSection
-            
-            // Features
-            featuresSection
             
             Divider()
                 .padding(.horizontal, 20)
             
-            // Shortcut grid section
-            shortcutSection
+            // Main content: HStack with features left, shortcuts right
+            HStack(alignment: .top, spacing: 0) {
+                // Left: Features + Screenshot
+                featuresSection
+                
+                Divider()
+                    .padding(.vertical, 16)
+                
+                // Right: Keyboard Shortcuts
+                shortcutSection
+            }
             
             Divider()
                 .padding(.horizontal, 20)
@@ -40,7 +46,7 @@ struct WindowSnapInfoView: View {
             // Buttons
             buttonSection
         }
-        .frame(width: 640)
+        .frame(width: 800)  // Wider for horizontal layout
         .fixedSize(horizontal: false, vertical: true)
         .background(Color.black)
         .clipped()
@@ -157,8 +163,9 @@ struct WindowSnapInfoView: View {
                 EmptyView()
             }
         }
+        .frame(width: 380, alignment: .top)
         .padding(.horizontal, 24)
-        .padding(.bottom, 20)
+        .padding(.vertical, 20)
     }
     
     private func featureRow(icon: String, text: String) -> some View {
@@ -214,8 +221,9 @@ struct WindowSnapInfoView: View {
                 }
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 16)
+        .frame(width: 360, alignment: .top)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 20)
     }
     
     private func shortcutRow(for action: SnapAction) -> some View {
