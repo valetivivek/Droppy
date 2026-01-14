@@ -3,6 +3,7 @@
 //  Droppy
 //
 //  Result window showing transcribed text with copy option
+//  Styled to match OCRResultView exactly but larger
 //
 
 import SwiftUI
@@ -11,13 +12,14 @@ import AppKit
 // MARK: - Result Window Controller
 
 @MainActor
-final class VoiceTranscriptionResultController {
+final class VoiceTranscriptionResultController: NSObject {
     static let shared = VoiceTranscriptionResultController()
     
-    private var window: NSPanel?
-    var isVisible = false
+    private(set) var window: NSPanel?
     
-    private init() {}
+    private override init() {
+        super.init()
+    }
     
     func showResult() {
         let result = VoiceTranscribeManager.shared.transcriptionResult
@@ -26,154 +28,188 @@ final class VoiceTranscriptionResultController {
             return
         }
         
-        showWindow()
+        show(with: result)
     }
     
-    func showWindow() {
-        guard window == nil else {
-            window?.makeKeyAndOrderFront(nil)
-            return
+    func show(with text: String) {
+        // If window already exists, close and recreate to ensure clean state
+        hideWindow()
+        
+        let contentView = VoiceTranscriptionResultView(text: text) { [weak self] in
+            self?.hideWindow()
         }
+        let hostingView = NSHostingView(rootView: contentView)
         
-        // Center on screen
-        guard let screen = NSScreen.main else { return }
-        let windowSize = NSSize(width: 400, height: 300)
-        let origin = NSPoint(
-            x: screen.visibleFrame.midX - windowSize.width / 2,
-            y: screen.visibleFrame.midY - windowSize.height / 2
-        )
-        
-        let panel = NSPanel(
-            contentRect: NSRect(origin: origin, size: windowSize),
-            styleMask: [.titled, .closable, .fullSizeContentView],
+        let newWindow = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 450),
+            styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
         
-        panel.title = "Transcription"
-        panel.titlebarAppearsTransparent = true
-        panel.titleVisibility = .hidden
-        panel.level = .floating
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.isMovableByWindowBackground = true
+        newWindow.center()
+        newWindow.title = "Transcription"
+        newWindow.titlebarAppearsTransparent = true
+        newWindow.titleVisibility = .visible
         
-        let contentView = NSHostingView(rootView: VoiceTranscriptionResultView(controller: self))
-        panel.contentView = contentView
+        newWindow.isMovableByWindowBackground = false
+        newWindow.backgroundColor = .clear
+        newWindow.isOpaque = false
+        newWindow.hasShadow = true
+        newWindow.isReleasedWhenClosed = false
+        newWindow.level = .screenSaver
+        newWindow.hidesOnDeactivate = false
         
-        window = panel
-        panel.makeKeyAndOrderFront(nil)
-        isVisible = true
+        newWindow.contentView = hostingView
         
-        print("VoiceTranscribe: Result window shown")
+        // Fade in - use deferred makeKey to avoid NotchWindow conflicts
+        newWindow.alphaValue = 0
+        newWindow.orderFront(nil)
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+            newWindow.makeKeyAndOrderFront(nil)
+        }
+        
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.25
+            newWindow.animator().alphaValue = 1.0
+        }
+        
+        self.window = newWindow
+        print("VoiceTranscribe: Result window shown at center")
     }
     
     func hideWindow() {
-        window?.close()
-        window = nil
-        isVisible = false
+        guard let panel = window else { return }
         
-        print("VoiceTranscribe: Result window hidden")
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.15
+            panel.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            panel.close()
+            self?.window = nil
+        })
     }
 }
 
-// MARK: - Result View
+// MARK: - Result View (matches OCRResultView style exactly)
 
 struct VoiceTranscriptionResultView: View {
-    let controller: VoiceTranscriptionResultController
-    @ObservedObject var manager = VoiceTranscribeManager.shared
-    @State private var copied = false
+    let text: String
+    let onClose: () -> Void
+    
+    @AppStorage("useTransparentBackground") private var useTransparentBackground = false
+    @State private var isCopyHovering = false
+    @State private var isCloseHovering = false
+    @State private var showCopiedFeedback = false
     
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            HStack(spacing: 14) {
                 Image(systemName: "waveform.and.mic")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 28))
                     .foregroundStyle(.blue)
                 
-                Text("Transcription")
-                    .font(.headline)
-                
-                Spacer()
-                
-                // Close button
-                Button {
-                    controller.hideWindow()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Transcription")
+                        .font(.headline)
+                    Text("Speech recognized from audio")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
+                
+                Spacer()
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 12)
+            .padding(20)
             
             Divider()
+                .padding(.horizontal, 20)
             
-            // Text content
+            // Content
             ScrollView {
-                Text(manager.transcriptionResult)
+                Text(text)
                     .font(.body)
-                    .foregroundStyle(.primary)
-                    .textSelection(.enabled)
+                    .foregroundColor(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(20)
+                    .textSelection(.enabled)
             }
-            .frame(maxHeight: .infinity)
+            .frame(maxHeight: 350)
             
             Divider()
+                .padding(.horizontal, 20)
             
-            // Actions
-            HStack(spacing: 12) {
-                Text("\(manager.transcriptionResult.count) characters")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+            // Action buttons
+            HStack(spacing: 10) {
+                Button {
+                    onClose()
+                } label: {
+                    Text("Close")
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.white.opacity(isCloseHovering ? 0.15 : 0.08))
+                        .foregroundStyle(.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .onHover { h in
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        isCloseHovering = h
+                    }
+                }
                 
                 Spacer()
                 
-                // Copy button
                 Button {
-                    manager.copyToClipboard()
-                    copied = true
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(text, forType: .string)
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        copied = false
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        showCopiedFeedback = true
+                    }
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        onClose()
                     }
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                        Image(systemName: showCopiedFeedback ? "checkmark" : "doc.on.doc")
                             .font(.system(size: 12, weight: .semibold))
-                        Text(copied ? "Copied!" : "Copy")
+                        Text(showCopiedFeedback ? "Copied!" : "Copy to Clipboard")
                     }
-                    .fontWeight(.medium)
-                    .foregroundStyle(.white)
+                    .fontWeight(.semibold)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(copied ? Color.green : Color.blue)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background((showCopiedFeedback ? Color.green : Color.blue).opacity(isCopyHovering ? 1.0 : 0.8))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                    )
                 }
                 .buttonStyle(.plain)
-                .animation(.spring(response: 0.2), value: copied)
+                .onHover { h in
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        isCopyHovering = h
+                    }
+                }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            .padding(16)
         }
-        .frame(width: 400, height: 300)
-        .background(.ultraThinMaterial)
-        .background(Color.black.opacity(0.2))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
-        )
+        .frame(width: 500)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
     }
 }
 
 #Preview {
-    VoiceTranscriptionResultView(controller: VoiceTranscriptionResultController.shared)
+    VoiceTranscriptionResultView(text: "This is a sample transcription of some spoken audio.") {}
 }

@@ -168,8 +168,11 @@ final class VoiceTranscribeMenuBar {
     @objc private func stopRecording() {
         Task { @MainActor in
             if isInvisiRecording {
-                // Stop invisi-recording - transcription will trigger result window via setRecordingState
+                // Stop invisi-recording - show the transcribing progress window
+                isInvisiRecording = false
                 VoiceTranscribeManager.shared.stopRecording()
+                // Show the progress window in bottom right so user sees transcription
+                VoiceRecordingWindowController.shared.showTranscribingProgress()
             } else {
                 // Stop normal recording
                 VoiceRecordingWindowController.shared.stopRecordingAndTranscribe()
