@@ -97,7 +97,7 @@
             filter: url('#gooey');
         }
 
-        /* Shimmer animation like Alcove's "Press to unlock" */
+        /* Shimmer animation */
         .shimmer {
             background: linear-gradient(120deg,
                     rgba(139, 92, 246, 0.3) 0%,
@@ -1424,7 +1424,7 @@
                 </svg>
             </a>
         </div>
-        <!-- Giant "Droppy" text like Alcove -->
+        <!-- Giant "Droppy" text -->
         <div
             class="pointer-events-none -mt-6 hidden select-none overflow-hidden bg-gradient-to-b from-slate-100/10 from-25% to-slate-100/0 bg-clip-text text-[14rem] font-black leading-none text-transparent sm:block sm:h-36 md:h-48 md:text-[18rem] lg:h-56 lg:text-[20rem]">
             Droppy
@@ -1454,7 +1454,7 @@
             }
         });
 
-        // Alcove-style page load animation
+        // Page load animation
         document.addEventListener('DOMContentLoaded', () => {
             // Trigger all elements with opacity-0 delay-* to animate in
             document.querySelectorAll('[data-animate]').forEach(el => {
