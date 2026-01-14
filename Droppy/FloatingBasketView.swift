@@ -321,6 +321,8 @@ struct FloatingBasketView: View {
                         .foregroundStyle(state.isAirDropZoneTargeted ? .primary : .secondary)
                 }
                 .frame(width: airDropZoneWidth, height: currentHeight)
+                .scaleEffect(state.isAirDropZoneTargeted ? 1.05 : 1.0)  // Match basket zoom effect
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isAirDropZoneTargeted)
                 .offset(x: baseWidth)
             }
         } else {
