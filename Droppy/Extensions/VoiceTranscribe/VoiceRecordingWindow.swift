@@ -89,23 +89,33 @@ final class VoiceRecordingWindowController {
         VoiceTranscribeManager.shared.stopRecording()
         
         // Watch for transcription completion
+        watchForTranscriptionCompletion()
+    }
+    
+    /// Show just the transcribing progress (for invisi-record mode)
+    func showTranscribingProgress() {
+        // Show window if not already visible
+        if window == nil {
+            showWindow()
+        }
+        
+        // Watch for transcription completion
+        watchForTranscriptionCompletion()
+    }
+    
+    private func watchForTranscriptionCompletion() {
         Task { @MainActor in
             // Poll for completion (max 60 seconds)
             for _ in 0..<120 {
                 try? await Task.sleep(for: .milliseconds(500))
                 
                 let state = VoiceTranscribeManager.shared.state
-                if case .complete = state {
-                    // Transcription done - hide window and show result
+                if case .idle = state {
+                    // Transcription done or cancelled - result window is shown from manager
                     hideWindow()
-                    VoiceTranscriptionResultController.shared.showResult()
                     return
                 } else if case .error = state {
                     // Error occurred - hide window
-                    hideWindow()
-                    return
-                } else if case .idle = state {
-                    // Cancelled or reset
                     hideWindow()
                     return
                 }

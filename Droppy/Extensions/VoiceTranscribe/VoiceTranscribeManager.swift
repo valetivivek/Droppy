@@ -580,15 +580,17 @@ final class VoiceTranscribeManager: ObservableObject {
             // Extract text from results
             if let result = results.first {
                 transcriptionResult = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                state = .complete
                 
                 print("VoiceTranscribe: Transcription complete - \(result.text.count) chars")
                 
                 // Show result window (works for both regular and invisi-record mode)
                 VoiceTranscriptionResultController.shared.showResult()
+                
+                // Reset to idle so new recordings can start
+                state = .idle
             } else {
                 transcriptionResult = ""
-                state = .complete
+                state = .idle  // Reset even if no result
             }
             
         } catch {
