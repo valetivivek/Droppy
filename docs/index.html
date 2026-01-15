@@ -235,7 +235,8 @@
             color: #888;
             text-align: center;
             max-width: 600px;
-            margin: 0 auto 64px;
+            margin: 0 auto 48px;
+            /* Consistent spacing */
         }
 
         /* Feature Grid */
@@ -333,6 +334,8 @@
         .privacy-section {
             background: linear-gradient(180deg, #000 0%, #0a0a0a 100%);
             text-align: center;
+            padding-bottom: 80px;
+            /* Consistent section gap */
         }
 
         .privacy-badge {
@@ -566,12 +569,36 @@
 
         <div class="hero-image-container animate-in delay-3">
             <div class="hero-glow"></div>
-            <img src="assets/extension-store.png" alt="Droppy Extension Store" class="hero-image">
+            <img src="assets/images/hero-screenshot.png"
+                alt="Droppy in action - Media player in your notch and floating basket for quick file access"
+                class="hero-image">
         </div>
 
-        <p class="hero-caption animate-in delay-4">
-            Droppy turns your Mac into a productivity powerhouse.
+        <p class="hero-caption animate-in delay-4" style="max-width: 600px; margin-top: 48px;">
+            <strong style="color: #fff;">Control music from your notch.</strong> Drop files into the floating
+            basket.<br>
+            <span style="color: #666;">Droppy transforms your Mac's notch into a productivity powerhouse.</span>
         </p>
+
+        <!-- Feature Highlights -->
+        <div class="animate-in delay-4"
+            style="display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; margin-top: 32px;">
+            <div
+                style="display: flex; align-items: center; gap: 8px; padding: 12px 20px; background: #111; border: 1px solid #222; border-radius: 999px;">
+                <span style="font-size: 16px;">🎵</span>
+                <span style="font-size: 13px; color: #888;">Media Controls</span>
+            </div>
+            <div
+                style="display: flex; align-items: center; gap: 8px; padding: 12px 20px; background: #111; border: 1px solid #222; border-radius: 999px;">
+                <span style="font-size: 16px;">📁</span>
+                <span style="font-size: 13px; color: #888;">Floating Basket</span>
+            </div>
+            <div
+                style="display: flex; align-items: center; gap: 8px; padding: 12px 20px; background: #111; border: 1px solid #222; border-radius: 999px;">
+                <span style="font-size: 16px;">⚡</span>
+                <span style="font-size: 13px; color: #888;">Instant Access</span>
+            </div>
+        </div>
     </section>
 
     <!-- What is Droppy -->
@@ -587,6 +614,39 @@
             </div>
             <div class="two-col-image">
                 <img src="assets/features-grid.png" alt="Droppy Features">
+            </div>
+        </div>
+    </section>
+
+    <!-- Context Menu Showcase -->
+    <section class="container">
+        <div class="two-col" style="direction: rtl;">
+            <div class="two-col-text" style="direction: ltr;">
+                <h2>Powerful actions,<br>right at your fingertips.</h2>
+                <p>
+                    Right-click any file in the shelf for instant access to everything you need.
+                    <strong style="color: #fff;">Remove backgrounds with AI</strong>, compress files, create ZIPs,
+                    or share anywhere — all without leaving Droppy.
+                </p>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px;">
+                    <span
+                        style="padding: 6px 12px; background: #0a0a0a; border: 1px solid #222; border-radius: 999px; font-size: 12px; color: #888;">🧠
+                        AI Background Removal</span>
+                    <span
+                        style="padding: 6px 12px; background: #0a0a0a; border: 1px solid #222; border-radius: 999px; font-size: 12px; color: #888;">📦
+                        Compress Files</span>
+                    <span
+                        style="padding: 6px 12px; background: #0a0a0a; border: 1px solid #222; border-radius: 999px; font-size: 12px; color: #888;">🔗
+                        Share Anywhere</span>
+                    <span
+                        style="padding: 6px 12px; background: #0a0a0a; border: 1px solid #222; border-radius: 999px; font-size: 12px; color: #888;">📁
+                        Batch Operations</span>
+                </div>
+            </div>
+            <div class="two-col-image" style="direction: ltr;">
+                <img src="assets/images/context-menu-screenshot.png"
+                    alt="Droppy context menu with AI background removal, compression, and file management options"
+                    style="border-radius: 20px; box-shadow: 0 30px 60px rgba(0,0,0,0.4);">
             </div>
         </div>
     </section>
@@ -686,7 +746,7 @@
     </section>
 
     <!-- Extensions Preview -->
-    <section class="container" style="padding-top: 80px; padding-bottom: 100px;">
+    <section class="container" style="padding-top: 80px; padding-bottom: 80px;">
         <h2 class="section-title">Explore Extensions</h2>
         <p class="section-subtitle">
             Extend Droppy with powerful integrations. All free, all open-source.

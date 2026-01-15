@@ -532,8 +532,15 @@
 
             <!-- Direct Download -->
             <div class="download-card">
-                <h3>Direct Download</h3>
+                <h3 style="display: flex; align-items: center; gap: 10px;">
+                    <img src="assets/macos-disk-icon.png" alt="DMG" style="width: 28px; height: 28px;">
+                    Direct Download
+                </h3>
                 <p>Download the DMG installer directly from GitHub releases.</p>
+                <!-- Step 1: Download -->
+                <p
+                    style="font-size: 11px; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    Step 1: Download</p>
                 <a href="https://github.com/iordv/Droppy/releases/latest/download/Droppy.dmg" class="download-btn"
                     id="dmg-download">
                     <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -542,10 +549,10 @@
                     Download Droppy.dmg
                 </a>
 
-                <!-- Quarantine removal command -->
+                <!-- Step 2: Remove quarantine -->
                 <p
                     style="font-size: 11px; color: #666; margin-bottom: 8px; margin-top: 16px; text-transform: uppercase; letter-spacing: 0.5px;">
-                    After downloading, run in Terminal</p>
+                    Step 2: Run in Terminal</p>
                 <div class="homebrew-cmd" style="background: #0d0d0d;">
                     <code style="font-size: 11px;">xattr -d com.apple.quarantine ~/Downloads/Droppy.dmg</code>
                     <button class="copy-btn" onclick="copyCommand(this)">
@@ -556,11 +563,14 @@
                         Copy
                     </button>
                 </div>
-                <p style="font-size: 11px; color: #555; margin-top: 8px; margin-bottom: 0; font-style: italic;">Adjust
-                    path if you saved elsewhere</p>
 
-                <p style="font-size: 12px; color: #666; margin-top: 16px; margin-bottom: 0;">
-                    <span class="droppy-version">v7.7.1</span> · Universal (Apple Silicon + Intel)
+                <!-- Step 3 -->
+                <p
+                    style="font-size: 11px; color: #666; margin-top: 16px; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    Step 3: Open the DMG and install</p>
+
+                <p style="font-size: 12px; color: #666; margin-top: 0; margin-bottom: 0;">
+                    <span class="droppy-version">v7.7.2</span> · Universal (Apple Silicon + Intel)
                 </p>
             </div>
         </div>

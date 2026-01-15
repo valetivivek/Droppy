@@ -110,6 +110,7 @@ struct DroppedItemView: View {
         .scaleEffect(isPressed ? 0.95 : 1.0)
         .shadow(color: .black.opacity(isHovering ? 0.15 : 0), radius: 8, y: 4)
         .onHover { hovering in
+            
             withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
                 isHovering = hovering
                 showRemoveButton = hovering

@@ -40,6 +40,23 @@ struct DraggableArea<Content: View>: NSViewRepresentable {
     }
     
     func updateNSView(_ nsView: DraggableAreaView<Content>, context: Context) {
+        // CRITICAL: Skip updating the hosting view content when a context menu is open
+        // Updating rootView causes SwiftUI to recreate the view, dismissing the menu
+        // Exclude Droppy's own windows (BasketPanel, ClipboardPanel, NotchWindow) which are at high levels
+        let hasActiveMenu = NSApp.windows.contains { window in
+            guard window.level.rawValue >= NSWindow.Level.popUpMenu.rawValue else { return false }
+            // Exclude our own app windows
+            let className = NSStringFromClass(type(of: window))
+            if className.contains("BasketPanel") ||
+               className.contains("ClipboardPanel") ||
+               className.contains("NotchWindow") ||
+               className.contains("NSHosting") {
+                return false
+            }
+            return true
+        }
+        guard !hasActiveMenu else { return }
+        
         nsView.update(rootView: content, items: items, onTap: onTap, onRightClick: onRightClick, onDragComplete: onDragComplete)
     }
 }

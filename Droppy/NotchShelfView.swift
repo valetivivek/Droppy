@@ -847,7 +847,13 @@ struct NotchShelfView: View {
         // Start timer to auto-shrink shelf
         let workItem = DispatchWorkItem { [self] in
             // Only shrink if still expanded and not hovering over the content
-            guard state.isExpanded && !isHoveringExpandedContent && !state.isDropTargeted else { return }
+            // Check both local hover state AND global mouse hover (NotchWindowController tracking)
+            guard state.isExpanded && !isHoveringExpandedContent && !state.isMouseHovering && !state.isDropTargeted else { return }
+            
+            // CRITICAL: Don't auto-shrink if a context menu is open
+            let hasActiveMenu = NSApp.windows.contains { $0.level.rawValue >= NSWindow.Level.popUpMenu.rawValue }
+            guard !hasActiveMenu else { return }
+            
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 state.isExpanded = false
                 state.isMouseHovering = false  // Reset hover state to go directly to regular notch
@@ -927,6 +933,7 @@ struct NotchShelfView: View {
             }
         }
         .onHover { isHovering in
+            
             // Only update hover state if not dragging (drag state handles its own)
             if !dragMonitor.isDragging {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
@@ -1090,6 +1097,7 @@ struct NotchShelfView: View {
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: musicManager.wasRecentlyPlaying)
         }
         .onHover { isHovering in
+            
             // Track hover state for the auto-shrink timer
             isHoveringExpandedContent = isHovering
             
@@ -1588,46 +1596,40 @@ struct NotchItemView: View {
                     .transition(.scale.combined(with: .opacity))
                 }
             }
-        }
-        .frame(width: 76, height: 96)
-        .background {
-            GeometryReader { geo in
-                Color.clear
-                    .preference(
-                        key: ItemFramePreferenceKey.self,
-                        value: [item.id: geo.frame(in: .named("shelfGrid"))]
-                    )
-            }
-        }
-        .onHover { hovering in
-            // Use fast easeOut instead of spring to reduce animation overhead
-            withAnimation(.easeOut(duration: 0.15)) {
-                isHovering = hovering
-            }
-        }
-        .onChange(of: state.poofingItemIds) { _, newIds in
-            // Trigger local poof animation when this item is marked for poof (from bulk operations)
-            if newIds.contains(item.id) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    isPoofing = true
+            .frame(width: 76, height: 96)
+            .background {
+                GeometryReader { geo in
+                    Color.clear
+                        .preference(
+                            key: ItemFramePreferenceKey.self,
+                            value: [item.id: geo.frame(in: .named("shelfGrid"))]
+                        )
                 }
-                // Clear the poof state after triggering
-                state.clearPoof(for: item.id)
             }
-        }
-        .onAppear {
-            // Check if this item was created with poof pending (from bulk operations)
-            if state.poofingItemIds.contains(item.id) {
-                // Small delay to ensure view is fully rendered before animation
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            .onHover { hovering in
+                withAnimation(.easeOut(duration: 0.15)) {
+                    isHovering = hovering
+                }
+            }
+            .onChange(of: state.poofingItemIds) { _, newIds in
+                if newIds.contains(item.id) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         isPoofing = true
                     }
                     state.clearPoof(for: item.id)
                 }
             }
-        }
-        .contextMenu {
+            .onAppear {
+                if state.poofingItemIds.contains(item.id) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            isPoofing = true
+                        }
+                        state.clearPoof(for: item.id)
+                    }
+                }
+            }
+            .contextMenu {
             Button {
                 state.copyToClipboard()
             } label: {
@@ -1859,15 +1861,16 @@ struct NotchItemView: View {
             }) {
                 Label("Remove from Shelf", systemImage: "xmark")
             }
-        }
-        .task {
-            // Use cached thumbnail if available, otherwise load async
-            if let cached = ThumbnailCache.shared.cachedThumbnail(for: item) {
-                thumbnail = cached
-            } else {
-                thumbnail = await ThumbnailCache.shared.loadThumbnailAsync(for: item, size: CGSize(width: 120, height: 120))
             }
-        }
+            .task {
+                // Use cached thumbnail if available, otherwise load async
+                if let cached = ThumbnailCache.shared.cachedThumbnail(for: item) {
+                    thumbnail = cached
+                } else {
+                    thumbnail = await ThumbnailCache.shared.loadThumbnailAsync(for: item, size: CGSize(width: 120, height: 120))
+                }
+            }
+        } // DraggableArea closes here
     }
     
     // MARK: - OCR
