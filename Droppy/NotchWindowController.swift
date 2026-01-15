@@ -48,6 +48,12 @@ final class NotchWindowController: NSObject, ObservableObject {
         stopMonitors()
     }
     
+    /// Checks if a context menu is currently open (prevents shelf closure during menu interactions)
+    func hasActiveContextMenu() -> Bool {
+        // Check for any window at popup menu level (101) or higher
+        return NSApp.windows.contains { $0.level.rawValue >= NSWindow.Level.popUpMenu.rawValue }
+    }
+    
     /// Sets up and shows the notch overlay window
     func setupNotchWindow() {
         guard notchWindow == nil else { return }
@@ -271,9 +277,9 @@ final class NotchWindowController: NSObject, ObservableObject {
                         DroppyState.shared.isExpanded.toggle()
                     }
                 }
-            } else if isExpanded && !isInExpandedShelfZone {
+            } else if isExpanded && !isInExpandedShelfZone && !self.hasActiveContextMenu() {
                 // CLICK OUTSIDE TO CLOSE: Shelf is open, click is outside shelf area
-                // Close the shelf
+                // Don't close if a context menu is active (user is interacting with submenu)
                 DispatchQueue.main.async {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                         DroppyState.shared.isExpanded = false
@@ -351,8 +357,9 @@ final class NotchWindowController: NSObject, ObservableObject {
                         }
                     }
                     return nil  // Consume the click event
-                } else if isExpanded && !isInExpandedShelfZone {
+                } else if isExpanded && !isInExpandedShelfZone && !self.hasActiveContextMenu() {
                     // CLICK OUTSIDE TO CLOSE: Click is outside the shelf area
+                    // Don't close if a context menu is active
                     DispatchQueue.main.async {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                             DroppyState.shared.isExpanded = false
@@ -406,7 +413,7 @@ final class NotchWindowController: NSObject, ObservableObject {
             let cgPoint = cgEvent.location
             
             // Convert CG coordinates to NS coordinates (CG origin is top-left, NS is bottom-left)
-            guard let targetScreen = NSScreen.builtInWithNotch ?? NSScreen.main else { return }
+            guard (NSScreen.builtInWithNotch ?? NSScreen.main) != nil else { return }
             
             // CG Y is inverted: 0 is at top, increases downward
             // NS Y: 0 is at bottom, increases upward
@@ -646,6 +653,12 @@ class NotchWindow: NSPanel {
     }
     
     func handleGlobalMouseEvent(_ event: NSEvent) {
+        // CRITICAL: Skip all hover tracking when a context menu is open
+        // This prevents view re-renders that would dismiss submenus (Share, Compress, etc.)
+        if NotchWindowController.shared.hasActiveContextMenu() {
+            return
+        }
+        
         // SAFETY: Use the event's location properties instead of NSEvent.mouseLocation
         // class property to avoid race conditions with the HID event decoding system.
         // For global monitors, we need to convert the event location to screen coordinates.
@@ -770,6 +783,33 @@ class NotchWindow: NSPanel {
                 DispatchQueue.main.async {
                     withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
                         DroppyState.shared.isMouseHovering = false
+                    }
+                }
+            } else if DroppyState.shared.isExpanded {
+                // When shelf is expanded, check if cursor is in the expanded shelf zone
+                // If so, maintain hover state to prevent auto-collapse
+                let expandedWidth: CGFloat = 450
+                let centerX = targetScreen.frame.origin.x + targetScreen.frame.width / 2
+                let rowCount = ceil(Double(DroppyState.shared.items.count) / 5.0)
+                var expandedHeight = max(1, rowCount) * 110 + 54
+                
+                // Add media player height if needed
+                let shouldShowPlayer = MusicManager.shared.isPlaying || MusicManager.shared.wasRecentlyPlaying
+                if DroppyState.shared.items.isEmpty && shouldShowPlayer && !MusicManager.shared.isPlayerIdle {
+                    expandedHeight += 100
+                }
+                
+                let expandedShelfZone = NSRect(
+                    x: centerX - expandedWidth / 2,
+                    y: targetScreen.frame.origin.y + targetScreen.frame.height - expandedHeight,
+                    width: expandedWidth,
+                    height: expandedHeight
+                )
+                
+                let isInExpandedShelf = expandedShelfZone.contains(mouseLocation)
+                if isInExpandedShelf && !currentlyHovering {
+                    DispatchQueue.main.async {
+                        DroppyState.shared.isMouseHovering = true
                     }
                 }
             }
@@ -943,7 +983,9 @@ class NotchDragContainer: NSView {
             removeTrackingArea(trackingArea)
         }
         
-        let options: NSTrackingArea.Options = [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect]
+        // NOTE: .mouseMoved removed - it was causing continuous events that triggered
+        // state updates and interfered with context menus. Basket has no tracking area.
+        let options: NSTrackingArea.Options = [.mouseEnteredAndExited, .activeAlways, .inVisibleRect]
         trackingArea = NSTrackingArea(rect: self.bounds, options: options, owner: self, userInfo: nil)
         addTrackingArea(trackingArea!)
     }
