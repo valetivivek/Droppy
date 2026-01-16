@@ -26,34 +26,36 @@ struct VoiceTranscribeInfoView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
+            // Header (fixed, non-scrolling)
             headerSection
             
             Divider()
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
             
-            // Main content: HStack with screenshot left, settings right
-            HStack(alignment: .top, spacing: 24) {
-                // Left: Screenshot + Features
-                screenshotSection
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                
-                // Right: Settings (config, download, shortcuts)
-                settingsSection
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            // Scrollable content area
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 20) {
+                    // Features
+                    screenshotSection
+                    
+                    // Settings (config card)
+                    settingsSection
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
             }
-            .padding(.horizontal, 24)
+            .frame(maxHeight: 520)
             
             Divider()
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
             
-            // Action Buttons
+            // Buttons (fixed, non-scrolling)
             buttonSection
         }
-        .frame(width: 920)  // Wide horizontal layout
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 450)
+        .fixedSize(horizontal: true, vertical: true)
         .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
-        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .sheet(isPresented: $showReviewsSheet) {
             ExtensionReviewsSheet(extensionType: .voiceTranscribe)
         }
@@ -147,12 +149,10 @@ struct VoiceTranscribeInfoView: View {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(AdaptiveColors.subtleBorderAuto, lineWidth: 1)
                     )
-                    .padding(.top, 8)
             } placeholder: {
                 EmptyView()
             }
         }
-        .padding(.vertical, 20)
     }
     
     private func featureRow(icon: String, text: String) -> some View {
@@ -281,8 +281,8 @@ struct VoiceTranscribeInfoView: View {
                 }
                 .padding(16)
             }
-            .background(AdaptiveColors.buttonBackgroundAuto)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(AdaptiveColors.buttonBackgroundAuto.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             
 
             // Download Section
@@ -357,11 +357,14 @@ struct VoiceTranscribeInfoView: View {
             
             // Keyboard Shortcuts Section (only when model is installed)
             if manager.isModelDownloaded {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Keyboard Shortcuts")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 4)
+                VStack(spacing: 12) {
+                    HStack {
+                        Text("Keyboard Shortcuts")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                        
+                        Spacer()
+                    }
                     
                     HStack(spacing: 10) {
                         // Quick Record shortcut
@@ -371,15 +374,21 @@ struct VoiceTranscribeInfoView: View {
                         shortcutRow(for: .invisi)
                     }
                 }
+                .padding(16)
+                .background(AdaptiveColors.buttonBackgroundAuto.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             
             // Installed Models Section (only when model is installed)
             if manager.isModelDownloaded {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Installed Models")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 4)
+                VStack(spacing: 12) {
+                    HStack {
+                        Text("Installed Models")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                        
+                        Spacer()
+                    }
                     
                     // Current installed model row
                     HStack {
@@ -417,89 +426,59 @@ struct VoiceTranscribeInfoView: View {
                         }
                         .buttonStyle(.plain)
                         .onHover { h in
-                            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                                isHoveringDelete = h
-                            }
+                            withAnimation(.easeInOut(duration: 0.15)) { isHoveringDelete = h }
                         }
                     }
-                    .padding(14)
-                    .background(AdaptiveColors.buttonBackgroundAuto)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
+                .padding(16)
+                .background(AdaptiveColors.buttonBackgroundAuto.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 20)
     }
     
     // MARK: - Buttons
     
+    @State private var isHoveringReset = false
+    
     private var buttonSection: some View {
         HStack(spacing: 10) {
-            // Close button
             Button {
                 dismiss()
             } label: {
                 Text("Close")
-                    .fontWeight(.medium)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background((isHoveringCancel ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(isHoveringCancel ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                    isHoveringCancel = h
-                }
-            }
-            
-            // Reviews button
-            Button {
-                showReviewsSheet = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "star.bubble")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("Reviews")
-                }
-                .fontWeight(.medium)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background((isHoveringReviews ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto))
-                .foregroundStyle(.secondary)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                    isHoveringReviews = h
-                }
+                withAnimation(.easeInOut(duration: 0.15)) { isHoveringCancel = h }
             }
             
             Spacer()
             
-            // Reset Shortcuts button
+            // Reset
             Button {
                 manager.removeShortcut(for: .quick)
                 manager.removeShortcut(for: .invisi)
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("Reset Shortcuts")
-                }
-                .fontWeight(.medium)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(AdaptiveColors.buttonBackgroundAuto)
-                .foregroundStyle(.secondary)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(8)
+                    .background(isHoveringReset ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
+            .onHover { h in
+                withAnimation(.easeInOut(duration: 0.15)) { isHoveringReset = h }
+            }
+            .help("Reset Shortcuts")
             
-            // Disable Extension button
             DisableExtensionButton(extensionType: .voiceTranscribe)
         }
         .padding(16)

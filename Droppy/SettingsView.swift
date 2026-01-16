@@ -237,15 +237,17 @@ struct SettingsView: View {
         Group {
             // MARK: Drop Zones Section
             Section {
-                Toggle(isOn: $enableNotchShelf) {
-                    VStack(alignment: .leading) {
-                        Text("Notch Shelf")
-                        Text("Drop zone at the top of your screen")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    NotchShelfInfoButton()
+                    Toggle(isOn: $enableNotchShelf) {
+                        VStack(alignment: .leading) {
+                            Text("Notch Shelf")
+                            Text("Drop zone at the top of your screen")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
-                .help("Right-click the notch to temporarily hide it. Show it again via the menu bar icon.")
                 .onChange(of: enableNotchShelf) { oldValue, newValue in
                     if newValue {
                         NotchWindowController.shared.setupNotchWindow()
@@ -1553,6 +1555,56 @@ struct SwipeGestureInfoButton: View {
             }
             .padding(20)
             .frame(width: 180)
+        }
+    }
+}
+
+// MARK: - Notch Shelf Info Button
+
+/// Info button explaining right-click to hide and show
+struct NotchShelfInfoButton: View {
+    @State private var showPopover = false
+    
+    var body: some View {
+        Button {
+            showPopover.toggle()
+        } label: {
+            Image(systemName: "info.circle")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Notch Shelf Tips")
+                    .font(.system(size: 15, weight: .semibold))
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "cursorarrow.click.2")
+                            .foregroundStyle(.red)
+                        Text("**Right-click** to hide the notch/island")
+                            .font(.system(size: 13))
+                    }
+                    
+                    HStack(spacing: 8) {
+                        Image(systemName: "cursorarrow.click.2")
+                            .foregroundStyle(.green)
+                        Text("**Right-click** the area again to show")
+                            .font(.system(size: 13))
+                    }
+                    
+                    HStack(spacing: 8) {
+                        Image(systemName: "menubar.arrow.up.rectangle")
+                            .foregroundStyle(.blue)
+                        Text("Or use the **menu bar icon**")
+                            .font(.system(size: 13))
+                    }
+                }
+                .foregroundStyle(.secondary)
+            }
+            .padding(16)
+            .frame(width: 280)
         }
     }
 }

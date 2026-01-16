@@ -36,30 +36,28 @@ struct DisableExtensionButton: View {
                 showConfirmation = true
             }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 if isProcessing {
                     ProgressView()
-                        .scaleEffect(0.7)
-                        .frame(width: 12, height: 12)
+                        .scaleEffect(0.6)
+                        .frame(width: 10, height: 10)
                 } else {
                     Image(systemName: isDisabled ? "plus.circle" : "minus.circle")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                 }
                 Text(buttonText)
+                    .font(.system(size: 13, weight: .medium))
             }
-            .fontWeight(.medium)
             .foregroundStyle(isDisabled ? .green : .red)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             .background((isDisabled ? Color.green : Color.red).opacity(isHovering ? 0.25 : 0.15))
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(isProcessing)
         .onHover { h in
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                isHovering = h
-            }
+            withAnimation(.easeInOut(duration: 0.15)) { isHovering = h }
         }
         .confirmationDialog(
             "Disable \(extensionType.title)?",

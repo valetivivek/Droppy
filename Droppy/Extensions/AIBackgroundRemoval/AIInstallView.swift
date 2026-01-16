@@ -57,21 +57,30 @@ struct AIInstallView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                // Header
+                // Header (fixed)
                 headerSection
                 
-                // Content - either steps during install or feature list
-                contentSection
+                Divider()
+                    .padding(.horizontal, 24)
                 
-                // Error Message
-                if let error = manager.installError {
-                    errorSection(error: error)
+                // Scrollable content
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 20) {
+                        contentSection
+                        
+                        if let error = manager.installError {
+                            errorSection(error: error)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 20)
                 }
+                .frame(maxHeight: 400)
                 
                 Divider()
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 24)
                 
-                // Action Buttons
+                // Buttons (fixed)
                 buttonSection
             }
             
@@ -81,10 +90,10 @@ struct AIInstallView: View {
                     .allowsHitTesting(false)
             }
         }
-        .frame(width: 510)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 450)
+        .fixedSize(horizontal: true, vertical: true)
         .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
-        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .sheet(isPresented: $showReviewsSheet) {
             ExtensionReviewsSheet(extensionType: .aiBackgroundRemoval)
         }
@@ -250,7 +259,6 @@ struct AIInstallView: View {
                 )
             }
         }
-        .padding(.horizontal, 24)
         .padding(.bottom, 20)
     }
     
@@ -276,7 +284,6 @@ struct AIInstallView: View {
                 EmptyView()
             }
         }
-        .padding(.horizontal, 24)
         .padding(.bottom, 20)
     }
     

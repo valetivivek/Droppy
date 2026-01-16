@@ -26,34 +26,36 @@ struct ExtensionInfoView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
+            // Header (fixed)
             headerSection
             
             Divider()
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
             
-            // Main content: HStack with screenshot left, features right
-            HStack(alignment: .top, spacing: 24) {
-                // Left: Screenshot
-                screenshotSection
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                
-                // Right: Features
-                featuresSection
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            // Scrollable content
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 20) {
+                    // Features section
+                    featuresSection
+                    
+                    // Screenshot section
+                    screenshotSection
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
             }
-            .padding(.horizontal, 24)
+            .frame(maxHeight: 500)
             
             Divider()
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
             
-            // Buttons
+            // Buttons (fixed)
             buttonSection
         }
-        .frame(width: 700)  // Wide horizontal layout
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 450)
+        .fixedSize(horizontal: true, vertical: true)
         .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
-        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .sheet(isPresented: $showReviewsSheet) {
             ExtensionReviewsSheet(extensionType: extensionType)
         }
@@ -146,11 +148,10 @@ struct ExtensionInfoView: View {
                                 .strokeBorder(AdaptiveColors.subtleBorderAuto, lineWidth: 1)
                         )
                 } placeholder: {
-                    EmptyView() // Silently fail if network unavailable
+                    EmptyView()
                 }
             }
         }
-        .padding(.vertical, 20)
     }
     
     // MARK: - Features Section (Right)
@@ -161,13 +162,11 @@ struct ExtensionInfoView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.bottom, 8)
             
             ForEach(Array(extensionType.features.enumerated()), id: \.offset) { _, feature in
                 featureRow(icon: feature.icon, text: feature.text)
             }
         }
-        .padding(.vertical, 20)
     }
     
     private func featureRow(icon: String, text: String) -> some View {
@@ -186,47 +185,22 @@ struct ExtensionInfoView: View {
     // MARK: - Buttons
     
     private var buttonSection: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             // Close button
             Button {
                 dismiss()
             } label: {
                 Text("Close")
-                    .fontWeight(.medium)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background((isHoveringClose ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(isHoveringClose ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                    isHoveringClose = h
-                }
-            }
-            
-            // Reviews button
-            Button {
-                showReviewsSheet = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "star.bubble")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("Reviews")
-                }
-                .fontWeight(.medium)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background((isHoveringReviews ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto))
-                .foregroundStyle(.secondary)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                    isHoveringReviews = h
-                }
+                withAnimation(.easeInOut(duration: 0.15)) { isHoveringClose = h }
             }
             
             Spacer()
@@ -234,38 +208,40 @@ struct ExtensionInfoView: View {
             // Action button (optional)
             if let action = onAction {
                 Button {
-                    // Track extension activation
                     AnalyticsService.shared.trackExtensionActivation(extensionId: extensionType.rawValue)
                     action()
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: actionIcon)
-                            .font(.system(size: 12, weight: .semibold))
-                        Text(actionText)
-                    }
-                    .fontWeight(.semibold)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(extensionType.categoryColor.opacity(isHoveringAction ? 1.0 : 0.85))
-                    .foregroundStyle(.primary)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(AdaptiveColors.subtleBorderAuto, lineWidth: 1)
-                    )
+                    Text(shortActionText)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(extensionType.categoryColor.opacity(isHoveringAction ? 1.0 : 0.85))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                        isHoveringAction = h
-                    }
+                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringAction = h }
                 }
             }
             
-            // Disable/Enable Extension button (always on right)
+            // Disable button
             DisableExtensionButton(extensionType: extensionType)
         }
         .padding(16)
+    }
+    
+    private var shortActionText: String {
+        switch extensionType {
+        case .aiBackgroundRemoval: return "Install"
+        case .alfred: return "Install"
+        case .finder, .finderServices: return "Configure"
+        case .spotify: return "Connect"
+        case .elementCapture: return "Configure"
+        case .windowSnap: return "Configure"
+        case .voiceTranscribe: return "Configure"
+        case .ffmpegVideoCompression: return "Install"
+        }
     }
     
     private var actionText: String {

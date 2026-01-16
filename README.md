@@ -40,32 +40,32 @@ Droppy transforms your MacBook notch into a **productivity powerhouse**. Drop fi
 
 ---
 
-## ✨ Clipboard Manager
+## 🎵 Shelf & Media Player
 
-Full history with search, favorites, OCR text extraction, and drag-out support. Use `⌘ + Shift + Space` to open (customizable in Settings).
+Your notch becomes a **media powerhouse**. See stunning album art, control playback with tap-to-seek, skip tracks, shuffle, and repeat—all without leaving your workflow. The live **audio visualizer** dances to your music in real-time. Drop files into the shelf and drag them out anywhere.
 
 <p align="center">
-  <img src="docs/assets/images/clipboard-manager.png" alt="Clipboard Manager" width="70%">
+  <img src="docs/assets/images/media-player-expanded.png" alt="Shelf & Media Player" width="100%">
 </p>
 
 ---
 
-## 🎵 Media Controls
+## 📋 Clipboard Manager
 
-Album art, playback controls, and a seek slider—right in your notch. With the Audio Visualizer enabled, see a live frequency spectrum dancing to your music.
+Never lose a copy again. Your **full clipboard history** with instant search, favorites, and rich previews. Push items to your shelf or basket, rename entries, extract text with **OCR**, and bulk-copy multiple items at once. Open with `⌘ + Shift + Space` (customizable).
 
 <p align="center">
-  <img src="docs/assets/images/media-hud.png" alt="Media Controls" width="70%">
+  <img src="docs/assets/images/clipboard-full.png" alt="Clipboard Manager" width="100%">
 </p>
 
 ---
 
-## 🎤 Voice Transcribe
+## 🧺 Floating Basket
 
-Record and transcribe speech to text with 100% on-device AI. Your voice never leaves your Mac.
+**Jiggle your mouse** to summon a floating basket anywhere on screen. Drop files in, push to shelf, convert formats, compress, extract text, remove backgrounds, share—all from a beautiful context menu. Enable drag-to-summon for instant access, and enjoy smooth **peek and hide** animations.
 
 <p align="center">
-  <img src="docs/assets/images/voice-transcribe-screenshot.png" alt="Voice Transcribe" width="70%">
+  <img src="docs/assets/images/floating-basket.png" alt="Floating Basket" width="100%">
 </p>
 
 ---
@@ -74,25 +74,23 @@ Record and transcribe speech to text with 100% on-device AI. Your voice never le
 
 | Feature | Description |
 |:---|:---|
-| **File Shelf & Basket** | Drag files to the notch. Jiggle your mouse to summon a floating basket. |
-| **Clipboard Manager** | Full history, search, favorites, OCR, drag-out |
-| **Native HUDs** | Volume, brightness, battery, caps lock, unlock, AirPods |
-| **Media Controls** | Album art, seek slider, playback controls, audio visualizer |
-| **Quick Actions** | Right-click to compress, convert formats, extract text, share |
-| **Multi-Monitor** | Works on external displays with smart fullscreen detection |
-| **Transparency Mode** | Optional glass effect for all windows |
-| **Powerful Extensions** | Window snapping, voice transcription, AI background removal, and more—see below |
+| **File Shelf & Basket** | Drag files to the notch. Jiggle your mouse to summon a floating basket with peek & hide animations. |
+| **Clipboard Manager** | Full history, instant search, favorites, OCR text extraction, rename entries, bulk copy, drag-out |
+| **Native HUDs** | Volume, brightness, battery, caps lock, screen unlock, AirPods connection—all beautifully animated |
+| **Media Controls** | Album art, tap-to-seek slider, playback controls, shuffle, repeat, live audio visualizer |
+| **Quick Actions** | Right-click to compress, convert formats, extract text, remove backgrounds, share via AirDrop |
+| **Dynamic Island** | No notch? Adds a sleek iPhone-style pill to any Mac with optional transparency mode |
+| **Multi-Monitor** | Works on external displays with smart fullscreen detection and per-screen expansion |
+| **Powerful Extensions** | Window snapping, voice transcription, AI background removal, video compression, and more |
 
 ---
 
 ## 🧩 All Extensions
 
-<p align="center">
-Droppy's built-in Extension Store adds powerful features on demand. Everything's free.
-</p>
+Droppy's built-in **Extension Store** adds powerful features on demand. Everything's free.
 
 <p align="center">
-  <img src="docs/assets/images/extension-store-new.png" alt="Extension Store" width="80%">
+  <img src="docs/assets/images/extension-store-full.png" alt="Extension Store" width="100%">
 </p>
 
 <div align="center">
@@ -107,8 +105,13 @@ Droppy's built-in Extension Store adds powerful features on demand. Everything's
 </div>
 
 <p align="center">
+  <strong>📊 Visit the live Extension Store to see real reviews, ratings, and install counts!</strong><br>
+  Available both in the app and on the web.
+</p>
+
+<p align="center">
   <a href="https://iordv.github.io/Droppy/extensions.html">
-    <img src="https://img.shields.io/badge/Browse_Extension_Store-blueviolet?style=for-the-badge" alt="Extension Store">
+    <img src="https://img.shields.io/badge/Browse_Live_Extension_Store-blueviolet?style=for-the-badge" alt="Extension Store">
   </a>
 </p>
 
@@ -151,70 +154,126 @@ Droppy requires a few permissions to work properly. All processing happens local
 
 <details>
 <summary><strong>Is Droppy really free?</strong></summary>
-Yes! Free forever with no ads, subscriptions, or paywalls. All extensions are included at no cost.
+
+Yes! Droppy is completely free forever—no ads, no subscriptions, no hidden fees, no paywalls. Every feature, including all extensions like Voice Transcribe and AI Background Removal, is included at no cost. We believe great software should be accessible to everyone.
 </details>
 
 <details>
 <summary><strong>"Droppy is damaged and can't be opened" — how do I fix this?</strong></summary>
 
-This is macOS Gatekeeper blocking unsigned apps. Run this command in Terminal:
+This is macOS Gatekeeper blocking apps that aren't notarized through Apple. It's a safety feature, not an actual problem with the app. To fix it, open Terminal and run:
 ```bash
 xattr -rd com.apple.quarantine /Applications/Droppy.app
 ```
-Or if you downloaded the DMG directly:
+If you downloaded the DMG directly, run this instead:
 ```bash
 xattr -rd com.apple.quarantine ~/Downloads/Droppy-*.dmg
 ```
-Using Homebrew (`brew install --cask iordv/tap/droppy`) avoids this issue entirely.
+**Pro tip:** Installing via Homebrew (`brew install --cask iordv/tap/droppy`) avoids this issue entirely and keeps Droppy automatically updated.
 </details>
 
 <details>
 <summary><strong>Does it work on Macs without a notch?</strong></summary>
-Absolutely. Droppy displays a Dynamic Island-style pill at the top of your screen with all the same features.
+
+Absolutely! On Macs without a notch (like iMacs, Mac minis, or older MacBooks), Droppy displays a sleek **Dynamic Island-style pill** at the top center of your screen. You get all the same features—shelf, media controls, HUDs, clipboard—just in a beautiful floating pill that matches the iPhone's Dynamic Island aesthetic.
 </details>
 
 <details>
 <summary><strong>Is my data private?</strong></summary>
-100%. All processing happens locally—clipboard history, voice transcription, background removal, and audio visualization never leave your Mac.
+
+100% private. Droppy is designed with privacy-first principles:
+- **Clipboard history** stays on your Mac—never uploaded anywhere
+- **Voice transcription** uses on-device AI (WhisperKit)—audio never leaves your Mac
+- **AI background removal** runs locally using Apple's ML framework
+- **No analytics, no tracking, no telemetry** that identifies you
+- The app is open-source, so you can verify this yourself
 </details>
 
 <details>
 <summary><strong>Why does Droppy need Accessibility permissions?</strong></summary>
-Accessibility allows Droppy to detect when you're dragging files (to show the basket), register global keyboard shortcuts, and intercept media keys for custom HUDs. Droppy never collects or transmits any data.
+
+Accessibility is the only **required** permission and enables Droppy's core features:
+- **Global keyboard shortcuts** (like ⌘+Shift+Space to open clipboard)
+- **Drag detection** to show the floating basket when you're moving files
+- **Media key interception** to display custom volume/brightness HUDs
+- **Mouse jiggle detection** to summon the basket
+
+Droppy never reads your keystrokes, screen content, or any personal data. The permission is purely for detecting gestures and shortcuts.
 </details>
 
 <details>
 <summary><strong>Why does Droppy need Screen Recording permission?</strong></summary>
-Screen Recording is only needed for the Element Capture extension and the Audio Visualizer feature. Element Capture screenshots UI elements, and the Audio Visualizer needs to capture system audio output. Both are optional features.
+
+Screen Recording is **optional** and only needed for two specific features:
+- **Element Capture extension**: Screenshots individual UI elements by clicking on them
+- **Audio Visualizer**: Captures system audio output to display the live frequency spectrum
+
+If you don't use these features, you don't need to grant this permission. Droppy works perfectly fine without it.
 </details>
 
 <details>
 <summary><strong>Can I use Droppy on multiple monitors?</strong></summary>
-Yes! Droppy supports multi-monitor setups with smart fullscreen detection. The shelf and HUDs appear on whichever display has your cursor.
+
+Yes! Droppy fully supports multi-monitor setups:
+- The notch/island appears on each connected display
+- **Smart fullscreen detection** automatically hides when apps go fullscreen
+- The shelf expands only on the screen where you're interacting
+- HUDs appear on the display with your active cursor
+- Works seamlessly with external monitors, including ultrawide displays
 </details>
 
 <details>
 <summary><strong>How do I change the keyboard shortcuts?</strong></summary>
-Go to Settings (click the gear icon) → Shortcuts. You can customize the shortcut for opening the clipboard and other actions.
+
+Open Droppy's Settings (click the gear icon in the shelf, or right-click the menu bar icon) → **Shortcuts** tab. Here you can customize:
+- Clipboard Manager shortcut (default: ⌘+Shift+Space)
+- Window Snap shortcuts (if you have the extension)
+- Voice Transcribe Quick Record (if you have the extension)
+- And more
+
+Click any shortcut field and press your desired key combination to record a new shortcut.
 </details>
 
 <details>
 <summary><strong>Does Droppy work with external keyboards?</strong></summary>
-Yes. Keyboard shortcuts and media keys work with any keyboard, including external and Bluetooth keyboards.
+
+Yes! All keyboard shortcuts and media key interception work with any keyboard:
+- Built-in MacBook keyboards
+- External USB and Bluetooth keyboards
+- Apple Magic Keyboard
+- Third-party keyboards (Logitech, Keychron, etc.)
+
+Media keys (play/pause, volume, brightness) are detected regardless of which keyboard you use.
 </details>
 
 <details>
 <summary><strong>How do I uninstall Droppy?</strong></summary>
-Drag Droppy from Applications to Trash. To remove all data, also delete:
-- `~/Library/Application Support/Droppy`
-- `~/Library/Preferences/iordv.Droppy.plist`
 
-Or if you used Homebrew: `brew uninstall droppy`
+**Simple uninstall:** Drag Droppy from the Applications folder to Trash.
+
+**Complete removal** (including all data and preferences):
+```bash
+rm -rf ~/Library/Application\ Support/Droppy
+rm -rf ~/Library/Preferences/iordv.Droppy.plist
+rm -rf ~/Library/Caches/iordv.Droppy
+```
+
+**If you installed via Homebrew:**
+```bash
+brew uninstall droppy
+```
 </details>
 
 <details>
 <summary><strong>Is Droppy open-source?</strong></summary>
-Yes! The source code is available under GPL-3.0 with Commons Clause (free for personal use, not for resale).
+
+Yes! Droppy's full source code is available on GitHub under the **GPL-3.0 license with Commons Clause**. This means:
+- ✅ Free to use, modify, and learn from
+- ✅ You can build it yourself from source
+- ✅ Contributions and pull requests are welcome
+- ❌ Cannot be sold or used commercially without permission
+
+We believe in transparency—you can see exactly what the app does and verify it respects your privacy.
 </details>
 
 ---
@@ -232,13 +291,23 @@ cd Droppy && open Droppy.xcodeproj
 ## Support
 
 <p align="center">
-  <strong>Free forever — no ads, no subscriptions.</strong><br>
-  If Droppy saves you time, consider buying me a coffee.
+  <strong>Hey! I'm Jordy 👋</strong><br>
+  I'm a solo developer building Droppy in my spare time because I love creating tools that make Mac workflows better.
+</p>
+
+<p align="center">
+  Droppy is <strong>free forever</strong>—no ads, no subscriptions, no paywalls, no tracking.<br>
+  Every feature and extension is included at no cost because I believe great software should be accessible to everyone.
+</p>
+
+<p align="center">
+  If Droppy saves you time or makes your workflow better, consider buying me a coffee.<br>
+  It helps keep the project alive and motivates me to keep adding new features! ☕
 </p>
 
 <p align="center">
   <a href="https://buymeacoffee.com/droppy">
-    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="160">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="220">
   </a>
 </p>
 

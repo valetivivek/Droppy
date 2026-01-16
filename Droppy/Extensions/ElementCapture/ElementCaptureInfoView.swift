@@ -23,34 +23,36 @@ struct ElementCaptureInfoView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
+            // Header (fixed, non-scrolling)
             headerSection
             
             Divider()
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
             
-            // Main content: HStack with features/screenshot left, shortcuts right
-            HStack(alignment: .top, spacing: 24) {
-                // Left: Features + Screenshot
-                featuresSection
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                
-                // Right: Keyboard Shortcut
-                shortcutSection
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            // Scrollable content area
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 24) {
+                    // Features + Screenshot
+                    featuresSection
+                    
+                    // Keyboard Shortcut Card
+                    shortcutSection
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
             }
-            .padding(.horizontal, 24)
+            .frame(maxHeight: 500)
             
             Divider()
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
             
-            // Buttons
+            // Buttons (fixed, non-scrolling)
             buttonSection
         }
-        .frame(width: 700)  // Wide horizontal layout
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 450)
+        .fixedSize(horizontal: true, vertical: true)
         .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
-        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .onDisappear {
             stopRecording()
         }
@@ -134,19 +136,20 @@ struct ElementCaptureInfoView: View {
     }
     
     private var featuresSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Capture specific screen elements and copy them to clipboard or add to Droppy. Perfect for grabbing UI components, icons, or any visual element.")
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Capture specific screen elements and copy them to clipboard or add to Droppy.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.bottom, 8)
             
-            featureRow(icon: "keyboard", text: "Configurable keyboard shortcuts")
-            featureRow(icon: "rectangle.dashed", text: "Select screen regions")
-            featureRow(icon: "doc.on.clipboard", text: "Copy to clipboard")
-            featureRow(icon: "plus.circle", text: "Add directly to Droppy")
+            VStack(alignment: .leading, spacing: 10) {
+                featureRow(icon: "keyboard", text: "Configurable shortcuts")
+                featureRow(icon: "rectangle.dashed", text: "Select screen regions")
+                featureRow(icon: "doc.on.clipboard", text: "Copy to clipboard")
+                featureRow(icon: "plus.circle", text: "Add directly to Droppy")
+            }
             
-            // Screenshot loaded from web (cached to prevent flashing)
+            // Screenshot
             CachedAsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/images/element-capture-screenshot.png")) { image in
                 image
                     .resizable()
@@ -156,12 +159,10 @@ struct ElementCaptureInfoView: View {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(AdaptiveColors.subtleBorderAuto, lineWidth: 1)
                     )
-                    .padding(.top, 8)
             } placeholder: {
                 EmptyView()
             }
         }
-        .padding(.vertical, 20)
     }
     
     private func featureRow(icon: String, text: String) -> some View {
@@ -178,24 +179,23 @@ struct ElementCaptureInfoView: View {
     }
     
     private var shortcutSection: some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Keyboard Shortcut")
                 .font(.headline)
                 .foregroundStyle(.primary)
             
-            // Shortcut display + Record button (matches KeyShortcutRecorder style)
+            // Shortcut display + Record button
             HStack(spacing: 8) {
                 // Shortcut display
                 Text(currentShortcut?.description ?? "None")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.primary)
-                    .frame(minWidth: 80, alignment: .center)
+                    .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 10)
-                    .padding(.horizontal, 12)
                     .background(AdaptiveColors.buttonBackgroundAuto)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .stroke(isRecording ? Color.blue : AdaptiveColors.subtleBorderAuto, lineWidth: isRecording ? 2 : 1)
                     )
                 
@@ -207,21 +207,24 @@ struct ElementCaptureInfoView: View {
                         startRecording()
                     }
                 } label: {
-                    Text(isRecording ? "Press Keys..." : "Record Shortcut")
+                    Text(isRecording ? "Press..." : "Record")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .frame(width: 120)
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 10)
                         .background((isRecording ? Color.red : Color.blue).opacity(0.85))
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.vertical, 20)
+        .padding(16)
+        .background(AdaptiveColors.buttonBackgroundAuto.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
+    
+    @State private var isHoveringReset = false
     
     private var buttonSection: some View {
         HStack(spacing: 10) {
@@ -229,67 +232,40 @@ struct ElementCaptureInfoView: View {
                 dismiss()
             } label: {
                 Text("Close")
-                    .fontWeight(.medium)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background((isHoveringClose ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(isHoveringClose ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                    isHoveringClose = h
-                }
-            }
-            
-            // Reviews button
-            Button {
-                showReviewsSheet = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "star.bubble")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("Reviews")
-                }
-                .fontWeight(.medium)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background((isHoveringReviews ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto))
-                .foregroundStyle(.secondary)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                    isHoveringReviews = h
-                }
+                withAnimation(.easeInOut(duration: 0.15)) { isHoveringClose = h }
             }
             
             Spacer()
             
-            // Reset Shortcut button
+            // Reset
             Button {
                 UserDefaults.standard.removeObject(forKey: "elementCaptureShortcut")
                 ElementCaptureManager.shared.shortcut = nil
                 ElementCaptureManager.shared.stopMonitoringShortcut()
                 currentShortcut = nil
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("Reset Shortcut")
-                }
-                .fontWeight(.medium)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(AdaptiveColors.buttonBackgroundAuto)
-                .foregroundStyle(.secondary)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(8)
+                    .background(isHoveringReset ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
+            .onHover { h in
+                withAnimation(.easeInOut(duration: 0.15)) { isHoveringReset = h }
+            }
+            .help("Reset Shortcut")
             
-            // Disable/Enable Extension button (always on right)
             DisableExtensionButton(extensionType: .elementCapture)
         }
         .padding(16)

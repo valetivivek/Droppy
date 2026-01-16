@@ -24,34 +24,36 @@ struct WindowSnapInfoView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header (centered, stays on top)
+            // Header (fixed, non-scrolling)
             headerSection
             
             Divider()
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
             
-            // Main content: HStack with features left, shortcuts right
-            HStack(alignment: .top, spacing: 24) {
-                // Left: Features + Screenshot
-                featuresSection
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                
-                // Right: Keyboard Shortcuts
-                shortcutSection
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            // Scrollable content area
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 20) {
+                    // Features + Screenshot
+                    featuresSection
+                    
+                    // Shortcuts grid
+                    shortcutSection
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
             }
-            .padding(.horizontal, 24)
+            .frame(maxHeight: 500)
             
             Divider()
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
             
-            // Buttons
+            // Buttons (fixed, non-scrolling)
             buttonSection
         }
-        .frame(width: 920)  // Wide horizontal layout for shortcut grid
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 450)
+        .fixedSize(horizontal: true, vertical: true)
         .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
-        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .onAppear {
             loadShortcuts()
         }
@@ -139,18 +141,19 @@ struct WindowSnapInfoView: View {
     
     private var featuresSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Snap windows to halves, quarters, thirds, or full screen with customizable keyboard shortcuts. Multi-monitor support included.")
+            Text("Snap windows to halves, quarters, or thirds with keyboard shortcuts.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.bottom, 8)
             
-            featureRow(icon: "keyboard", text: "Configurable keyboard shortcuts")
-            featureRow(icon: "rectangle.split.2x2", text: "Halves, quarters, and thirds")
-            featureRow(icon: "arrow.up.left.and.arrow.down.right", text: "Maximize and restore")
-            featureRow(icon: "display", text: "Multi-monitor support")
+            VStack(alignment: .leading, spacing: 8) {
+                featureRow(icon: "keyboard", text: "Configurable shortcuts")
+                featureRow(icon: "rectangle.split.2x2", text: "Halves, quarters, thirds")
+                featureRow(icon: "arrow.up.left.and.arrow.down.right", text: "Maximize and restore")
+                featureRow(icon: "display", text: "Multi-monitor support")
+            }
             
-            // Screenshot loaded from web (cached to prevent flashing)
+            // Screenshot
             CachedAsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/images/window-snap-screenshot.png")) { image in
                 image
                     .resizable()
@@ -160,12 +163,10 @@ struct WindowSnapInfoView: View {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(AdaptiveColors.subtleBorderAuto, lineWidth: 1)
                     )
-                    .padding(.top, 8)
             } placeholder: {
                 EmptyView()
             }
         }
-        .padding(.vertical, 20)
     }
     
     private func featureRow(icon: String, text: String) -> some View {
@@ -182,48 +183,40 @@ struct WindowSnapInfoView: View {
     }
     
     private var shortcutSection: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             HStack {
-                Text("Keyboard Shortcuts")
+                Text("Shortcuts")
                     .font(.headline)
                     .foregroundStyle(.primary)
                 
                 Spacer()
                 
-                // Load Defaults button
                 Button {
                     loadDefaults()
                 } label: {
                     Text("Load Defaults")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.cyan)
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(Color.cyan.opacity(isHoveringDefaults ? 0.25 : 0.15))
-                        )
+                        .background(Capsule().fill(Color.cyan.opacity(0.15)))
                 }
                 .buttonStyle(.plain)
-                .onHover { h in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                        isHoveringDefaults = h
-                    }
-                }
             }
-
             
-            // Two-column grid of snap actions
+            // Two-column grid
             LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12)
-            ], spacing: 10) {
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8)
+            ], spacing: 8) {
                 ForEach(SnapAction.allCases.filter { $0 != .restore }) { action in
                     shortcutRow(for: action)
                 }
             }
         }
-        .padding(.vertical, 20)
+        .padding(16)
+        .background(AdaptiveColors.buttonBackgroundAuto.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
     
     private func shortcutRow(for action: SnapAction) -> some View {
@@ -282,70 +275,45 @@ struct WindowSnapInfoView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
     
+    @State private var isHoveringReset = false
+    
     private var buttonSection: some View {
         HStack(spacing: 10) {
             Button {
                 dismiss()
             } label: {
                 Text("Close")
-                    .fontWeight(.medium)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background((isHoveringClose ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(isHoveringClose ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                    isHoveringClose = h
-                }
-            }
-            
-            // Reviews button
-            Button {
-                showReviewsSheet = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "star.bubble")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("Reviews")
-                }
-                .fontWeight(.medium)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background((isHoveringReviews ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto))
-                .foregroundStyle(.secondary)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                    isHoveringReviews = h
-                }
+                withAnimation(.easeInOut(duration: 0.15)) { isHoveringClose = h }
             }
             
             Spacer()
             
-            // Reset Shortcuts button
+            // Reset
             Button {
                 removeDefaults()
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("Reset Shortcuts")
-                }
-                .fontWeight(.medium)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(AdaptiveColors.buttonBackgroundAuto)
-                .foregroundStyle(.secondary)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(8)
+                    .background(isHoveringReset ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
+            .onHover { h in
+                withAnimation(.easeInOut(duration: 0.15)) { isHoveringReset = h }
+            }
+            .help("Reset Shortcuts")
             
-            // Disable/Enable Extension button (always on right)
             DisableExtensionButton(extensionType: .windowSnap)
         }
         .padding(16)

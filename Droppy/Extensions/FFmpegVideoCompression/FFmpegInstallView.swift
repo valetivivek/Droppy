@@ -55,27 +55,36 @@ struct FFmpegInstallView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
+            // Header (fixed)
             headerSection
             
-            // Content - features or install status
-            contentSection
+            Divider()
+                .padding(.horizontal, 24)
             
-            // Error Message
-            if let error = manager.installError {
-                errorSection(error: error)
+            // Scrollable content
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 20) {
+                    contentSection
+                    
+                    if let error = manager.installError {
+                        errorSection(error: error)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
             }
+            .frame(maxHeight: 450)
             
             Divider()
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
             
-            // Action Buttons
+            // Buttons (fixed)
             buttonSection
         }
-        .frame(width: 765) // 50% larger than 510
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 450)
+        .fixedSize(horizontal: true, vertical: true)
         .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
-        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .sheet(isPresented: $showReviewsSheet) {
             ExtensionReviewsSheet(extensionType: .ffmpegVideoCompression)
         }
@@ -251,7 +260,6 @@ struct FFmpegInstallView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 24)
         .padding(.bottom, 20)
     }
     
@@ -295,7 +303,6 @@ struct FFmpegInstallView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 24)
         .padding(.bottom, 20)
     }
     

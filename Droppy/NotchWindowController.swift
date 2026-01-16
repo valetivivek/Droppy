@@ -58,6 +58,9 @@ final class NotchWindowController: NSObject, ObservableObject {
     /// Local monitor for scroll wheel events (over Droppy's window)
     private var localScrollMonitor: Any?
     
+    /// Monitor for right-click events when notch is hidden (to re-show)
+    private var hiddenRightClickMonitor: Any?
+    
     /// Shared instance
     static let shared = NotchWindowController()
     
@@ -188,24 +191,74 @@ final class NotchWindowController: NSObject, ObservableObject {
     }
     
     /// Temporarily hides or shows all notch windows
+    /// Animation is handled by SwiftUI (scale + opacity with spring animation)
     /// - Parameter hidden: true to hide, false to show
     func setTemporarilyHidden(_ hidden: Bool) {
         isTemporarilyHidden = hidden
         
         if hidden {
-            // Hide all windows by setting alpha to 0 and disabling hit testing
+            // Disable hit testing when hidden
             for window in notchWindows.values {
-                window.alphaValue = 0
                 window.ignoresMouseEvents = true
             }
             stopMonitors()
+            startHiddenRightClickMonitor()  // Start listening for right-click to re-show
         } else {
-            // Show all windows
+            stopHiddenRightClickMonitor()  // Stop listening for right-click
+            
+            // Enable hit testing when shown
             for window in notchWindows.values {
-                window.alphaValue = 1
                 window.ignoresMouseEvents = false
             }
             startMonitors()
+        }
+    }
+    
+    /// Starts monitoring for right-click events when the notch is hidden
+    /// Right-click in the notch area will re-show it
+    private func startHiddenRightClickMonitor() {
+        guard hiddenRightClickMonitor == nil else { return }
+        
+        hiddenRightClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
+            guard let self = self, self.isTemporarilyHidden else { return }
+            
+            // Get the click location in screen coordinates
+            let clickLocation = event.locationInWindow
+            
+            // Check if click is in any notch window's original frame area
+            for (displayID, _) in self.notchWindows {
+                guard let screen = NSScreen.screens.first(where: { $0.displayID == displayID }) else { continue }
+                
+                // Get the notch area at the top center of the screen
+                let screenFrame = screen.frame
+                let notchWidth: CGFloat = 450  // Approximate notch/island width
+                let notchHeight: CGFloat = 60  // Approximate notch/island height
+                let notchArea = CGRect(
+                    x: screenFrame.midX - notchWidth / 2,
+                    y: screenFrame.maxY - notchHeight,
+                    width: notchWidth,
+                    height: notchHeight
+                )
+                
+                // Convert click location to screen coordinates (NSEvent uses bottom-left origin)
+                let screenLocation = NSPoint(x: clickLocation.x, y: clickLocation.y)
+                
+                if notchArea.contains(screenLocation) {
+                    // Right-click in notch area - re-show the notch/island
+                    DispatchQueue.main.async {
+                        self.setTemporarilyHidden(false)
+                    }
+                    return
+                }
+            }
+        }
+    }
+    
+    /// Stops the right-click monitor when notch is shown
+    private func stopHiddenRightClickMonitor() {
+        if let monitor = hiddenRightClickMonitor {
+            NSEvent.removeMonitor(monitor)
+            hiddenRightClickMonitor = nil
         }
     }
     
