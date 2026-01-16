@@ -114,9 +114,13 @@ Droppy's built-in Extension Store lets you add powerful features on demand. Ever
 
 <img src="https://iordv.github.io/Droppy/assets/icons/ai-bg.jpg" height="20" style="vertical-align: middle; border-radius: 4px;"> **AI Background Removal** — Remove backgrounds from images locally using machine learning
 
+<img src="https://iordv.github.io/Droppy/assets/icons/video-target-size.png" height="20" style="vertical-align: middle; border-radius: 4px;"> **Video Target Size** — Compress videos to exact file sizes using FFmpeg two-pass encoding
+
 <img src="https://iordv.github.io/Droppy/assets/icons/window-snap.jpg" height="20" style="vertical-align: middle; border-radius: 4px;"> **Window Snap** — Snap windows to screen edges and corners with keyboard shortcuts
 
 <img src="https://iordv.github.io/Droppy/assets/icons/element-capture.jpg" height="20" style="vertical-align: middle; border-radius: 4px;"> **Element Capture** — Screenshot any UI element with customizable shortcuts
+
+<img src="https://iordv.github.io/Droppy/assets/icons/spotify.png" height="20" style="vertical-align: middle; border-radius: 4px;"> **Spotify Integration** — Control Spotify playback directly from your notch
 
 <img src="https://iordv.github.io/Droppy/assets/icons/alfred.jpg" height="20" style="vertical-align: middle; border-radius: 4px;"> **Alfred Workflow** — Add files to Droppy directly from Alfred
 
