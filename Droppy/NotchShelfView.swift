@@ -402,23 +402,8 @@ struct NotchShelfView: View {
                 height: currentNotchHeight + (isDynamicIslandMode && state.isExpanded ? 18 : 0)
             )
             .opacity(shouldShowVisualNotch ? 1.0 : 0.0)
-            // IDLE INDICATOR: Narrow version of Dynamic Island when shelf is not active
-            // Shows users there's something available to interact with at the top of the screen
-            // This is a slim, elegant version of the full island - same width, minimal height
-            .overlay(alignment: .top) {
-                // Show indicator only when shelf is enabled and DI mode is active but currently hidden
-                if isDynamicIslandMode && enableNotchShelf && !shouldShowVisualNotch && !state.isExpanded && !state.isMouseHovering {
-                    // Narrow island shape - same width as regular island, but very thin
-                    DynamicIslandShape(cornerRadius: 8)
-                        .fill(shouldUseDynamicIslandTransparent ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
-                        .frame(width: notchWidth, height: 10)
-                        // Position at top with proper margin
-                        .padding(.top, dynamicIslandTopMargin)
-                        .shadow(color: Color.black.opacity(0.15), radius: 4, y: 1)
-                        .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: shouldShowVisualNotch)
-                }
-            }
+            // Note: Idle indicator removed - island is now completely invisible when idle
+            // Only appears on hover, drag, or when HUDs/media are active
             .overlay(
                 // MORPH: Both outline shapes exist, crossfade for smooth transition
                 ZStack {
