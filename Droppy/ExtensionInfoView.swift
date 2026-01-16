@@ -24,18 +24,25 @@ struct ExtensionInfoView: View {
     
     @State private var isHoveringReviews = false
     
-    // Alfred needs more width for the workflow content
-    private var viewWidth: CGFloat {
-        extensionType == .alfred ? 640 : 510
-    }
-    
     var body: some View {
         VStack(spacing: 0) {
             // Header
             headerSection
             
-            // Features
-            featuresSection
+            Divider()
+                .padding(.horizontal, 20)
+            
+            // Main content: HStack with screenshot left, features right
+            HStack(alignment: .top, spacing: 24) {
+                // Left: Screenshot
+                screenshotSection
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                
+                // Right: Features
+                featuresSection
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .padding(.horizontal, 24)
             
             Divider()
                 .padding(.horizontal, 20)
@@ -43,7 +50,7 @@ struct ExtensionInfoView: View {
             // Buttons
             buttonSection
         }
-        .frame(width: viewWidth)
+        .frame(width: 700)  // Wide horizontal layout
         .fixedSize(horizontal: false, vertical: true)
         .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
         .clipped()
@@ -123,7 +130,30 @@ struct ExtensionInfoView: View {
         }
     }
     
-    // MARK: - Features
+    // MARK: - Screenshot Section (Left)
+    
+    private var screenshotSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Screenshot preview loaded from web (cached to prevent flashing)
+            if let screenshotURL = extensionType.screenshotURL {
+                CachedAsyncImage(url: screenshotURL) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(AdaptiveColors.subtleBorderAuto, lineWidth: 1)
+                        )
+                } placeholder: {
+                    EmptyView() // Silently fail if network unavailable
+                }
+            }
+        }
+        .padding(.vertical, 20)
+    }
+    
+    // MARK: - Features Section (Right)
     
     private var featuresSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -136,26 +166,8 @@ struct ExtensionInfoView: View {
             ForEach(Array(extensionType.features.enumerated()), id: \.offset) { _, feature in
                 featureRow(icon: feature.icon, text: feature.text)
             }
-            
-            // Screenshot preview loaded from web (cached to prevent flashing)
-            if let screenshotURL = extensionType.screenshotURL {
-                CachedAsyncImage(url: screenshotURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .strokeBorder(AdaptiveColors.subtleBorderAuto, lineWidth: 1)
-                        )
-                        .padding(.top, 8)
-                } placeholder: {
-                    EmptyView() // Silently fail if network unavailable
-                }
-            }
         }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 20)
+        .padding(.vertical, 20)
     }
     
     private func featureRow(icon: String, text: String) -> some View {
