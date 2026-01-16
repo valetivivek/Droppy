@@ -1204,7 +1204,8 @@ struct NotchShelfView: View {
                 }
                 .padding(.horizontal, 12)
                 // More top padding in notch mode to clear physical notch
-                .padding(.top, isDynamicIslandMode ? 8 : 32)
+                // Top padding clears physical notch in notch mode (notchHeight + margin)
+                .padding(.top, isDynamicIslandMode ? 8 : notchHeight + 4)
                 .padding(.bottom, 6)
             }
         }
@@ -1386,8 +1387,9 @@ extension NotchShelfView {
                     )
                 )
         )
-        // More top padding in notch mode to clear the physical notch
-        .padding(EdgeInsets(top: isDynamicIslandMode ? 10 : 36, leading: 20, bottom: 20, trailing: 20))
+        // Top padding must clear the physical notch (notchHeight + small margin)
+        // Island mode: minimal padding since there's no physical obstruction
+        .padding(EdgeInsets(top: isDynamicIslandMode ? 10 : notchHeight + 6, leading: 20, bottom: 20, trailing: 20))
         .scaleEffect(state.isDropTargeted ? 1.03 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isDropTargeted)
         .onAppear {
