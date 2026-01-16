@@ -1110,6 +1110,18 @@ struct NotchShelfView: View {
                 Button("Open Clipboard") {
                     ClipboardWindowController.shared.toggle()
                 }
+            }
+            
+            // Clear shelf (when items exist)
+            if !state.items.isEmpty {
+                Button("Clear Shelf") {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        state.clearAll()
+                    }
+                }
+            }
+            
+            if showClipboardButton || !state.items.isEmpty {
                 Divider()
             }
             

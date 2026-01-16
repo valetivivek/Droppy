@@ -38,10 +38,10 @@ struct TargetSizeDialogView: View {
                 
                 Spacer()
             }
-            .padding(20)
+            .padding(16)
             
             Divider()
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
             
             // Content
             VStack(spacing: 16) {
@@ -89,10 +89,10 @@ struct TargetSizeDialogView: View {
                     }
                 }
             }
-            .padding(20)
+            .padding(14)
             
             Divider()
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
             
             // Action buttons
             HStack(spacing: 10) {
@@ -148,7 +148,7 @@ struct TargetSizeDialogView: View {
                 .disabled(targetBytes == nil || targetBytes! >= currentSize)
                 .opacity(targetBytes == nil || targetBytes! >= currentSize ? 0.5 : 1.0)
             }
-            .padding(16)
+            .padding(14)
         }
         .frame(width: 380)
         .fixedSize(horizontal: false, vertical: true)
@@ -289,7 +289,7 @@ class TargetSizeDialogController {
             
             // Use custom CompressPanel that can become key (like BasketPanel)
             let panel = CompressPanel(
-                contentRect: NSRect(x: 0, y: 0, width: 380, height: 280),
+                contentRect: NSRect(x: 0, y: 0, width: 380, height: 240),
                 styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel],
                 backing: .buffered,
                 defer: false
