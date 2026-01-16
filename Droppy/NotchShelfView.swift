@@ -1037,7 +1037,8 @@ struct NotchShelfView: View {
                     .padding(.trailing, 8)
                 }
                 
-                // Clear button OR Settings button (when empty)
+                // Clear button (only when items exist)
+                // Settings removed - use right-click context menu instead
                 if !state.items.isEmpty {
                     NotchControlButton(icon: "eraser.fill") {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -1045,14 +1046,6 @@ struct NotchShelfView: View {
                             state.isExpanded = false
                             state.isMouseHovering = false // Reset to hide indicator
                         }
-                    }
-                    .padding(.trailing, 16)
-                } else {
-                    NotchControlButton(icon: "gearshape") {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            state.isExpanded = false
-                        }
-                        SettingsWindowController.shared.showSettings()
                     }
                     .padding(.trailing, 16)
                 }
