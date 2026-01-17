@@ -164,9 +164,9 @@ struct MediaHUDView: View {
                         
                         Spacer()
                         
-                        // Visualizer - scaled to match other HUD elements
-                        AudioSpectrumView(isPlaying: musicManager.isPlaying, barCount: 3, barWidth: 2.5, spacing: 2, height: 14, color: visualizerColor)
-                            .frame(width: 3 * 2.5 + 2 * 2, height: 14)
+                        // Visualizer - harmonized to match icon size (18px for DI mode)
+                        AudioSpectrumView(isPlaying: musicManager.isPlaying, barCount: 3, barWidth: 2.5, spacing: 2, height: 18, color: visualizerColor)
+                            .frame(width: 3 * 2.5 + 2 * 2, height: 18)
                     }
                     .padding(.horizontal, symmetricPadding)  // Same as vertical for symmetry
                 }
@@ -186,7 +186,7 @@ struct MediaHUDView: View {
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
                             } else {
-                                RoundedRectangle(cornerRadius: 14)
+                                RoundedRectangle(cornerRadius: 5)  // ~25% of size for Apple-style rounded corners
                                     .fill(Color.white.opacity(0.2))
                                     .overlay(
                                         Image(systemName: "music.note")
@@ -196,7 +196,7 @@ struct MediaHUDView: View {
                             }
                         }
                         .frame(width: iconSize, height: iconSize)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .clipShape(RoundedRectangle(cornerRadius: 5))  // ~25% of size for Apple-style rounded corners
                         Spacer(minLength: 0)
                     }
                     .padding(.leading, symmetricPadding)
