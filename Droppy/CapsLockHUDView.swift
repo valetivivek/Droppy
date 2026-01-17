@@ -66,23 +66,28 @@ struct CapsLockHUDView: View {
         VStack(alignment: .center, spacing: 0) {
             if isDynamicIslandMode {
                 // DYNAMIC ISLAND: Icon on left edge, On/Off on right edge
+                // Using BoringNotch pattern: padding = (notchHeight - iconHeight) / 2 for symmetry
+                let iconSize: CGFloat = 18
+                let symmetricPadding = (notchHeight - iconSize) / 2
+                
                 HStack {
-                    // Caps Lock icon (left edge)
+                    // Caps Lock icon - .leading alignment within frame
                     Image(systemName: capsLockIcon)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: iconSize, weight: .semibold))
                         .foregroundStyle(dynamicIslandColor)
                         .symbolEffect(.bounce.up, value: capsLockManager.isCapsLockOn)
                         .contentTransition(.symbolEffect(.replace.byLayer.downUp))
+                        .frame(width: 20, height: iconSize, alignment: .leading)
                     
                     Spacer()
                     
-                    // On/Off text (right edge)
+                    // On/Off text
                     Text(capsLockManager.isCapsLockOn ? "On" : "Off")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(dynamicIslandColor)
                         .contentTransition(.interpolate)
                 }
-                .padding(.horizontal, 10)  // Match vertical spacing for symmetry
+                .padding(.horizontal, symmetricPadding)  // Same as vertical for symmetry
                 .frame(height: notchHeight)
             } else {
                 // NOTCH MODE: Two wings separated by the notch space

@@ -111,7 +111,11 @@ struct AirPodsHUDView: View {
     // MARK: - Dynamic Island Layout
     
     private var dynamicIslandContent: some View {
-        ZStack {
+        // Using BoringNotch pattern: padding = (notchHeight - iconHeight) / 2 for symmetry
+        let iconSize: CGFloat = 18
+        let symmetricPadding = (notchHeight - iconSize) / 2
+        
+        return ZStack {
             // Device name - centered
             VStack {
                 Spacer(minLength: 0)
@@ -127,11 +131,11 @@ struct AirPodsHUDView: View {
             
             // Icon (left edge) and Battery ring (right edge)
             HStack {
-                airPodsIconView(size: 18)
+                airPodsIconView(size: iconSize)
                 Spacer()
                 batteryRingView(size: 20)
             }
-            .padding(.horizontal, 10)  // Match vertical spacing for symmetry
+            .padding(.horizontal, symmetricPadding)  // Same as vertical for symmetry
         }
         .frame(height: notchHeight)
     }

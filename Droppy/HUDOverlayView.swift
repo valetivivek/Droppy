@@ -58,13 +58,18 @@ struct NotchHUDView: View {
         VStack(alignment: .center, spacing: 0) {
             if isDynamicIslandMode {
                 // DYNAMIC ISLAND: Wide horizontal layout - icon + label on left, slider on right
+                // Using BoringNotch pattern: padding = (notchHeight - iconHeight) / 2 for symmetry
+                let iconSize: CGFloat = 18
+                let symmetricPadding = (notchHeight - iconSize) / 2
+                
                 HStack(spacing: 0) {
                     // Left side: Icon + Label
                     HStack(spacing: 10) {
                         Image(systemName: hudType.icon(for: value))
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: iconSize, weight: .semibold))
                             .foregroundStyle(isMuted ? .red : (hudType == .brightness ? .yellow : .white))
                             .contentTransition(.symbolEffect(.replace.byLayer))
+                            .frame(width: 20, height: iconSize, alignment: .leading)
                         
                         Text(hudType == .brightness ? "Brightness" : "Volume")
                             .font(.system(size: 14, weight: .semibold))
@@ -85,7 +90,7 @@ struct NotchHUDView: View {
                     .frame(width: 100)
                     .frame(height: 16)
                 }
-                .padding(.horizontal, 10)  // Match vertical spacing for symmetry
+                .padding(.horizontal, symmetricPadding)  // Same as vertical for symmetry
                 .frame(height: notchHeight)
             } else {
                 // NOTCH MODE: Wide layout - icon + label on left wing, slider on right wing

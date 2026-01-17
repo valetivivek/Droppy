@@ -125,7 +125,10 @@ struct MediaHUDView: View {
             // Main HUD layout differs for Dynamic Island vs Notch mode
             if isDynamicIslandMode {
                 // DYNAMIC ISLAND: Album on left, Visualizer on right, Title centered
-                // Standardized sizing: 20px elements, 13pt text, 14px horizontal padding
+                // Using BoringNotch pattern: padding = (notchHeight - iconHeight) / 2 for symmetry
+                let iconSize: CGFloat = 20
+                let symmetricPadding = (notchHeight - iconSize) / 2
+                
                 ZStack {
                     // Title - truly centered in the island (both horizontally and vertically)
                     VStack {
@@ -156,7 +159,7 @@ struct MediaHUDView: View {
                                     )
                             }
                         }
-                        .frame(width: 20, height: 20)
+                        .frame(width: iconSize, height: iconSize)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         
                         Spacer()
@@ -165,7 +168,7 @@ struct MediaHUDView: View {
                         AudioSpectrumView(isPlaying: musicManager.isPlaying, barCount: 3, barWidth: 2.5, spacing: 2, height: 14, color: visualizerColor)
                             .frame(width: 3 * 2.5 + 2 * 2, height: 14)
                     }
-                    .padding(.horizontal, 10)  // Match vertical spacing for symmetry
+                    .padding(.horizontal, symmetricPadding)  // Same as vertical for symmetry
                 }
                 .frame(height: notchHeight)
             } else {

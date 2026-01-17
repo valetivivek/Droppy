@@ -73,25 +73,29 @@ struct BatteryHUDView: View {
         VStack(alignment: .center, spacing: 0) {
             if isDynamicIslandMode {
                 // DYNAMIC ISLAND: Icon on left edge, percentage on right edge
-                // Vertical spacing = (37 - ~18pt icon) / 2 ≈ 9.5px, so horizontal should match
+                // Using BoringNotch pattern: padding = (notchHeight - iconHeight) / 2 for symmetry
+                let iconSize: CGFloat = 18
+                let symmetricPadding = (notchHeight - iconSize) / 2
+                
                 HStack {
-                    // Battery icon (left edge) - font size controls actual size
+                    // Battery icon - .leading alignment within frame for edge alignment
                     Image(systemName: batteryIcon)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: iconSize, weight: .semibold))
                         .foregroundStyle(accentColor)
                         .symbolEffect(.bounce, value: batteryManager.isCharging)
                         .contentTransition(.symbolEffect(.replace.byLayer))
+                        .frame(width: 20, height: iconSize, alignment: .leading)
                     
                     Spacer()
                     
-                    // Percentage (right edge)
+                    // Percentage
                     Text("\(batteryManager.batteryLevel)%")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(accentColor)
                         .monospacedDigit()
                         .contentTransition(.numericText(value: Double(batteryManager.batteryLevel)))
                 }
-                .padding(.horizontal, 10)  // ~10px to match vertical spacing
+                .padding(.horizontal, symmetricPadding)  // Same as vertical for symmetry
                 .frame(height: notchHeight)
             } else {
                 // NOTCH MODE: Two wings separated by the notch space
