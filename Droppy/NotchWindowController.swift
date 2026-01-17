@@ -1354,14 +1354,20 @@ class NotchWindow: NSPanel {
             }
         }
         
+        // CRITICAL FIX (v8.1.x): When shelf is DISABLED, the window should NOT block
+        // for shelf-related interactions (hover, expand, drag-to-drop on notch).
+        // User only wants floating basket, not the notch/island UI blocking their screen.
+        // HUDs are handled separately and render passively without needing click interaction.
+        let enableNotchShelf = UserDefaults.standard.bool(forKey: "enableNotchShelf")
+        
         // Window should accept mouse events when:
-        // - Shelf is expanded (need to interact with items)
-        // - User is hovering over notch (need click to open)
-        // - Drop is actively targeted on the notch
-        // - User is dragging files AND they are OVER a valid drop zone
-        // CRITICAL: We now check isDragOverValidZone instead of just isDraggingFiles!
-        // This ensures drags below the notch pass through to other apps.
-        let shouldAcceptEvents = isExpanded || isHovering || isDropTargeted || isDragOverValidZone
+        // - Shelf is expanded AND shelf is enabled (need to interact with items)
+        // - User is hovering over notch AND shelf is enabled (need click to open)
+        // - Drop is actively targeted on the notch AND shelf is enabled
+        // - User is dragging files AND they are OVER a valid drop zone AND shelf is enabled
+        // When shelf is disabled, the window passes through ALL mouse events.
+        // HUDs are display-only and don't require mouse hit detection.
+        let shouldAcceptEvents = enableNotchShelf && (isExpanded || isHovering || isDropTargeted || isDragOverValidZone)
         
         // Only update if the value actually needs to change
         if self.ignoresMouseEvents == shouldAcceptEvents {
