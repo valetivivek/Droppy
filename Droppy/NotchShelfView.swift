@@ -535,7 +535,7 @@ struct NotchShelfView: View {
                             }
                         }
                     )
-                    .frame(width: volumeHudWidth, height: isDynamicIslandMode ? notchHeight : hudHeight)
+                    .frame(width: volumeHudWidth, height: notchHeight)  // Only expand HORIZONTALLY, never taller
                     // Match media player transition - scale with notch
                     .transition(.scale(scale: 0.8).combined(with: .opacity).animation(.spring(response: 0.25, dampingFraction: 0.8)))
                     .zIndex(3)

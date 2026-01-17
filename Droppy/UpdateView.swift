@@ -55,7 +55,9 @@ struct UpdateView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 4) {
                         if let notes = checker.releaseNotes {
-                            ForEach(Array(notes.components(separatedBy: .newlines).enumerated()), id: \.offset) { _, line in
+                            // Helper to strip HTML tags (img, etc.) that markdown can't render
+                            let cleanedNotes = notes.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+                            ForEach(Array(cleanedNotes.components(separatedBy: .newlines).enumerated()), id: \.offset) { _, line in
                                 if !line.trimmingCharacters(in: .whitespaces).isEmpty {
                                     if let attributed = try? AttributedString(markdown: line) {
                                         Text(attributed)
