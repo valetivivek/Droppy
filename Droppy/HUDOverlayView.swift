@@ -66,7 +66,7 @@ struct NotchHUDView: View {
                             .foregroundStyle(isMuted ? .red : (hudType == .brightness ? .yellow : .white))
                             .contentTransition(.symbolEffect(.replace.byLayer))
                             .symbolEffect(.bounce, value: value)
-                            .frame(width: 20, height: 20)  // Standardized with other HUDs
+                            .frame(width: 22, height: 22, alignment: .center)
                         
                         Text(hudType == .brightness ? "Brightness" : "Volume")
                             .font(.system(size: 14, weight: .semibold))
@@ -99,7 +99,7 @@ struct NotchHUDView: View {
                             .foregroundStyle(isMuted ? .red : (hudType == .brightness ? .yellow : .white))
                             .contentTransition(.symbolEffect(.replace.byLayer))
                             .symbolEffect(.bounce, value: value)
-                            .frame(width: 26, height: 26)  // Standardized with other HUDs
+                            .frame(width: 26, height: 26, alignment: .center)
                         
                         Text(hudType == .brightness ? "Brightness" : "Volume")
                             .font(.system(size: 15, weight: .semibold))
