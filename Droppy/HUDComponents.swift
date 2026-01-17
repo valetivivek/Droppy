@@ -150,7 +150,7 @@ struct MediaHUDView: View {
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
                             } else {
-                                RoundedRectangle(cornerRadius: 4)
+                            RoundedRectangle(cornerRadius: iconSize / 2)  // Circular to match pill-shaped DI edges
                                     .fill(Color.white.opacity(0.2))
                                     .overlay(
                                         Image(systemName: "music.note")
@@ -160,7 +160,7 @@ struct MediaHUDView: View {
                             }
                         }
                         .frame(width: iconSize, height: iconSize)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .clipShape(RoundedRectangle(cornerRadius: iconSize / 2))  // Circular to match pill-shaped DI edges
                         
                         Spacer()
                         
