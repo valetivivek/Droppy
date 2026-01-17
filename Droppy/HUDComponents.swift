@@ -261,11 +261,11 @@ struct MiniAudioVisualizerBars: View {
             barCount: 5,
             barWidth: 3,
             spacing: 2,
-            height: 18,
+            height: 20,  // Match 20px icon standard
             color: color,
             audioLevel: audioAnalyzer.audioLevel
         )
-        .frame(width: 5 * 3 + 4 * 2, height: 18)
+        .frame(width: 5 * 3 + 4 * 2, height: 20)  // Match 20px icon standard
         .onAppear { audioAnalyzer.startObserving() }
         .onDisappear { audioAnalyzer.stopObserving() }
     }

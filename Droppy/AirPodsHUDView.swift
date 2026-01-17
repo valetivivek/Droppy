@@ -187,7 +187,7 @@ struct AirPodsHUDView: View {
                 anchorZ: 0,
                 perspective: 0.3
             )
-            .frame(width: size + 8, height: size + 8)
+            .frame(width: size, height: size)  // Match icon size exactly
             // Scale and opacity entrance
             .scaleEffect(iconScale)
             .opacity(iconOpacity)
