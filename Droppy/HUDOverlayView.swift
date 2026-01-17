@@ -69,7 +69,7 @@ struct NotchHUDView: View {
                             .font(.system(size: iconSize, weight: .semibold))
                             .foregroundStyle(isMuted ? .red : (hudType == .brightness ? .yellow : .white))
                             .contentTransition(.symbolEffect(.replace.byLayer))
-                            .frame(width: 20, height: iconSize, alignment: .leading)
+                            .frame(width: 28, height: iconSize, alignment: .leading)  // Wider for speaker.wave icons
                         
                         Text(hudType == .brightness ? "Brightness" : "Volume")
                             .font(.system(size: 14, weight: .semibold))
@@ -105,7 +105,7 @@ struct NotchHUDView: View {
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(isMuted ? .red : (hudType == .brightness ? .yellow : .white))
                             .contentTransition(.symbolEffect(.replace.byLayer))
-                            .frame(width: iconSize, height: iconSize, alignment: .leading)
+                            .frame(width: 30, height: iconSize, alignment: .leading)  // Wider for speaker.wave icons
                         
                         Text(hudType == .brightness ? "Brightness" : "Volume")
                             .font(.system(size: 15, weight: .semibold))
