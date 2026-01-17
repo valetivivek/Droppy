@@ -17,7 +17,7 @@ struct InlineHUDView: View {
                 .foregroundStyle(type.accentColor)
                 .frame(width: 32, alignment: .trailing) // Same width as text for symmetry
                 .contentTransition(.symbolEffect(.replace))
-                .animation(.spring(response: 0.25, dampingFraction: 0.7), value: type.icon(for: value))
+                .animation(.spring(response: 0.25, dampingFraction: 0.8), value: type.icon(for: value))
             
             // Slider (visual only) - matches HUDSlider style
             if type.showsSlider {
@@ -43,7 +43,7 @@ struct InlineHUDView: View {
                     }
                     .frame(height: trackHeight)
                     .frame(maxHeight: .infinity, alignment: .center)
-                    .animation(.spring(response: 0.15, dampingFraction: 0.8), value: value)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.8), value: value)
                 }
                 .frame(height: 28)
             }

@@ -456,13 +456,10 @@ struct MediaPlayerView: View {
             // MARK: - Universal Inline HUD (morphs in for any HUD type)
             if let hudType = inlineHUDType {
                 InlineHUDView(type: hudType, value: inlineHUDValue)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.85).combined(with: .opacity),
-                        removal: .scale(scale: 0.9).combined(with: .opacity)
-                    ))
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
         }
-        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: inlineHUDType != nil)
+        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: inlineHUDType != nil)
         .allowsHitTesting(true)
     }
 }
