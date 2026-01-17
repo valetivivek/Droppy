@@ -62,10 +62,9 @@ struct NotchHUDView: View {
                     // Left side: Icon + Label
                     HStack(spacing: 10) {
                         Image(systemName: hudType.icon(for: value))
-                            .font(.system(size: 18, weight: .semibold))  // Standardized with other HUDs
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(isMuted ? .red : (hudType == .brightness ? .yellow : .white))
                             .contentTransition(.symbolEffect(.replace.byLayer))
-                            .symbolEffect(.bounce, value: value)
                             .frame(width: 22, height: 22, alignment: .center)
                         
                         Text(hudType == .brightness ? "Brightness" : "Volume")
@@ -98,7 +97,6 @@ struct NotchHUDView: View {
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(isMuted ? .red : (hudType == .brightness ? .yellow : .white))
                             .contentTransition(.symbolEffect(.replace.byLayer))
-                            .symbolEffect(.bounce, value: value)
                             .frame(width: 26, height: 26, alignment: .center)
                         
                         Text(hudType == .brightness ? "Brightness" : "Volume")
@@ -131,7 +129,7 @@ struct NotchHUDView: View {
                 .frame(height: notchHeight)
             }
         }
-        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: value)
+        // Only animate hudType changes, NOT value changes (value animation handled by slider)
         .animation(.spring(response: 0.25, dampingFraction: 0.8), value: hudType)
     }
 }

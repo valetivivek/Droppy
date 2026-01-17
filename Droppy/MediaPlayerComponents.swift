@@ -30,9 +30,8 @@ struct InlineHUDView: View {
                         .symbolEffect(.bounce, value: value)
                         .contentTransition(.symbolEffect(.replace.byLayer))
                 case .volume, .brightness:
-                    // Value-based: bounce on value change (same as Volume/Brightness HUD)
+                    // No bounce - just smooth icon transition (bounce on slider causes jitter)
                     Image(systemName: type.icon(for: value))
-                        .symbolEffect(.bounce, value: value)
                         .contentTransition(.symbolEffect(.replace.byLayer))
                 }
             }
