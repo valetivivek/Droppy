@@ -79,10 +79,9 @@ struct BatteryHUDView: View {
                     Image(systemName: batteryIcon)
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(accentColor)
-                        .symbolEffect(.bounce, value: batteryManager.isCharging)
+                        .symbolEffect(.variableColor.iterative, options: .repeating, isActive: batteryManager.isCharging)
                         .contentTransition(.symbolEffect(.replace.byLayer))
-                        .symbolVariant(.fill)
-                        .frame(width: 20, height: 20)
+                        .frame(width: 22, height: 20)
                     
                     // Percentage
                     Text("\(batteryManager.batteryLevel)%")
@@ -100,12 +99,11 @@ struct BatteryHUDView: View {
                     // Left wing: Battery icon near left edge
                     HStack {
                         Image(systemName: batteryIcon)
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(accentColor)
-                            .symbolEffect(.bounce, value: batteryManager.isCharging)
+                            .symbolEffect(.variableColor.iterative, options: .repeating, isActive: batteryManager.isCharging)
                             .contentTransition(.symbolEffect(.replace.byLayer))
-                            .symbolVariant(.fill)
-                            .frame(width: 26, height: 26)
+                            .frame(width: 28, height: 26)
                         Spacer(minLength: 0)
                     }
                     .padding(.leading, 8)  // Balanced with vertical padding

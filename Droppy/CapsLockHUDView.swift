@@ -73,9 +73,8 @@ struct CapsLockHUDView: View {
                     Image(systemName: capsLockIcon)
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(dynamicIslandColor)
-                        .symbolEffect(.bounce, value: capsLockManager.isCapsLockOn)
-                        .contentTransition(.symbolEffect(.replace.byLayer))
-                        .symbolVariant(.fill)
+                        .symbolEffect(.bounce.up, value: capsLockManager.isCapsLockOn)
+                        .contentTransition(.symbolEffect(.replace.byLayer.downUp))
                         .frame(width: 20, height: 20)
                     
                     // On/Off text - title case
@@ -94,11 +93,10 @@ struct CapsLockHUDView: View {
                     // Left wing: Caps Lock icon near left edge
                     HStack {
                         Image(systemName: capsLockIcon)
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(accentColor)
-                            .symbolEffect(.bounce, value: capsLockManager.isCapsLockOn)
-                            .contentTransition(.symbolEffect(.replace.byLayer))
-                            .symbolVariant(.fill)
+                            .symbolEffect(.bounce.up, value: capsLockManager.isCapsLockOn)
+                            .contentTransition(.symbolEffect(.replace.byLayer.downUp))
                             .frame(width: 26, height: 26)
                         Spacer(minLength: 0)
                     }

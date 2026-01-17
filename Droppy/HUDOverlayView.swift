@@ -60,22 +60,22 @@ struct NotchHUDView: View {
                 // DYNAMIC ISLAND: Wide horizontal layout - icon + label on left, slider on right
                 HStack(spacing: 0) {
                     // Left side: Icon + Label
-                    HStack(spacing: 8) {
+                    HStack(spacing: 10) {
                         Image(systemName: hudType.icon(for: value))
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(isMuted ? .red : (hudType == .brightness ? .yellow : .white))
                             .contentTransition(.symbolEffect(.replace.byLayer))
-                            .symbolEffect(.bounce, value: hudType)
-                            .symbolVariant(.fill)
-                            .frame(width: 20, height: 20)
+                            .symbolEffect(.variableColor.iterative, options: .repeating, isActive: isActive)
+                            .frame(width: 24, height: 24)
                         
                         Text(hudType == .brightness ? "Brightness" : "Volume")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .fixedSize()
                     }
-                    .frame(width: 110, alignment: .leading)
                     
-                    Spacer(minLength: 16)
+                    Spacer(minLength: 20)
                     
                     // Right side: Slider
                     HUDSlider(
@@ -84,31 +84,32 @@ struct NotchHUDView: View {
                         isActive: isActive,
                         onChange: onValueChange
                     )
-                    .frame(maxWidth: .infinity)
+                    .frame(width: 100)
                     .frame(height: 16)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 18)
                 .frame(height: notchHeight)
             } else {
                 // NOTCH MODE: Wide layout - icon + label on left wing, slider on right wing
                 HStack(spacing: 0) {
                     // Left wing: Icon + Label
-                    HStack(spacing: 8) {
+                    HStack(spacing: 10) {
                         Image(systemName: hudType.icon(for: value))
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(isMuted ? .red : (hudType == .brightness ? .yellow : .white))
                             .contentTransition(.symbolEffect(.replace.byLayer))
-                            .symbolEffect(.bounce, value: hudType)
-                            .symbolVariant(.fill)
-                            .frame(width: 26, height: 26)
+                            .symbolEffect(.variableColor.iterative, options: .repeating, isActive: isActive)
+                            .frame(width: 24, height: 24)
                         
                         Text(hudType == .brightness ? "Brightness" : "Volume")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .fixedSize()
                         
                         Spacer(minLength: 0)
                     }
-                    .padding(.leading, 12)
+                    .padding(.leading, 14)
                     .frame(width: wingWidth)
                     
                     // Camera notch area (spacer)
@@ -123,10 +124,8 @@ struct NotchHUDView: View {
                             isActive: isActive,
                             onChange: onValueChange
                         )
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 16)
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 14)
                     .frame(width: wingWidth)
                 }
                 .frame(height: notchHeight)
