@@ -73,14 +73,14 @@ struct BatteryHUDView: View {
         VStack(alignment: .center, spacing: 0) {
             if isDynamicIslandMode {
                 // DYNAMIC ISLAND: Icon on left edge, percentage on right edge
+                // Vertical spacing = (37 - ~18pt icon) / 2 ≈ 9.5px, so horizontal should match
                 HStack {
-                    // Battery icon (left edge)
+                    // Battery icon (left edge) - font size controls actual size
                     Image(systemName: batteryIcon)
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(accentColor)
                         .symbolEffect(.bounce, value: batteryManager.isCharging)
                         .contentTransition(.symbolEffect(.replace.byLayer))
-                        .frame(width: 22, height: 22)
                     
                     Spacer()
                     
@@ -91,7 +91,7 @@ struct BatteryHUDView: View {
                         .monospacedDigit()
                         .contentTransition(.numericText(value: Double(batteryManager.batteryLevel)))
                 }
-                .padding(.horizontal, 8)  // Match vertical spacing for symmetry
+                .padding(.horizontal, 10)  // ~10px to match vertical spacing
                 .frame(height: notchHeight)
             } else {
                 // NOTCH MODE: Two wings separated by the notch space

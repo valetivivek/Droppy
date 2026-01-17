@@ -131,7 +131,7 @@ struct AirPodsHUDView: View {
                 Spacer()
                 batteryRingView(size: 20)
             }
-            .padding(.horizontal, 8)  // Match vertical spacing for symmetry
+            .padding(.horizontal, 10)  // Match vertical spacing for symmetry
         }
         .frame(height: notchHeight)
     }

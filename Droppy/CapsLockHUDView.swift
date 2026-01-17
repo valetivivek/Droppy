@@ -73,7 +73,6 @@ struct CapsLockHUDView: View {
                         .foregroundStyle(dynamicIslandColor)
                         .symbolEffect(.bounce.up, value: capsLockManager.isCapsLockOn)
                         .contentTransition(.symbolEffect(.replace.byLayer.downUp))
-                        .frame(width: 22, height: 22)
                     
                     Spacer()
                     
@@ -83,7 +82,7 @@ struct CapsLockHUDView: View {
                         .foregroundStyle(dynamicIslandColor)
                         .contentTransition(.interpolate)
                 }
-                .padding(.horizontal, 8)  // Match vertical spacing for symmetry
+                .padding(.horizontal, 10)  // Match vertical spacing for symmetry
                 .frame(height: notchHeight)
             } else {
                 // NOTCH MODE: Two wings separated by the notch space

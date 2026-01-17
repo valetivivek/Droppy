@@ -65,7 +65,6 @@ struct NotchHUDView: View {
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(isMuted ? .red : (hudType == .brightness ? .yellow : .white))
                             .contentTransition(.symbolEffect(.replace.byLayer))
-                            .frame(width: 22, height: 22, alignment: .center)
                         
                         Text(hudType == .brightness ? "Brightness" : "Volume")
                             .font(.system(size: 14, weight: .semibold))
@@ -86,7 +85,7 @@ struct NotchHUDView: View {
                     .frame(width: 100)
                     .frame(height: 16)
                 }
-                .padding(.horizontal, 8)  // Match vertical spacing for symmetry
+                .padding(.horizontal, 10)  // Match vertical spacing for symmetry
                 .frame(height: notchHeight)
             } else {
                 // NOTCH MODE: Wide layout - icon + label on left wing, slider on right wing
