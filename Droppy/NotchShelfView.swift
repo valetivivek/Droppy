@@ -624,8 +624,8 @@ struct NotchShelfView: View {
                 // Hide when battery/caps lock/airpods HUD is visible (they take priority briefly)
                 // Debounce check only applies when setting is enabled
                 // Note: shouldShowMediaHUD already handles forced mode, but inline check is needed for view visibility
-                let shouldShowForced = musicManager.isMediaHUDForced && !musicManager.isPlayerIdle && showMediaPlayer && !hudIsVisible && !batteryHUDIsVisible && !capsLockHUDIsVisible && !airPodsHUDIsVisible && !lockScreenHUDIsVisible && !isExpandedOnThisScreen
-                let shouldShowNormal = showMediaPlayer && musicManager.isPlaying && !musicManager.songTitle.isEmpty && !hudIsVisible && !batteryHUDIsVisible && !capsLockHUDIsVisible && !airPodsHUDIsVisible && !lockScreenHUDIsVisible && !isExpandedOnThisScreen && !(autoFadeMediaHUD && mediaHUDFadedOut) && !isSongTransitioning && (!debounceMediaChanges || isMediaStable)
+                let shouldShowForced = musicManager.isMediaHUDForced && !musicManager.isPlayerIdle && showMediaPlayer && !hudIsVisible && !batteryHUDIsVisible && !capsLockHUDIsVisible && !dndHUDIsVisible && !airPodsHUDIsVisible && !lockScreenHUDIsVisible && !isExpandedOnThisScreen
+                let shouldShowNormal = showMediaPlayer && musicManager.isPlaying && !musicManager.songTitle.isEmpty && !hudIsVisible && !batteryHUDIsVisible && !capsLockHUDIsVisible && !dndHUDIsVisible && !airPodsHUDIsVisible && !lockScreenHUDIsVisible && !isExpandedOnThisScreen && !(autoFadeMediaHUD && mediaHUDFadedOut) && !isSongTransitioning && (!debounceMediaChanges || isMediaStable)
                 if shouldShowForced || shouldShowNormal {
                     MediaHUDView(musicManager: musicManager, isHovered: $mediaHUDIsHovered, notchWidth: notchWidth, notchHeight: notchHeight, hudWidth: hudWidth, targetScreen: targetScreen)
                         .frame(width: hudWidth, alignment: .top)
