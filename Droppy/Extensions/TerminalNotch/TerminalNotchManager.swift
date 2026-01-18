@@ -40,6 +40,9 @@ class TerminalNotchManager: ObservableObject {
     /// Pulse animation trigger (set briefly on command execution)
     @Published var showPulse: Bool = false
     
+    /// Pulse position for sweeping animation (0 to 1)
+    @Published var pulsePosition: CGFloat = 0
+    
     /// Whether any command has been executed in this terminal session
     @Published var hasExecutedCommand: Bool = false
     
@@ -126,13 +129,19 @@ class TerminalNotchManager: ObservableObject {
         hasExecutedCommand = true
         lastOutput = ""
         
-        // Trigger pulse animation
-        withAnimation(.easeOut(duration: 0.3)) {
-            showPulse = true
+        // Trigger sweeping pulse animation
+        showPulse = true
+        pulsePosition = 0
+        
+        // Animate position from 0 to past 1 (so the pulse sweeps completely across)
+        withAnimation(.easeInOut(duration: 0.6)) {
+            pulsePosition = 1.15
         }
-        // Auto-reset pulse after animation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+        
+        // Hide pulse after animation completes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
             self.showPulse = false
+            self.pulsePosition = 0
         }
         
         Task {

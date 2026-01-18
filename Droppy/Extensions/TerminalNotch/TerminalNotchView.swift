@@ -30,13 +30,21 @@ struct TerminalNotchView: View {
                 }
             }
             
-            // Green edge pulse on command execution
+            // Sweeping green pulse on command execution (left to right)
             if manager.showPulse {
+                // Sweeping trim animation
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.green, lineWidth: 2)
-                    .opacity(manager.showPulse ? 0.8 : 0)
-                    .blur(radius: 4)
-                    .animation(.easeOut(duration: 0.4), value: manager.showPulse)
+                    .trim(from: max(0, manager.pulsePosition - 0.15), to: min(1, manager.pulsePosition))
+                    .stroke(
+                        LinearGradient(
+                            colors: [.clear, .green, .green, .clear],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                    )
+                    .blur(radius: 2)
+                    .animation(.easeInOut(duration: 0.5), value: manager.pulsePosition)
             }
         }
         // No external styling - terminal lives inside shelf's content area
@@ -69,7 +77,7 @@ struct TerminalNotchView: View {
                     .font(.system(size: 24, weight: .light))
                     .foregroundStyle(.green.opacity(0.6))
                 
-                // Command input row
+                // Command input row with fixed frame to prevent shift
                 HStack(spacing: 8) {
                     Text("$")
                         .font(.system(size: 16, weight: .bold, design: .monospaced))
@@ -92,9 +100,14 @@ struct TerminalNotchView: View {
                             return .handled
                         }
                     
+                    // Placeholder for running indicator to prevent shift
                     if manager.isRunning {
                         ProgressView()
                             .scaleEffect(0.6)
+                            .frame(width: 16, height: 16)
+                    } else {
+                        // Invisible spacer to keep layout stable
+                        Color.clear
                             .frame(width: 16, height: 16)
                     }
                 }
@@ -104,10 +117,17 @@ struct TerminalNotchView: View {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.white.opacity(0.05))
                 )
+                .fixedSize(horizontal: false, vertical: true) // Prevent height changes
             }
             .padding(24)
         }
-        .padding(16)
+        // CRITICAL: Use same padding as MediaPlayerView for proper notch clearance
+        .padding(EdgeInsets(
+            top: notchHeight > 0 ? notchHeight + 6 : 20,
+            leading: 16,
+            bottom: 16,
+            trailing: 16
+        ))
     }
     
     // MARK: - Quick Command View
