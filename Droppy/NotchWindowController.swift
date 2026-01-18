@@ -115,9 +115,10 @@ final class NotchWindowController: NSObject, ObservableObject {
     private func createWindowForScreen(_ screen: NSScreen) {
         let displayID = screen.displayID
         
-        // Window needs to be wide enough for expanded shelf and tall enough for glow + shelf
+        // Window needs to be wide enough for expanded shelf and tall enough for glow + shelf + floating buttons
         let windowWidth: CGFloat = 500
-        let windowHeight: CGFloat = 200
+        // CRITICAL: Height must accommodate expanded terminal (up to 270) + floating buttons (46) + margin
+        let windowHeight: CGFloat = 350
 
         // Position at top center of screen (aligned with notch) using global coordinates
         let xPosition = screen.frame.origin.x + (screen.frame.width - windowWidth) / 2
