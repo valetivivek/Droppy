@@ -1140,6 +1140,8 @@ struct NotchShelfView: View {
                                 pomodoroManager.start()
                                 isRevealingPomodoro = false
                                 pomodoroRevealOffset = 0
+                                // CRITICAL: Collapse shelf so the HUD can show
+                                state.expandedDisplayID = nil
                             }
                             
                             // Haptic feedback (if available)
