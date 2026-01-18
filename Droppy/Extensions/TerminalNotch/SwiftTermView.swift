@@ -56,35 +56,38 @@ struct SwiftTermView: NSViewRepresentable {
     }
     
     private func startShell(in terminalView: LocalProcessTerminalView) {
-        // Get shell path
-        let shell = shellPath.isEmpty ? "/bin/zsh" : shellPath
+        // Get shell path (use user's configured shell or default to zsh)
+        let shell = shellPath.isEmpty ? getDefaultShell() : shellPath
         
-        // Extract shell name from path (e.g., "zsh" from "/bin/zsh")
+        // Extract shell name and create login shell idiom (e.g., "-zsh")
         let shellName = (shell as NSString).lastPathComponent
+        let shellIdiom = "-" + shellName
         
-        // For login shell, the execName should be prefixed with "-" (e.g., "-zsh")
-        let loginShellName = "-" + shellName
-        
-        // Get environment variables
-        var env = ProcessInfo.processInfo.environment
-        env["TERM"] = "xterm-256color"
-        env["COLORTERM"] = "truecolor"
-        env["LANG"] = "en_US.UTF-8"
-        env["HOME"] = FileManager.default.homeDirectoryForCurrentUser.path
-        env["SHELL"] = shell
-        
-        // Convert environment to array format (KEY=VALUE)
-        let envArray = env.map { "\($0.key)=\($0.value)" }
-        
-        // Start the process
-        // args: [loginShellName] means the shell sees itself as a login shell
-        // execName: is what goes in argv[0]
-        terminalView.startProcess(
-            executable: shell,
-            args: [],  // Arguments AFTER the shell name
-            environment: envArray,
-            execName: loginShellName  // Makes it a login shell
+        // Change to home directory before starting shell
+        FileManager.default.changeCurrentDirectoryPath(
+            FileManager.default.homeDirectoryForCurrentUser.path
         )
+        
+        // Start process using the same pattern as SwiftTerm's sample app
+        // This lets SwiftTerm handle environment variables internally
+        terminalView.startProcess(executable: shell, execName: shellIdiom)
+    }
+    
+    /// Get the user's default shell from the system
+    private func getDefaultShell() -> String {
+        let bufsize = sysconf(_SC_GETPW_R_SIZE_MAX)
+        guard bufsize != -1 else { return "/bin/zsh" }
+        
+        let buffer = UnsafeMutablePointer<Int8>.allocate(capacity: bufsize)
+        defer { buffer.deallocate() }
+        
+        var pwd = passwd()
+        var result: UnsafeMutablePointer<passwd>?
+        
+        if getpwuid_r(getuid(), &pwd, buffer, bufsize, &result) == 0 {
+            return String(cString: pwd.pw_shell)
+        }
+        return "/bin/zsh"
     }
     
     // MARK: - Coordinator
