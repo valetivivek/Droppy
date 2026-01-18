@@ -20,9 +20,8 @@ struct TerminalNotchView: View {
                 quickCommandView
             }
         }
-        .background(terminalBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
+        // No external styling - terminal lives inside shelf's content area
+        // which already has its own black background
         .onAppear {
             isInputFocused = true
         }

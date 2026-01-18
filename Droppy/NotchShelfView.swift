@@ -54,6 +54,7 @@ struct NotchShelfView: View {
     var airPodsManager = AirPodsManager.shared  // @Observable - no wrapper needed
     @ObservedObject private var lockScreenManager = LockScreenManager.shared
     @ObservedObject private var dndManager = DNDManager.shared
+    @ObservedObject private var terminalManager = TerminalNotchManager.shared
     @State private var showVolumeHUD = false
     @State private var showBrightnessHUD = false
     @State private var hudWorkItem: DispatchWorkItem?
@@ -458,15 +459,18 @@ struct NotchShelfView: View {
             shelfContent
             
             // Floating buttons (Bottom Centered)
-            // Visible whenever the shelf is expanded and sticky (auto-collapse disabled)
-            if enableNotchShelf && isExpandedOnThisScreen && !autoCollapseShelf {
+            // Terminal button: Shows when expanded AND terminal installed (regardless of sticky mode)
+            // Close/Terminal-close button: In sticky mode OR when terminal is visible
+            if enableNotchShelf && isExpandedOnThisScreen && (terminalManager.isInstalled || !autoCollapseShelf) {
                 HStack(spacing: 12) {
                     // Terminal button (if extension installed)
-                    if TerminalNotchManager.shared.isInstalled {
+                    if terminalManager.isInstalled {
                         Button(action: {
-                            TerminalNotchManager.shared.toggle()
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                terminalManager.toggle()
+                            }
                         }) {
-                            Image(systemName: "terminal")
+                            Image(systemName: terminalManager.isVisible ? "xmark" : "terminal")
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundStyle(.white)
                                 .frame(width: 26, height: 26)
@@ -477,36 +481,30 @@ struct NotchShelfView: View {
                         .transition(.scale(scale: 0.8).combined(with: .opacity))
                     }
                     
-                    // Close button
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            state.expandedDisplayID = nil
-                            state.isMouseHovering = false
+                    // Close button (only in sticky mode AND when terminal is not visible)
+                    if !autoCollapseShelf && !terminalManager.isVisible {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                state.expandedDisplayID = nil
+                                state.isMouseHovering = false
+                            }
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 26, height: 26)
+                                .padding(10)
+                                .background(indicatorBackground)
                         }
-                    }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 26, height: 26)
-                            .padding(10)
-                            .background(indicatorBackground)
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
                 // Position exactly below the expanded content
                 .offset(y: currentExpandedHeight + (isDynamicIslandMode ? 8 : 12))
                 .zIndex(100)
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
-            
-            // Terminal overlay
-            if TerminalNotchManager.shared.isInstalled && TerminalNotchManager.shared.isVisible {
-                TerminalNotchView(manager: TerminalNotchManager.shared)
-                    .frame(width: min(currentNotchWidth, 500))
-                    .offset(y: currentExpandedHeight + 70) // Below the buttons
-                    .zIndex(200)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
+
         }
     }
 
@@ -1229,12 +1227,22 @@ struct NotchShelfView: View {
     // MARK: - Expanded Content
     
     private var expandedShelfContent: some View {
-        // Grid Items or Media Player or Drop Zone
+        // Grid Items or Media Player or Drop Zone or Terminal
         // No header row - auto-collapse handles hiding, right-click for settings/clipboard
         ZStack {
+            // TERMINAL VIEW: Highest priority - takes over the shelf when active
+            if terminalManager.isInstalled && terminalManager.isVisible {
+                TerminalNotchView(manager: terminalManager)
+                    .frame(height: currentExpandedHeight)
+                    .id("terminal-view")
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.95).combined(with: .opacity),
+                        removal: .scale(scale: 0.95).combined(with: .opacity)
+                    ))
+            }
             // Show drop zone when dragging over (takes priority)
             // ALSO show when hovering over AirDrop zone (isShelfAirDropZoneTargeted) to prevent snap-back to media
-            if (state.isDropTargeted || state.isShelfAirDropZoneTargeted) && state.items.isEmpty {
+            else if (state.isDropTargeted || state.isShelfAirDropZoneTargeted) && state.items.isEmpty {
                 emptyShelfContent
                     .frame(height: currentExpandedHeight)
                     .transition(.asymmetric(

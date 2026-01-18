@@ -15,6 +15,7 @@ struct TerminalNotchInfoView: View {
     @State private var isHoveringCancel = false
     @State private var isHoveringReviews = false
     @State private var isHoveringRecord = false
+    @State private var isHoveringReset = false
     @State private var showReviewsSheet = false
     @State private var isRecordingShortcut = false
     @State private var recordMonitor: Any?
@@ -392,6 +393,29 @@ struct TerminalNotchInfoView: View {
             }
             
             Spacer()
+            
+            // Reset shortcut button (only when installed and shortcut exists)
+            if manager.isInstalled && manager.shortcut != nil {
+                Button {
+                    manager.removeShortcut()
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(8)
+                        .background(isHoveringReset ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .onHover { h in
+                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringReset = h }
+                }
+                .help("Reset Shortcut")
+            }
             
             if manager.isInstalled {
                 DisableExtensionButton(extensionType: .terminalNotch)
