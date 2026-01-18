@@ -768,6 +768,10 @@ struct NotchShelfView: View {
             .opacity(notchController.isTemporarilyHidden ? 0 : 1)
             // DYNAMIC ISLAND: Match top margin of the background shape
             .padding(.top, isDynamicIslandMode ? dynamicIslandTopMargin : 0)
+            // Clip content to prevent overflow during shrink animation
+            .clipped()
+            // Sync child animations with parent for synchronized shrink/grow
+            .geometryGroup()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         // Animate all state changes smoothly (includes isTemporarilyHidden via currentNotchWidth/Height)
