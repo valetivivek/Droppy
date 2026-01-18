@@ -744,6 +744,8 @@ struct NotchShelfView: View {
                 if shouldShowForced || shouldShowNormal {
                     MediaHUDView(musicManager: musicManager, isHovered: $mediaHUDIsHovered, notchWidth: notchWidth, notchHeight: notchHeight, hudWidth: hudWidth, targetScreen: targetScreen)
                         .frame(width: hudWidth, alignment: .top)
+                        // Clip to notch shape to prevent ghosting during shrink animation
+                        .clipShape(isDynamicIslandMode ? AnyShape(DynamicIslandShape(cornerRadius: 50)) : AnyShape(NotchShape(bottomRadius: 18)))
                         // Match other HUD transitions for consistent morphing
                         .transition(.scale(scale: 0.8).combined(with: .opacity).animation(.spring(response: 0.25, dampingFraction: 0.8)))
                         .zIndex(3)
