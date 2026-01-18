@@ -38,6 +38,7 @@ enum ExtensionType: String, CaseIterable, Identifiable {
         case .ffmpegVideoCompression: return "Video Target Size"
         case .terminalNotch: return "Terminal Notch"
         }
+    }
     
     var subtitle: String {
         switch self {
@@ -51,6 +52,7 @@ enum ExtensionType: String, CaseIterable, Identifiable {
         case .ffmpegVideoCompression: return "Compress videos to exact file sizes"
         case .terminalNotch: return "Quick access terminal in your notch"
         }
+    }
     
     var category: String {
         switch self {
@@ -61,6 +63,7 @@ enum ExtensionType: String, CaseIterable, Identifiable {
         case .ffmpegVideoCompression: return "Media"
         case .terminalNotch: return "Productivity"
         }
+    }
     
     // Colors matching the extension card accent colors
     var categoryColor: Color {
