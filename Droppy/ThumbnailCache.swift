@@ -46,8 +46,12 @@ final class ThumbnailCache {
     }
     
     /// Warms up QuickLook's thumbnail generator to preload Metal shaders
+    /// Called synchronously from init to ensure completion before any user interaction
     private func warmupQuickLook() {
-        Task(priority: .high) {
+        // Use semaphore to make this synchronous - BLOCKS until warmup completes
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        Task(priority: .userInitiated) {
             let warmupURL = URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")
             let request = QLThumbnailGenerator.Request(
                 fileAt: warmupURL,
@@ -56,7 +60,11 @@ final class ThumbnailCache {
                 representationTypes: .thumbnail
             )
             _ = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request)
+            semaphore.signal()
         }
+        
+        // Wait for warmup to complete (with timeout to prevent deadlock)
+        _ = semaphore.wait(timeout: .now() + 3.0)
     }
     
     /// Get or create a thumbnail for the given clipboard item
