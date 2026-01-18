@@ -111,8 +111,8 @@ class NotchDragContainer: NSView {
                 expandedHeight += 100
             }
             
-            // Add buffer for the floating close button
-            expandedHeight += 60
+            // Add buffer for the floating close button and bottom padding
+            expandedHeight += 100
             
             trackingRect = NSRect(
                 x: centerX - expandedWidth / 2,
@@ -323,8 +323,8 @@ class NotchDragContainer: NSView {
                 expandedHeight += 100
             }
             
-            // Add buffer for the floating close button
-            expandedHeight += 60
+            // Add buffer for the floating close button and bottom padding
+            expandedHeight += 100
              
             // Y is from top (bounds.height) down to (bounds.height - expandedHeight)
             let yRange = (bounds.height - expandedHeight)...bounds.height
@@ -377,8 +377,8 @@ class NotchDragContainer: NSView {
                     expandedHeight += 100
                 }
                 
-                // Add buffer for the floating close button
-                expandedHeight += 60
+                // Add buffer for the floating close button and bottom padding
+                expandedHeight += 100
 
                 let yMin = screen.frame.origin.y + screen.frame.height - expandedHeight
                 let yMax = screen.frame.origin.y + screen.frame.height
@@ -485,8 +485,8 @@ class NotchDragContainer: NSView {
             expandedHeight += 100
         }
         
-        // Add buffer for the floating close button
-        expandedHeight += 60
+        // Add buffer for the floating close button and bottom padding
+        expandedHeight += 100
 
         let yMin = screen.frame.origin.y + screen.frame.height - expandedHeight
         let yMax = screen.frame.origin.y + screen.frame.height
