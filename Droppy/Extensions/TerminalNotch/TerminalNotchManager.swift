@@ -76,12 +76,10 @@ class TerminalNotchManager: ObservableObject {
             isVisible.toggle()
             if isVisible {
                 // CRITICAL: Also expand the shelf - terminal renders inside expanded shelf
-                // Find the screen containing the mouse and expand on that screen
-                let mouseLocation = NSEvent.mouseLocation
-                if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) {
-                    DroppyState.shared.expandShelf(for: screen.displayID)
+                // Use built-in display (with notch), or fall back to main screen
+                if let notchScreen = NSScreen.builtInWithNotch {
+                    DroppyState.shared.expandShelf(for: notchScreen.displayID)
                 } else if let mainScreen = NSScreen.main {
-                    // Fallback to main screen
                     DroppyState.shared.expandShelf(for: mainScreen.displayID)
                 }
                 // Focus the terminal when shown
