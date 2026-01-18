@@ -132,8 +132,8 @@ struct TerminalNotchView: View {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.white.opacity(0.05))
                 )
-            // Content is already padded (24pt) inside the ZStack
-            // The dotted outline and its parent should fill the available space
+            }
+            // Content padding inside the ZStack
             .padding(24)
         }
         // NO external padding - let the dotted outline fill the available space
