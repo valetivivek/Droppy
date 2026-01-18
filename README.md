@@ -53,6 +53,8 @@ No subscriptions. No tracking. **100% free and open-source**, built entirely in 
 
 Droppy replaces a handful of separate utilities with one native app that feels like it belongs on your Mac.
 
+---
+
 ## 🎵 Shelf & Media Player
 
 Your notch becomes a **media powerhouse**. See stunning album art, control playback with tap-to-seek, skip tracks, shuffle, and repeat—all without leaving your workflow. The live **audio visualizer** dances to your music in real-time. Drop files into the shelf and drag them out anywhere.
