@@ -114,6 +114,15 @@ Droppy's built-in **Extension Store** adds powerful features on demand. Everythi
 </table>
 
 <p align="center">
+  <strong>Power User? Extensions make you fully stacked.</strong><br>
+  Like a quick terminal right in your notch—run commands instantly without switching apps.
+</p>
+
+<p align="center">
+  <img src="docs/assets/images/terminal-notch-screenshot.png" alt="Terminal Extension" width="80%">
+</p>
+
+<p align="center">
   <strong>📊 Visit the live Extension Store to see real reviews, ratings, and install counts!</strong><br>
   Available both in the app and on the web.
 </p>
