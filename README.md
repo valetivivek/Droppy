@@ -48,7 +48,7 @@ Droppy transforms your MacBook notch into a **productivity powerhouse**. Drop fi
 Your notch becomes a **media powerhouse**. See stunning album art, control playback with tap-to-seek, skip tracks, shuffle, and repeat—all without leaving your workflow. The live **audio visualizer** dances to your music in real-time. Drop files into the shelf and drag them out anywhere.
 
 <p align="center">
-  <img src="docs/assets/images/media-player-expanded.png" alt="Shelf & Media Player" width="100%">
+  <img src="docs/assets/images/shelf-demo.gif" alt="Shelf & Media Player" width="100%">
 </p>
 
 ---
