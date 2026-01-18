@@ -127,18 +127,12 @@ class TerminalNotchManager: ObservableObject {
         }
     }
     
-    /// Open Terminal.app with current working directory
+    /// Open Terminal.app (no automation - just launches the app)
     func openInTerminalApp() {
-        let script = """
-        tell application "Terminal"
-            activate
-            do script ""
-        end tell
-        """
-        
-        if let appleScript = NSAppleScript(source: script) {
-            var error: NSDictionary?
-            appleScript.executeAndReturnError(&error)
+        // Use NSWorkspace to simply open Terminal.app
+        // This doesn't require any special permissions
+        if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
+            NSWorkspace.shared.openApplication(at: terminalURL, configuration: NSWorkspace.OpenConfiguration())
         }
     }
     
