@@ -76,9 +76,10 @@ class TerminalNotchManager: ObservableObject {
             isVisible.toggle()
             if isVisible {
                 // CRITICAL: Also expand the shelf - terminal renders inside expanded shelf
-                // Use built-in display (works for both notch and island modes)
-                if let builtInScreen = NSScreen.screens.first(where: { $0.isBuiltIn }) {
-                    DroppyState.shared.expandShelf(for: builtInScreen.displayID)
+                // Open on the screen where cursor is (consistent with all shelf/island behavior)
+                let mouseLocation = NSEvent.mouseLocation
+                if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) {
+                    DroppyState.shared.expandShelf(for: screen.displayID)
                 } else if let mainScreen = NSScreen.main {
                     DroppyState.shared.expandShelf(for: mainScreen.displayID)
                 }
