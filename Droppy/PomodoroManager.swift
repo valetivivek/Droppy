@@ -12,29 +12,28 @@ import Combine
 
 /// Centralized state management for the Pomodoro timer
 /// Follows the singleton pattern (like VolumeManager, BatteryManager)
-@Observable
 final class PomodoroManager: ObservableObject {
     static let shared = PomodoroManager()
     
     // MARK: - Published State
     
     /// Whether the timer is currently active (running or paused)
-    var isActive: Bool = false
+    @Published var isActive: Bool = false
     
     /// Whether the timer is paused
-    var isPaused: Bool = false
+    @Published var isPaused: Bool = false
     
     /// Remaining seconds on the timer
-    var remainingSeconds: Int = 0
+    @Published var remainingSeconds: Int = 0
     
     /// Total duration in seconds (for progress calculation)
-    var totalSeconds: Int = 0
+    @Published var totalSeconds: Int = 0
     
     /// Timestamp for HUD triggering (notifies observers of state changes)
-    var lastChangeAt: Date = Date()
+    @Published var lastChangeAt: Date = Date()
     
     /// Whether to show the HUD after timer reveal gesture
-    var showHUD: Bool = false
+    @Published var showHUD: Bool = false
     
     // MARK: - Preset Durations
     
