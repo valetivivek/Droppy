@@ -58,17 +58,12 @@ struct TerminalNotchView: View {
         // No external styling - terminal lives inside shelf's content area
         // which already has its own black background
         .onAppear {
-            // Delay focus to allow view transitions to complete
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isInputFocused = true
-            }
+            isInputFocused = true
         }
         .onChange(of: manager.isVisible) { _, isVisible in
             if isVisible {
-                // Delay focus to allow view transitions to complete
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    isInputFocused = true
-                }
+                // Focus the text field when terminal becomes visible
+                isInputFocused = true
             }
         }
     }
@@ -137,17 +132,12 @@ struct TerminalNotchView: View {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.white.opacity(0.05))
                 )
-                .fixedSize(horizontal: false, vertical: true) // Prevent height changes
-            }
+            // Content is already padded (24pt) inside the ZStack
+            // The dotted outline and its parent should fill the available space
             .padding(24)
         }
-        // CRITICAL: Match drop zone padding - Island mode: 16pt uniform, Notch mode: symmetrical 20pt + notch-aware top
-        .padding(EdgeInsets(
-            top: isDynamicIslandMode ? 16 : notchHeight + 14,
-            leading: isDynamicIslandMode ? 16 : 20,
-            bottom: isDynamicIslandMode ? 16 : 20,
-            trailing: isDynamicIslandMode ? 16 : 20
-        ))
+        // NO external padding - let the dotted outline fill the available space
+        // The shelf view provides the proper insets
         // Start marching ants animation when view appears
         .onAppear {
             withAnimation(.linear(duration: 25).repeatForever(autoreverses: false)) {
