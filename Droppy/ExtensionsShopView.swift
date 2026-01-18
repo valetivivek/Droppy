@@ -322,7 +322,10 @@ struct ExtensionsShopView: View {
                 analyticsKey: "terminalNotch",
                 extensionType: .terminalNotch
             ) {
-                AnyView(TerminalNotchInfoView())
+                AnyView(TerminalNotchInfoView(
+                    installCount: extensionCounts["terminalNotch"],
+                    rating: extensionRatings["terminalNotch"]
+                ))
             }
         ]
         

@@ -100,6 +100,8 @@ struct DisableExtensionButton: View {
             return "This will disable the integration. You can enable it again later."
         case .ffmpegVideoCompression:
             return "This will disable Video Target Size compression. You can enable it again later."
+        case .terminalNotch:
+            return "This will disable the terminal extension. You can enable it again later."
         }
     }
     

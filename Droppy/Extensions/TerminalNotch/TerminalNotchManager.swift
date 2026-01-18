@@ -51,15 +51,21 @@ class TerminalNotchManager: ObservableObject {
     /// Whether extension is installed
     @AppStorage("terminalNotch_installed") var isInstalled: Bool = false
     
+    /// Saved keyboard shortcut
+    @Published var shortcut: SavedShortcut? = nil
+    
     // MARK: - Private
     
     private var cancellables = Set<AnyCancellable>()
     private var process: Process?
     private var outputPipe: Pipe?
     private var inputPipe: Pipe?
+    private var globalMonitor: Any?
     
     private init() {
         loadHistory()
+        loadShortcut()
+        registerShortcut()
     }
     
     // MARK: - Public Methods
@@ -163,6 +169,9 @@ class TerminalNotchManager: ObservableObject {
         commandHistory = []
         isInstalled = false
         
+        // Remove keyboard shortcut
+        removeShortcut()
+        
         // Clear history from disk
         UserDefaults.standard.removeObject(forKey: "terminalNotch_history")
     }
@@ -229,5 +238,72 @@ class TerminalNotchManager: ObservableObject {
                 continuation.resume(throwing: error)
             }
         }
+    }
+    
+    // MARK: - Shortcut Management
+    
+    private func loadShortcut() {
+        if let data = UserDefaults.standard.data(forKey: "terminalNotch_shortcut"),
+           let saved = try? JSONDecoder().decode(SavedShortcut.self, from: data) {
+            shortcut = saved
+        }
+    }
+    
+    private func saveShortcut() {
+        if let shortcut = shortcut,
+           let data = try? JSONEncoder().encode(shortcut) {
+            UserDefaults.standard.set(data, forKey: "terminalNotch_shortcut")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "terminalNotch_shortcut")
+        }
+    }
+    
+    /// Register global keyboard shortcut for terminal toggle
+    func registerShortcut() {
+        // Remove existing monitor
+        if let monitor = globalMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalMonitor = nil
+        }
+        
+        guard let shortcut = shortcut, isInstalled else { return }
+        
+        // Create new global monitor
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self else { return }
+            
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if Int(event.keyCode) == shortcut.keyCode && flags.rawValue == shortcut.modifiers {
+                Task { @MainActor in
+                    self.toggle()
+                }
+            }
+        }
+        
+        // Also monitor local events (when app is focused)
+        _ = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self, let shortcut = self.shortcut, self.isInstalled else { return event }
+            
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if Int(event.keyCode) == shortcut.keyCode && flags.rawValue == shortcut.modifiers {
+                Task { @MainActor in
+                    self.toggle()
+                }
+                return nil // Consume the event
+            }
+            return event
+        }
+        
+        saveShortcut()
+    }
+    
+    /// Remove shortcut
+    func removeShortcut() {
+        shortcut = nil
+        if let monitor = globalMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalMonitor = nil
+        }
+        UserDefaults.standard.removeObject(forKey: "terminalNotch_shortcut")
     }
 }

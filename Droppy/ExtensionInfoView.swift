@@ -249,6 +249,7 @@ struct ExtensionInfoView: View {
         case .windowSnap: return "Configure"
         case .voiceTranscribe: return "Configure"
         case .ffmpegVideoCompression: return "Install"
+        case .terminalNotch: return "Configure"
         }
     }
     
@@ -262,6 +263,7 @@ struct ExtensionInfoView: View {
         case .windowSnap: return "Configure Shortcuts"
         case .voiceTranscribe: return "Configure"
         case .ffmpegVideoCompression: return "Install FFmpeg"
+        case .terminalNotch: return "Configure"
         }
     }
     
@@ -275,6 +277,7 @@ struct ExtensionInfoView: View {
         case .windowSnap: return "keyboard"
         case .voiceTranscribe: return "mic.fill"
         case .ffmpegVideoCompression: return "arrow.down.circle.fill"
+        case .terminalNotch: return "terminal"
         }
     }
 }
