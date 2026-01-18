@@ -70,7 +70,7 @@ struct TerminalNotchInfoView: View {
     private var headerSection: some View {
         VStack(spacing: 12) {
             // Icon
-            CachedAsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/terminal-notch.png")) { image in
+            CachedAsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/termi-notch.jpg")) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
                 Image(systemName: "terminal").font(.system(size: 32, weight: .medium)).foregroundStyle(.green)
@@ -79,7 +79,7 @@ struct TerminalNotchInfoView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .shadow(color: .green.opacity(0.4), radius: 8, y: 4)
             
-            Text("Terminal Notch")
+            Text("Termi-Notch")
                 .font(.title2.bold())
                 .foregroundStyle(.primary)
             

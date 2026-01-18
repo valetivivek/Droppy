@@ -36,7 +36,7 @@ enum ExtensionType: String, CaseIterable, Identifiable {
         case .windowSnap: return "Window Snap"
         case .voiceTranscribe: return "Voice Transcribe"
         case .ffmpegVideoCompression: return "Video Target Size"
-        case .terminalNotch: return "Terminal Notch"
+        case .terminalNotch: return "Termi-Notch"
         }
     }
     
@@ -264,7 +264,7 @@ enum ExtensionType: String, CaseIterable, Identifiable {
             .frame(width: 64, height: 64)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         case .terminalNotch:
-            CachedAsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/terminal-notch.png")) { image in
+            CachedAsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/termi-notch.jpg")) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
                 Image(systemName: "terminal").font(.system(size: 32, weight: .medium)).foregroundStyle(.green)

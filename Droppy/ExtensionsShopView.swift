@@ -314,8 +314,8 @@ struct ExtensionsShopView: View {
             },
             ExtensionListItem(
                 id: "terminalNotch",
-                iconURL: "https://iordv.github.io/Droppy/assets/icons/terminal-notch.png",
-                title: "Terminal Notch",
+                iconURL: "https://iordv.github.io/Droppy/assets/icons/termi-notch.jpg",
+                title: "Termi-Notch",
                 subtitle: "Quick terminal access",
                 category: .productivity,
                 isInstalled: isTerminalNotchInstalled,
