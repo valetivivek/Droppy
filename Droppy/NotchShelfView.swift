@@ -555,14 +555,15 @@ struct NotchShelfView: View {
     }
 
     var shelfContent: some View {
-        ZStack(alignment: .top) {
-            // MARK: - Main Morphing Background
-            morphingBackground
-            
-            // MARK: - Content Overlay
-            contentOverlay
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // Type erasure via AnyView breaks complex type inference chain
+        // that was causing compiler timeout on .onChange modifier chains
+        AnyView(
+            ZStack(alignment: .top) {
+                morphingBackground
+                contentOverlay
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        )
         // Animate all state changes smoothly (includes isTemporarilyHidden via currentNotchWidth/Height)
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: notchController.isTemporarilyHidden)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showMediaPlayer)
