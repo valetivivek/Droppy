@@ -34,14 +34,6 @@ struct SwiftTermView: NSViewRepresentable {
         // Configure terminal options
         terminalView.optionAsMetaKey = true
         
-        // Set up process termination handler
-        terminalView.processTerminationHandler = { exitCode, reason in
-            DispatchQueue.main.async {
-                // Process ended - could restart or notify user
-                print("Terminal process ended with code \(exitCode)")
-            }
-        }
-        
         // Start the shell process
         startShell(in: terminalView)
         
@@ -73,19 +65,19 @@ struct SwiftTermView: NSViewRepresentable {
         env["COLORTERM"] = "truecolor"
         env["LANG"] = "en_US.UTF-8"
         
-        // Start shell in home directory
+        // Change to home directory before starting
         let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
+        FileManager.default.changeCurrentDirectoryPath(homeDir)
         
         // Convert environment to array format
         let envArray = env.map { "\($0.key)=\($0.value)" }
         
-        // Start the process
+        // Start the process (no initialDirectory parameter)
         terminalView.startProcess(
             executable: shell,
             args: [shell, "-l"],  // Login shell
             environment: envArray,
-            execName: shell,
-            initialDirectory: homeDir
+            execName: shell
         )
     }
     
@@ -111,8 +103,8 @@ struct SwiftTermView: NSViewRepresentable {
         
         /// Terminate the process
         func terminate() {
-            // Send SIGTERM to the shell
-            terminalView?.send([0x03]) // Ctrl+C first
+            // Send Ctrl+C to the shell
+            terminalView?.send([0x03])
         }
     }
 }
