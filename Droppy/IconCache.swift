@@ -60,7 +60,7 @@ final class IconCache {
             .heic, .heif, .webP, .svg, .rawImage,
             
             // Audio
-            .audio, .mp3, .wav, .aiff, .midi, .m4a,
+            .audio, .mp3, .wav, .aiff, .midi,
             
             // Video
             .movie, .video, .mpeg, .mpeg2Video, .mpeg4Movie, .quickTimeMovie, .avi,
@@ -70,7 +70,7 @@ final class IconCache {
             
             // Code
             .sourceCode, .swiftSource, .cSource, .cPlusPlusSource,
-            .objectiveCSource, .javaSource, .script, .shellScript,
+            .objectiveCSource, .script, .shellScript,
             .pythonScript, .rubyScript, .perlScript, .phpScript, .javaScript,
             
             // System
