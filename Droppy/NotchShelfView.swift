@@ -476,31 +476,20 @@ struct NotchShelfView: View {
             // Terminal button: Shows when expanded AND terminal installed (regardless of sticky mode)
             // Close/Terminal-close button: In sticky mode OR when terminal is visible
             if enableNotchShelf && isExpandedOnThisScreen && (terminalManager.isInstalled || !autoCollapseShelf) {
-                HStack(spacing: 12) {
-                    // Terminal button (if extension installed)
-                    if terminalManager.isInstalled {
-                        // Open in Terminal.app button (only when terminal is visible)
-                        if terminalManager.isVisible {
-                            Button(action: {
-                                terminalManager.openInTerminalApp()
-                            }) {
-                                Image(systemName: "arrow.up.forward.app")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 26, height: 26)
-                                    .padding(10)
-                                    .background(indicatorBackground)
-                            }
-                            .buttonStyle(.plain)
-                            .help("Open in Terminal.app")
-                            .transition(.scale(scale: 0.8).combined(with: .opacity))
-                            
-                            // Clear terminal button (only when there's output)
-                            if !terminalManager.lastOutput.isEmpty {
+                VStack {
+                    // Spacer pushes buttons to bottom of container
+                    Spacer()
+                        .frame(height: currentExpandedHeight + (isDynamicIslandMode ? 8 : 12))
+                    
+                    HStack(spacing: 12) {
+                        // Terminal button (if extension installed)
+                        if terminalManager.isInstalled {
+                            // Open in Terminal.app button (only when terminal is visible)
+                            if terminalManager.isVisible {
                                 Button(action: {
-                                    terminalManager.clearOutput()
+                                    terminalManager.openInTerminalApp()
                                 }) {
-                                    Image(systemName: "arrow.counterclockwise")
+                                    Image(systemName: "arrow.up.forward.app")
                                         .font(.system(size: 13, weight: .bold))
                                         .foregroundStyle(.white)
                                         .frame(width: 26, height: 26)
@@ -508,49 +497,63 @@ struct NotchShelfView: View {
                                         .background(indicatorBackground)
                                 }
                                 .buttonStyle(.plain)
-                                .help("Clear terminal output")
+                                .help("Open in Terminal.app")
                                 .transition(.scale(scale: 0.8).combined(with: .opacity))
+                                
+                                // Clear terminal button (only when there's output)
+                                if !terminalManager.lastOutput.isEmpty {
+                                    Button(action: {
+                                        terminalManager.clearOutput()
+                                    }) {
+                                        Image(systemName: "arrow.counterclockwise")
+                                            .font(.system(size: 13, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .frame(width: 26, height: 26)
+                                            .padding(10)
+                                            .background(indicatorBackground)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help("Clear terminal output")
+                                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+                                }
                             }
+                            
+                            // Toggle terminal button (shows terminal icon when hidden, X when visible)
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    terminalManager.toggle()
+                                }
+                            }) {
+                                Image(systemName: terminalManager.isVisible ? "xmark" : "terminal")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 26, height: 26)
+                                    .padding(10)
+                                    .background(indicatorBackground)
+                            }
+                            .buttonStyle(.plain)
+                            .transition(.scale(scale: 0.8).combined(with: .opacity))
                         }
                         
-                        // Toggle terminal button (shows terminal icon when hidden, X when visible)
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                terminalManager.toggle()
+                        // Close button (only in sticky mode AND when terminal is not visible)
+                        if !autoCollapseShelf && !terminalManager.isVisible {
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    state.expandedDisplayID = nil
+                                    state.isMouseHovering = false
+                                }
+                            }) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 26, height: 26)
+                                    .padding(10)
+                                    .background(indicatorBackground)
                             }
-                        }) {
-                            Image(systemName: terminalManager.isVisible ? "xmark" : "terminal")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 26, height: 26)
-                                .padding(10)
-                                .background(indicatorBackground)
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
-                        .transition(.scale(scale: 0.8).combined(with: .opacity))
-                    }
-                    
-                    // Close button (only in sticky mode AND when terminal is not visible)
-                    if !autoCollapseShelf && !terminalManager.isVisible {
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                state.expandedDisplayID = nil
-                                state.isMouseHovering = false
-                            }
-                        }) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 26, height: 26)
-                                .padding(10)
-                                .background(indicatorBackground)
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
-                // Position exactly below the expanded content
-                // CRITICAL: Use padding instead of offset so hit area moves with visual position
-                .padding(.top, currentExpandedHeight + (isDynamicIslandMode ? 8 : 12))
                 .animation(.spring(response: 0.4, dampingFraction: 0.85), value: currentExpandedHeight)
                 .zIndex(100)
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
