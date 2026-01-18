@@ -29,6 +29,26 @@ struct DroppyApp: App {
         _ = warmupItem.icon
         _ = warmupItem.name
         _ = warmupItem.fileType
+        
+        // FORCE RENDER: Actually render the icon to a bitmap to trigger Metal shaders in rendering pipeline
+        let icon = NSWorkspace.shared.icon(forFile: "/System/Applications/Utilities/Terminal.app")
+        icon.size = NSSize(width: 64, height: 64)
+        
+        // Create a bitmap representation - this forces the actual GPU rendering
+        if let cgImage = icon.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            // Create a context and draw the image to force Metal shader compilation
+            let context = CGContext(
+                data: nil,
+                width: 64,
+                height: 64,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+            context?.draw(cgImage, in: CGRect(x: 0, y: 0, width: 64, height: 64))
+            _ = context?.makeImage()
+        }
     }
     
     @AppStorage("showInMenuBar") private var showInMenuBar = true
