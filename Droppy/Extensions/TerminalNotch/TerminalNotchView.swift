@@ -21,12 +21,16 @@ struct TerminalNotchView: View {
         return !screen.isBuiltIn || (!hasNotch && useDynamicIsland)
     }
     
-    /// Standard padding for content
-    private let uniformPadding: CGFloat = 14
+    /// Physical notch height from safe area insets
+    private var notchHeight: CGFloat {
+        NSScreen.main?.safeAreaInsets.top ?? 0
+    }
     
-    /// Extra top padding needed to clear the physical notch
+    /// Top padding to match MediaPlayerView alignment
+    /// Uses notchHeight + 6 for notch mode (same as MediaPlayerView)
+    /// Uses 20pt for DI mode (same as MediaPlayerView)
     private var topPadding: CGFloat {
-        isDynamicIslandMode ? uniformPadding : 36
+        isDynamicIslandMode ? 20 : notchHeight + 6
     }
     
     var body: some View {
