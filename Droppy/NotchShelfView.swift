@@ -557,107 +557,7 @@ struct NotchShelfView: View {
     var shelfContent: some View {
         ZStack(alignment: .top) {
             // MARK: - Main Morphing Background
-            // This is the persistent black shape that grows/shrinks
-            // NOTE: The shelf/notch always uses solid black background.
-            // The "Transparent Background" setting only applies to other UI elements
-            // (Settings, Clipboard, etc.) - not the shelf, as that would look weird.
-            // MORPH: Both shapes exist, crossfade with opacity for smooth transition
-            ZStack {
-                // Dynamic Island shape (pill)
-                // When transparent DI is enabled, use glass material instead of black
-                DynamicIslandShape(cornerRadius: isExpandedOnThisScreen ? 40 : 50)
-                    .fill(shouldUseDynamicIslandTransparent ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
-                    // Shadow scales with expanded state for proper depth perception
-                    .shadow(
-                        color: Color.black.opacity(isDynamicIslandMode ? (isExpandedOnThisScreen ? 0.3 : 0.25) : 0),
-                        radius: isExpandedOnThisScreen ? 12 : 6,
-                        x: 0,
-                        y: isExpandedOnThisScreen ? 6 : 3
-                    )
-                    .opacity(isDynamicIslandMode ? 1 : 0)
-                    .scaleEffect(isDynamicIslandMode ? 1 : 0.85)
-                
-                // Notch shape (U-shaped) - always black (physical notch is black)
-                NotchShape(bottomRadius: isExpandedOnThisScreen ? 40 : (hudIsVisible ? 18 : 16))
-                    .fill(Color.black)
-                    .opacity(isDynamicIslandMode ? 0 : 1)
-                    .scaleEffect(isDynamicIslandMode ? 0.85 : 1)
-            }
-            // Add bottom padding to prevent shadow clipping when expanded
-            // Shadow extends: radius (12) + y-offset (6) = 18px downward
-            .padding(.bottom, isDynamicIslandMode && isExpandedOnThisScreen ? 18 : 0)
-            .frame(
-                width: currentNotchWidth,
-                height: currentNotchHeight + (isDynamicIslandMode && isExpandedOnThisScreen ? 18 : 0)
-            )
-            .opacity(shouldShowVisualNotch ? 1.0 : 0.0)
-            // Note: Idle indicator removed - island is now completely invisible when idle
-            // Only appears on hover, drag, or when HUDs/media are active
-            .overlay(
-                // MORPH: Both outline shapes exist, crossfade for smooth transition
-                ZStack {
-                    // Dynamic Island: Fully rounded outline
-                    DynamicIslandOutlineShape(cornerRadius: isExpandedOnThisScreen ? 40 : 50)
-                        .stroke(
-                            style: StrokeStyle(
-                                lineWidth: 2,
-                                lineCap: .round,
-                                lineJoin: .round,
-                                dash: [3, 5],
-                                dashPhase: dashPhase
-                            )
-                        )
-                        .foregroundStyle(Color.blue)
-                        .opacity(isDynamicIslandMode ? 1 : 0)
-                    
-                    // Notch mode: U-shaped outline (no top edge)
-                    NotchOutlineShape(bottomRadius: isExpandedOnThisScreen ? 40 : 16)
-                        .trim(from: 0, to: 1)
-                        .stroke(
-                            style: StrokeStyle(
-                                lineWidth: 2,
-                                lineCap: .round,
-                                lineJoin: .round,
-                                dash: [3, 5],
-                                dashPhase: dashPhase
-                            )
-                        )
-                        .foregroundStyle(Color.blue)
-                        .opacity(isDynamicIslandMode ? 0 : 1)
-                }
-                .opacity((enableNotchShelf && shouldShowVisualNotch && !isExpandedOnThisScreen && (dragMonitor.isDragging || state.isMouseHovering)) ? 1 : 0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragMonitor.isDragging)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isMouseHovering)
-            )
-                .animation(.spring(response: 0.35, dampingFraction: 0.7), value: state.isExpanded)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragMonitor.isDragging)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: hudIsVisible)
-                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: musicManager.isPlaying)
-                .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isSongTransitioning)  // Match song transition timing
-                // Animate height changes when items are added/removed
-                .animation(.spring(response: 0.35, dampingFraction: 0.7), value: state.items.count)
-                // Smooth morph when switching between Notch and Dynamic Island modes
-                .animation(.spring(response: 0.4, dampingFraction: 0.75), value: useDynamicIslandStyle)
-                // DYNAMIC ISLAND: Add top margin for floating effect
-                .padding(.top, isDynamicIslandMode ? dynamicIslandTopMargin : 0)
-                // Right-click context menu to hide the notch/island
-                .contextMenu {
-                    // Clipboard button (when enabled in settings)
-                    if showClipboardButton {
-                        Button("Open Clipboard") {
-                            ClipboardWindowController.shared.toggle()
-                        }
-                        Divider()
-                    }
-                    
-                    Button("Hide \(isDynamicIslandMode ? "Dynamic Island" : "Notch")") {
-                        NotchWindowController.shared.setTemporarilyHidden(true)
-                    }
-                    Divider()
-                    Button("Settings...") {
-                        SettingsWindowController.shared.showSettings()
-                    }
-                }
+            morphingBackground
             
             // MARK: - Content Overlay
             ZStack(alignment: .top) {
@@ -1176,6 +1076,112 @@ struct NotchShelfView: View {
     
     // Old glowEffect removed
 
+
+    // MARK: - Morphing Background
+    
+    /// Extracted from shelfContent to reduce type-checker complexity
+    private var morphingBackground: some View {
+        // This is the persistent black shape that grows/shrinks
+        // NOTE: The shelf/notch always uses solid black background.
+        // The "Transparent Background" setting only applies to other UI elements
+        // (Settings, Clipboard, etc.) - not the shelf, as that would look weird.
+        // MORPH: Both shapes exist, crossfade with opacity for smooth transition
+        ZStack {
+            // Dynamic Island shape (pill)
+            // When transparent DI is enabled, use glass material instead of black
+            DynamicIslandShape(cornerRadius: isExpandedOnThisScreen ? 40 : 50)
+                .fill(shouldUseDynamicIslandTransparent ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
+                // Shadow scales with expanded state for proper depth perception
+                .shadow(
+                    color: Color.black.opacity(isDynamicIslandMode ? (isExpandedOnThisScreen ? 0.3 : 0.25) : 0),
+                    radius: isExpandedOnThisScreen ? 12 : 6,
+                    x: 0,
+                    y: isExpandedOnThisScreen ? 6 : 3
+                )
+                .opacity(isDynamicIslandMode ? 1 : 0)
+                .scaleEffect(isDynamicIslandMode ? 1 : 0.85)
+            
+            // Notch shape (U-shaped) - always black (physical notch is black)
+            NotchShape(bottomRadius: isExpandedOnThisScreen ? 40 : (hudIsVisible ? 18 : 16))
+                .fill(Color.black)
+                .opacity(isDynamicIslandMode ? 0 : 1)
+                .scaleEffect(isDynamicIslandMode ? 0.85 : 1)
+        }
+        // Add bottom padding to prevent shadow clipping when expanded
+        // Shadow extends: radius (12) + y-offset (6) = 18px downward
+        .padding(.bottom, isDynamicIslandMode && isExpandedOnThisScreen ? 18 : 0)
+        .frame(
+            width: currentNotchWidth,
+            height: currentNotchHeight + (isDynamicIslandMode && isExpandedOnThisScreen ? 18 : 0)
+        )
+        .opacity(shouldShowVisualNotch ? 1.0 : 0.0)
+        // Note: Idle indicator removed - island is now completely invisible when idle
+        // Only appears on hover, drag, or when HUDs/media are active
+        .overlay(morphingOutline)
+        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: state.isExpanded)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragMonitor.isDragging)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: hudIsVisible)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: musicManager.isPlaying)
+        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isSongTransitioning)
+        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: state.items.count)
+        .animation(.spring(response: 0.4, dampingFraction: 0.75), value: useDynamicIslandStyle)
+        .padding(.top, isDynamicIslandMode ? dynamicIslandTopMargin : 0)
+        .contextMenu {
+            if showClipboardButton {
+                Button("Open Clipboard") {
+                    ClipboardWindowController.shared.toggle()
+                }
+                Divider()
+            }
+            
+            Button("Hide \(isDynamicIslandMode ? "Dynamic Island" : "Notch")") {
+                NotchWindowController.shared.setTemporarilyHidden(true)
+            }
+            Divider()
+            Button("Settings...") {
+                SettingsWindowController.shared.showSettings()
+            }
+        }
+    }
+    
+    // MARK: - Morphing Outline
+    
+    /// Marching ants outline for drag/hover state
+    private var morphingOutline: some View {
+        ZStack {
+            // Dynamic Island: Fully rounded outline
+            DynamicIslandOutlineShape(cornerRadius: isExpandedOnThisScreen ? 40 : 50)
+                .stroke(
+                    style: StrokeStyle(
+                        lineWidth: 2,
+                        lineCap: .round,
+                        lineJoin: .round,
+                        dash: [3, 5],
+                        dashPhase: dashPhase
+                    )
+                )
+                .foregroundStyle(Color.blue)
+                .opacity(isDynamicIslandMode ? 1 : 0)
+            
+            // Notch mode: U-shaped outline (no top edge)
+            NotchOutlineShape(bottomRadius: isExpandedOnThisScreen ? 40 : 16)
+                .trim(from: 0, to: 1)
+                .stroke(
+                    style: StrokeStyle(
+                        lineWidth: 2,
+                        lineCap: .round,
+                        lineJoin: .round,
+                        dash: [3, 5],
+                        dashPhase: dashPhase
+                    )
+                )
+                .foregroundStyle(Color.blue)
+                .opacity(isDynamicIslandMode ? 0 : 1)
+        }
+        .opacity((enableNotchShelf && shouldShowVisualNotch && !isExpandedOnThisScreen && (dragMonitor.isDragging || state.isMouseHovering)) ? 1 : 0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragMonitor.isDragging)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isMouseHovering)
+    }
 
     // MARK: - Drop Zone
     
