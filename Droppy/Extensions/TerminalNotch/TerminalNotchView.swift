@@ -17,6 +17,9 @@ struct TerminalNotchView: View {
         NSScreen.main?.safeAreaInsets.top ?? 0
     }
     
+    /// Animated dash phase for marching ants effect on dotted outline
+    @State private var dashPhase: CGFloat = 0
+    
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
@@ -59,14 +62,15 @@ struct TerminalNotchView: View {
     /// Beautiful centered command input with dotted outline (shown before first command)
     private var initialCommandView: some View {
         ZStack {
-            // Dotted outline container (like empty shelf)
+            // Dotted outline container with marching ants animation (like empty shelf)
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(
                     Color.green.opacity(0.4),
                     style: StrokeStyle(
                         lineWidth: 1.5,
                         lineCap: .round,
-                        dash: [6, 8]
+                        dash: [6, 8],
+                        dashPhase: dashPhase
                     )
                 )
             
@@ -128,6 +132,16 @@ struct TerminalNotchView: View {
             bottom: 16,
             trailing: 16
         ))
+        // Start marching ants animation when view appears
+        .onAppear {
+            withAnimation(.linear(duration: 25).repeatForever(autoreverses: false)) {
+                dashPhase -= 280 // Multiple of 14 (6+8) for smooth loop
+            }
+        }
+        // Reset dash phase when view disappears to save CPU
+        .onDisappear {
+            dashPhase = 0
+        }
     }
     
     // MARK: - Quick Command View
