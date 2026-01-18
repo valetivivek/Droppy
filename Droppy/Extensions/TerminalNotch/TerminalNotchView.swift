@@ -62,24 +62,6 @@ struct TerminalNotchView: View {
                         .scaleEffect(0.6)
                         .frame(width: 16, height: 16)
                 }
-                
-                // Expand button
-                Button(action: { manager.toggleExpanded() }) {
-                    Image(systemName: "rectangle.expand.vertical")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.6))
-                }
-                .buttonStyle(.plain)
-                .help("Expand terminal")
-                
-                // Open in Terminal.app
-                Button(action: { manager.openInTerminalApp() }) {
-                    Image(systemName: "arrow.up.forward.app")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.6))
-                }
-                .buttonStyle(.plain)
-                .help("Open in Terminal.app")
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -99,6 +81,35 @@ struct TerminalNotchView: View {
                 }
                 .frame(maxHeight: 120)
             }
+            
+            // Floating bottom controls
+            HStack(spacing: 12) {
+                // Open in Terminal.app
+                Button(action: { manager.openInTerminalApp() }) {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .frame(width: 32, height: 32)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Open in Terminal.app")
+                
+                // Close button
+                Button(action: { manager.hide() }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .frame(width: 32, height: 32)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Close terminal")
+            }
+            .padding(.top, 8)
+            .padding(.bottom, 4)
         }
     }
     
