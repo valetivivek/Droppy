@@ -348,9 +348,9 @@ struct NotchShelfView: View {
             let topPaddingDelta: CGFloat = isDynamicIslandMode ? 0 : (notchHeight - 14)
             let terminalHeight = baseTerminalHeight + topPaddingDelta
             
-            // Add 30% extra height when there's output to display
+            // Add 50% extra height when there's output to display
             if !terminalManager.lastOutput.isEmpty {
-                return terminalHeight * 1.3
+                return terminalHeight * 1.5
             }
             return terminalHeight
         }
@@ -494,6 +494,23 @@ struct NotchShelfView: View {
                             .buttonStyle(.plain)
                             .help("Open in Terminal.app")
                             .transition(.scale(scale: 0.8).combined(with: .opacity))
+                            
+                            // Clear terminal button (only when there's output)
+                            if !terminalManager.lastOutput.isEmpty {
+                                Button(action: {
+                                    terminalManager.clearOutput()
+                                }) {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 26, height: 26)
+                                        .padding(10)
+                                        .background(indicatorBackground)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Clear terminal output")
+                                .transition(.scale(scale: 0.8).combined(with: .opacity))
+                            }
                         }
                         
                         // Toggle terminal button (shows terminal icon when hidden, X when visible)

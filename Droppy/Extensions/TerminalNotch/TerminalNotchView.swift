@@ -79,6 +79,7 @@ struct TerminalNotchView: View {
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.8))
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled) // Allow text selection and copy
                 }
                 .frame(maxHeight: 200)
             }

@@ -100,6 +100,14 @@ class TerminalNotchManager: ObservableObject {
         }
     }
     
+    /// Clear terminal output (start fresh)
+    func clearOutput() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            lastOutput = ""
+            commandText = ""
+        }
+    }
+    
     /// Execute a quick command (non-interactive)
     func executeQuickCommand(_ command: String) {
         guard !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
