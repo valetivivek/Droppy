@@ -768,6 +768,18 @@ struct NotchShelfView: View {
             }
             // Hide ALL content when notch is temporarily hidden (matches background shape animation)
             .opacity(notchController.isTemporarilyHidden ? 0 : 1)
+            // CRITICAL: Frame content overlay to match background size - prevents ghosting on shrink
+            .frame(width: currentNotchWidth, height: currentNotchHeight)
+            // Mask content to the notch/island shape so it clips during shrink animation
+            .mask {
+                Group {
+                    if isDynamicIslandMode {
+                        DynamicIslandShape(cornerRadius: isExpandedOnThisScreen ? 40 : 50)
+                    } else {
+                        NotchShape(bottomRadius: isExpandedOnThisScreen ? 40 : (hudIsVisible ? 18 : 16))
+                    }
+                }
+            }
             // DYNAMIC ISLAND: Match top margin of the background shape
             .padding(.top, isDynamicIslandMode ? dynamicIslandTopMargin : 0)
         }
