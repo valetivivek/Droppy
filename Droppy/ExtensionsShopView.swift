@@ -413,11 +413,13 @@ struct FeaturedExtensionCard<DetailView: View>: View {
                 // Content overlay
                 HStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 8) {
-                        // Category label
-                        Text(category)
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(accentColor.opacity(0.9))
-                            .tracking(0.5)
+                        // Category label (only show if not empty)
+                        if !category.isEmpty {
+                            Text(category)
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(accentColor.opacity(0.9))
+                                .tracking(0.5)
+                        }
                         
                         // Title
                         Text(title)
@@ -554,10 +556,12 @@ struct FeaturedExtensionCardCompact<DetailView: View>: View {
                 VStack(alignment: .leading, spacing: 8) {
                     // Category + Icon row
                     HStack {
-                        Text(category)
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(accentColor.opacity(0.9))
-                            .tracking(0.5)
+                        if !category.isEmpty {
+                            Text(category)
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(accentColor.opacity(0.9))
+                                .tracking(0.5)
+                        }
                         
                         Spacer()
                         
