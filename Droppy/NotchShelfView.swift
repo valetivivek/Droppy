@@ -76,6 +76,9 @@ struct NotchShelfView: View {
     @State private var mediaDebounceWorkItem: DispatchWorkItem?  // Debounce for media changes
     @State private var isMediaStable = false  // Only show media HUD after debounce delay
     
+    // Idle face preference
+    @AppStorage("enableIdleFace") private var enableIdleFace = true
+    
     
     /// Animation state for the border dash
     @State private var dashPhase: CGFloat = 0
@@ -166,6 +169,14 @@ struct NotchShelfView: View {
     private let dynamicIslandTopMargin: CGFloat = 4
     
     private let expandedWidth: CGFloat = 450
+    
+    /// Media player horizontal layout dimensions (v8.1.5 redesign)
+    /// Wider but shorter for horizontal album art + controls layout
+    private let mediaPlayerExpandedWidth: CGFloat = 480
+    /// Content height matching shelf pattern exactly:
+    /// Island mode: 100pt (album) + 20pt top + 20pt bottom = 140pt
+    /// Notch mode: 100pt + (notchHeight + 6) top + 20pt bottom
+    private let mediaPlayerContentHeight: CGFloat = 140
     
     /// Fixed wing sizes (area left/right of notch for content)  
     /// Using fixed sizes ensures consistent content positioning across all screen resolutions
@@ -264,7 +275,8 @@ struct NotchShelfView: View {
             return batteryHudWidth  // Focus/DND HUD uses same width as battery HUD
         } else if shouldShowMediaHUD {
             return hudWidth  // Media HUD uses tighter wings
-        } else if enableNotchShelf && (dragMonitor.isDragging || state.isMouseHovering) {
+        } else if enableNotchShelf && state.isMouseHovering {
+            // Only expand on mouse hover, NOT when dragging files (prevents sliding animation)
             return notchWidth + 20
         } else {
             return notchWidth
@@ -303,11 +315,13 @@ struct NotchShelfView: View {
             if !isBuiltInDisplay {
                 return notchHeight
             }
-            // Built-in notch: Grow when hovered OR when dragging files (peek effect with title)
+            // Built-in notch: Grow when hovered AND media player is visible (not volume/brightness HUD)
             // Title row: 4px top + 20px title + 4px bottom = 28px
-            let shouldExpand = mediaHUDIsHovered || (enableNotchShelf && dragMonitor.isDragging)
+            let mediaHUDVisible = showMediaPlayer && !hudIsVisible
+            // Only expand on media hover, NOT when dragging files (prevents sliding animation)
+            let shouldExpand = mediaHUDIsHovered && mediaHUDVisible
             return shouldExpand ? notchHeight + 28 : notchHeight
-        } else if enableNotchShelf && (dragMonitor.isDragging || state.isMouseHovering) {
+        } else if enableNotchShelf && state.isMouseHovering {
             // Dynamic Island stays fixed height - no vertical extension on hover
             if isDynamicIslandMode {
                 return notchHeight
@@ -316,6 +330,7 @@ struct NotchShelfView: View {
             if !isBuiltInDisplay {
                 return notchHeight
             }
+            // Only expand on mouse hover, NOT when dragging files (prevents sliding animation)
             return notchHeight + 16  // Subtle expansion, not too tall
         } else {
             return notchHeight
@@ -327,11 +342,13 @@ struct NotchShelfView: View {
         let shouldShowMediaPlayer = musicManager.isMediaHUDForced || 
             ((musicManager.isPlaying || musicManager.wasRecentlyPlaying) && !musicManager.isMediaHUDHidden && state.items.isEmpty)
         
-        // MEDIA PLAYER: FIXED height (doesn't grow with shelf items)
-        // This is the height when showing media player via swipe or natural playback
+        // MEDIA PLAYER: Content height + notch compensation (if applicable)
         if showMediaPlayer && shouldShowMediaPlayer && !musicManager.isPlayerIdle {
-            // Fixed media player height (no header - collapsed via auto-shrink)
-            return 210
+            // v8.1.5: Horizontal layout matching shelf pattern exactly
+            // Island mode: 140pt (100pt album + 20pt top + 20pt bottom)
+            // Notch mode: 140pt + (notchHeight + 6 - 20) = 140pt + notchHeight - 14
+            let topPaddingDelta: CGFloat = isDynamicIslandMode ? 0 : (notchHeight - 14)
+            return mediaPlayerContentHeight + topPaddingDelta
         }
         
         // SHELF: DYNAMIC height (grows with files, small when empty)
@@ -415,6 +432,22 @@ struct NotchShelfView: View {
         } else {
             NotchShape(bottomRadius: radius)
                 .fill(Color.black)
+        }
+    }
+    
+    // MARK: - Personality Views
+    
+    /// Idle face when shelf is empty
+    @ViewBuilder
+    private var idleFaceContent: some View {
+        let shelfIsEmpty = state.items.isEmpty
+        let isShowingMediaPlayer = musicManager.isMediaHUDForced && !musicManager.isMediaHUDHidden && !musicManager.isPlayerIdle
+        let shouldShow = enableIdleFace && isExpandedOnThisScreen && shelfIsEmpty && !isShowingMediaPlayer
+        
+        if shouldShow {
+            NotchFace(size: 40)
+                .transition(.scale(scale: 0.5).combined(with: .opacity).animation(.spring(response: 0.3, dampingFraction: 0.7)))
+                .zIndex(1)
         }
     }
     
@@ -639,8 +672,18 @@ struct NotchShelfView: View {
                 // Hide when battery/caps lock/airpods HUD is visible (they take priority briefly)
                 // Debounce check only applies when setting is enabled
                 // Note: shouldShowMediaHUD already handles forced mode, but inline check is needed for view visibility
-                let shouldShowForced = musicManager.isMediaHUDForced && !musicManager.isPlayerIdle && showMediaPlayer && !hudIsVisible && !batteryHUDIsVisible && !capsLockHUDIsVisible && !dndHUDIsVisible && !airPodsHUDIsVisible && !lockScreenHUDIsVisible && !isExpandedOnThisScreen
-                let shouldShowNormal = showMediaPlayer && musicManager.isPlaying && !musicManager.songTitle.isEmpty && !hudIsVisible && !batteryHUDIsVisible && !capsLockHUDIsVisible && !dndHUDIsVisible && !airPodsHUDIsVisible && !lockScreenHUDIsVisible && !isExpandedOnThisScreen && !(autoFadeMediaHUD && mediaHUDFadedOut) && !isSongTransitioning && (!debounceMediaChanges || isMediaStable)
+                
+                // Break up complex expressions for type checker
+                let noHUDsVisible = !hudIsVisible && !batteryHUDIsVisible && !capsLockHUDIsVisible && !dndHUDIsVisible && !airPodsHUDIsVisible && !lockScreenHUDIsVisible
+                let notExpanded = !isExpandedOnThisScreen
+                
+                let shouldShowForced = musicManager.isMediaHUDForced && !musicManager.isPlayerIdle && showMediaPlayer && noHUDsVisible && notExpanded
+                
+                let mediaIsPlaying = musicManager.isPlaying && !musicManager.songTitle.isEmpty
+                let notFadedOrTransitioning = !(autoFadeMediaHUD && mediaHUDFadedOut) && !isSongTransitioning
+                let debounceOk = !debounceMediaChanges || isMediaStable
+                let shouldShowNormal = showMediaPlayer && mediaIsPlaying && noHUDsVisible && notExpanded && notFadedOrTransitioning && debounceOk
+                
                 if shouldShowForced || shouldShowNormal {
                     MediaHUDView(musicManager: musicManager, isHovered: $mediaHUDIsHovered, notchWidth: notchWidth, notchHeight: notchHeight, hudWidth: hudWidth, targetScreen: targetScreen)
                         .frame(width: hudWidth, alignment: .top)
@@ -834,6 +877,9 @@ struct NotchShelfView: View {
         hudValue = volumeManager.isMuted ? 0 : CGFloat(volumeManager.rawVolume)
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             hudIsVisible = true
+            // Reset hover states to prevent layout shift when HUD appears
+            state.isMouseHovering = false
+            mediaHUDIsHovered = false
         }
         
         let workItem = DispatchWorkItem { [self] in
@@ -851,6 +897,9 @@ struct NotchShelfView: View {
         hudValue = CGFloat(brightnessManager.rawBrightness)
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             hudIsVisible = true
+            // Reset hover states to prevent layout shift when HUD appears
+            state.isMouseHovering = false
+            mediaHUDIsHovered = false
         }
         
         let workItem = DispatchWorkItem { [self] in
@@ -1010,7 +1059,8 @@ struct NotchShelfView: View {
         // - Horizontal: ±20px expansion for fast cursor movements (both modes)
         // - Vertical: EXACT height matching the visual - NO downward expansion
         // This ensures we don't block Safari URL bars, Outlook search fields, etc.
-        let isActive = enableNotchShelf && (isExpandedOnThisScreen || state.isMouseHovering || dragMonitor.isDragging || state.isDropTargeted)
+        // CRITICAL: Never expand when volume/brightness HUD is visible (prevents position shift)
+        let isActive = enableNotchShelf && !hudIsVisible && (isExpandedOnThisScreen || state.isMouseHovering || dragMonitor.isDragging || state.isDropTargeted)
         
         // Both modes: Horizontal expansion when active, but height is ALWAYS exact
         let dropAreaWidth: CGFloat = isActive ? (currentNotchWidth + 40) : currentNotchWidth
@@ -1061,21 +1111,31 @@ struct NotchShelfView: View {
         .onHover { isHovering in
             
             // Only update hover state if not dragging (drag state handles its own)
-            if !dragMonitor.isDragging {
+            // AND not when volume/brightness HUD is visible (prevents layout shift)
+            if !dragMonitor.isDragging && !hudIsVisible {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
                     // Only set mouse hovering if shelf is enabled
                     if enableNotchShelf {
                         state.isMouseHovering = isHovering
                     }
                     // Propagate hover to media HUD when music is playing (works independently)
-                    // Use simple check instead of shouldShowMediaHUD to avoid flickering
                     if showMediaPlayer && musicManager.isPlaying && !isExpandedOnThisScreen {
                         mediaHUDIsHovered = isHovering
                     }
                 }
+            } else if hudIsVisible {
+                // CRITICAL: Force reset hover states when HUD is visible to prevent any layout shift
+                // This handles edge case where cursor was already over area when HUD appeared
+                if state.isMouseHovering || mediaHUDIsHovered {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                        state.isMouseHovering = false
+                        mediaHUDIsHovered = false
+                    }
+                }
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isDropTargeted)
+        // NOTE: isDropTargeted animation REMOVED to prevent sliding effect
+        // Visual feedback handled by internal transitions in emptyShelfContent
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isMouseHovering)
     }
     
@@ -1149,8 +1209,8 @@ struct NotchShelfView: View {
                 else if showMediaPlayer && !musicManager.isPlayerIdle && !state.isDropTargeted && 
                         (musicManager.isMediaHUDForced || 
                          ((musicManager.isPlaying || musicManager.wasRecentlyPlaying) && !musicManager.isMediaHUDHidden && state.items.isEmpty)) {
-                    MediaPlayerView(musicManager: musicManager)
-                                            .frame(height: currentExpandedHeight)
+                    MediaPlayerView(musicManager: musicManager, notchHeight: isDynamicIslandMode ? 0 : notchHeight)
+                        .frame(height: currentExpandedHeight)
                         // Capture all clicks within the media player area
                         .contentShape(Rectangle())
                         // Stable identity for animation - prevents jitter on state changes
@@ -1168,11 +1228,10 @@ struct NotchShelfView: View {
                                             .frame(height: currentExpandedHeight)
                         // Stable identity for animation
                         .id("empty-shelf-view")
-                        // Shelf slides in from LEFT when appearing (user swiped right)
-                        // Shelf slides out to LEFT when disappearing (user swiped left)
+                        // In-place morph instead of sliding (matches NotchFace behavior)
                         .transition(.asymmetric(
-                            insertion: .move(edge: .leading).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
+                            insertion: .scale(scale: 0.95).combined(with: .opacity),
+                            removal: .scale(scale: 0.95).combined(with: .opacity)
                         ))
                 }
                 // Show items grid when items exist
@@ -1181,15 +1240,16 @@ struct NotchShelfView: View {
                                             .frame(height: currentExpandedHeight)
                         // Stable identity for animation
                         .id("items-grid-view")
-                        // Same as empty shelf - items come from LEFT
+                        // In-place morph instead of sliding (matches NotchFace behavior)
                         .transition(.asymmetric(
-                            insertion: .move(edge: .leading).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
+                            insertion: .scale(scale: 0.95).combined(with: .opacity),
+                            removal: .scale(scale: 0.95).combined(with: .opacity)
                         ))
-                }
             }
-        // Smoother, more premium animation
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: state.isDropTargeted)
+        }
+        // Smoother, more premium animation for media state changes
+        // NOTE: isDropTargeted animation REMOVED to prevent sliding effect when files hover over shelf
+        // Internal transitions handle content animations instead
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: musicManager.isPlaying)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: musicManager.wasRecentlyPlaying)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: musicManager.isMediaHUDForced)
@@ -1466,16 +1526,23 @@ struct DynamicIslandOutlineShape: Shape {
 extension NotchShelfView {
 
     private var emptyShelfContent: some View {
-        HStack(spacing: 12) {
-            Image(systemName: state.isDropTargeted ? "tray.and.arrow.down.fill" : "tray")
-                .font(.system(size: 24, weight: .light))
-                .foregroundStyle(state.isDropTargeted ? .blue : .white.opacity(0.7))
-                .symbolEffect(.bounce, value: state.isDropTargeted)
-            
-            Text(state.isDropTargeted ? "Drop!" : "Drop files here")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(state.isDropTargeted ? Color.white : Color.white.opacity(0.5))
-                .contentTransition(.numericText())
+        ZStack {
+            // Face reacts to files being dragged - gets excited when drop targeted
+            if enableIdleFace {
+                NotchFace(size: 50, isExcited: state.isDropTargeted)
+            } else {
+                // Fallback if idle face is disabled
+                if state.isDropTargeted {
+                    Image(systemName: "tray.and.arrow.down.fill")
+                        .font(.system(size: 28, weight: .light))
+                        .foregroundStyle(.blue)
+                        .symbolEffect(.bounce, value: state.isDropTargeted)
+                } else {
+                    Image(systemName: "tray")
+                        .font(.system(size: 28, weight: .light))
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(
@@ -1489,6 +1556,7 @@ extension NotchShelfView {
                         dashPhase: dropZoneDashPhase
                     )
                 )
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isDropTargeted)
         )
         // Top padding must clear the physical notch (notchHeight + small margin)
         // Island mode: minimal padding since there's no physical obstruction

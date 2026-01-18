@@ -33,6 +33,12 @@ final class CrashReporter {
     
     /// Check if last session crashed and offer to report
     func checkForCrashAndPrompt() {
+        // Skip crash detection in debug builds - rebuilding/stopping debugger triggers false positives
+        #if DEBUG
+        UserDefaults.standard.set(false, forKey: crashFlagKey)
+        print("🔧 CrashReporter: Skipping crash check (DEBUG build)")
+        return
+        #else
         let didCrash = UserDefaults.standard.bool(forKey: crashFlagKey)
         
         // Clear the flag immediately to avoid repeated prompts
@@ -47,6 +53,7 @@ final class CrashReporter {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             self.showCrashReportPrompt(crashLog: crashLog)
         }
+        #endif
     }
     
     // MARK: - Crash Log Discovery

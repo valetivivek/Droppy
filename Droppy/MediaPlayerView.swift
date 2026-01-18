@@ -83,6 +83,7 @@ enum InlineHUDType: Equatable {
 /// Native macOS design with album art, visualizer, and control buttons
 struct MediaPlayerView: View {
     @ObservedObject var musicManager: MusicManager
+    var notchHeight: CGFloat = 0  // Physical notch height to clear (0 for Dynamic Island)
     @State private var isDragging: Bool = false
     @State private var dragValue: Double = 0
     @State private var lastDragTime: Date = .distantPast
@@ -145,67 +146,77 @@ struct MediaPlayerView: View {
             return String(format: "%d:%02d", minutes, secs)
         }
     }
+    // Edge padding - reduced to push content closer to edges
+    private let edgePadding: CGFloat = 12
+    // Album art size - VStack must match this height for perfect symmetry
+    private let albumArtSize: CGFloat = 100
     
     var body: some View {
         TimelineView(.animation(minimumInterval: 0.1, paused: !musicManager.isPlaying && !isDragging)) { context in
             let currentDate = context.date
             
-            VStack(spacing: 16) {
-                // MARK: - Top Row: Album Art + Song Info + Visualizer
-                HStack(spacing: 14) {
-                    // Album Art
-                    albumArtView
-                    
-                    // Song info (title + artist)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(musicManager.songTitle.isEmpty ? "Not Playing" : musicManager.songTitle)
-                            .font(.system(size: 16, weight: .semibold))
+            // MARK: - Horizontal Layout: Big Album Art Left | Controls Right
+            HStack(alignment: .top, spacing: 16) {
+                // MARK: - Left: Large Album Art (100x100) with glow
+                albumArtViewLarge
+                
+                // MARK: - Right: Stacked Controls
+                VStack(alignment: .leading, spacing: 4) {
+                    // Row 1: Song Title + Visualizer
+                    let songTitle = musicManager.songTitle.isEmpty ? "Not Playing" : musicManager.songTitle
+                    HStack(spacing: 8) {
+                        Text(songTitle)
+                            .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
                             .lineLimit(1)
+                            .truncationMode(.tail)
                         
-                        Text(musicManager.artistName.isEmpty ? "—" : musicManager.artistName)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
-                            .lineLimit(1)
+                        Spacer(minLength: 4)
+                        
+                        // Audio Visualizer (colored by album art)
+                        AudioVisualizerBars(isPlaying: musicManager.isPlaying, color: visualizerColor)
+                            .frame(width: 28, height: 18)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                     
-                    // Audio Visualizer (right side, colored by album art)
-                    AudioVisualizerBars(isPlaying: musicManager.isPlaying, color: visualizerColor)
-                        .frame(width: 32, height: 20)
-                }
-                
-                // MARK: - Middle Row: Time + Slider
-                HStack(spacing: 0) {
-                    // Current time - aligned to left edge (same as album art)
-                    Text(elapsedTimeString(at: currentDate))
-                        .font(.system(size: 12, weight: .medium))
+                    // Row 2: Artist Name
+                    let artistName = musicManager.artistName.isEmpty ? "—" : musicManager.artistName
+                    Text(artistName)
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.white.opacity(0.6))
-                        .monospacedDigit()
                         .lineLimit(1)
-                        .frame(width: 56, alignment: .leading)
+                        .truncationMode(.tail)
                     
-                    Spacer().frame(width: 8)
+                    Spacer(minLength: 0)
                     
-                    // Progress Slider
-                    progressSliderView(at: currentDate)
+                    // Row 3: Progress Bar with Timestamps
+                    HStack(spacing: 8) {
+                        Text(elapsedTimeString(at: currentDate))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .monospacedDigit()
+                            .frame(width: 40, alignment: .leading)
+                        
+                        progressSliderView(at: currentDate)
+                        
+                        Text(remainingTimeString())
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .monospacedDigit()
+                            .frame(width: 40, alignment: .trailing)
+                    }
                     
-                    Spacer().frame(width: 8)
-                    
-                    // Total time - aligned to right edge (same as visualizer)
-                    Text(remainingTimeString())
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .frame(width: 56, alignment: .trailing)
+                    // Row 4: Media Controls (centered)
+                    controlsRowCompact
                 }
-                
-                // MARK: - Bottom Row: Controls
-                controlsRow
+                .frame(maxWidth: .infinity, minHeight: albumArtSize, maxHeight: albumArtSize)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            // Fill available space, padding applied after
+            .padding(EdgeInsets(
+                top: notchHeight > 0 ? notchHeight + 6 : 20,
+                leading: 20,
+                bottom: 20,
+                trailing: 20
+            ))
         }
         // MARK: - Universal Inline HUD Observers
         // Uses local @ObservedObject references for snappy updates
@@ -331,6 +342,78 @@ struct MediaPlayerView: View {
         )
     }
     
+    // MARK: - Large Album Art (for horizontal layout)
+    
+    private var albumArtViewLarge: some View {
+        ZStack {
+            // MARK: - Album Art Glow (very subtle blurred halo)
+            if musicManager.albumArt.size.width > 0 && musicManager.isPlaying {
+                Image(nsImage: musicManager.albumArt)
+                    .resizable()
+                    .aspectRatio(1, contentMode: .fill)
+                    .frame(width: 100, height: 100)
+                    .blur(radius: 18)
+                    .scaleEffect(1.05)
+                    .opacity(0.2)
+            }
+            
+            // MARK: - Actual Album Art Button
+            Button {
+                musicManager.openMusicApp()
+            } label: {
+                ZStack(alignment: .bottomTrailing) {
+                    Group {
+                        if musicManager.albumArt.size.width > 0 {
+                            Image(nsImage: musicManager.albumArt)
+                                .resizable()
+                                .aspectRatio(1, contentMode: .fill)
+                        } else {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.08))
+                                .overlay(
+                                    Image(systemName: "music.note")
+                                        .font(.system(size: 36))
+                                        .foregroundStyle(.white.opacity(0.3))
+                                )
+                        }
+                    }
+                    .frame(width: 100, height: 100)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    
+                    // Spotify badge (bottom-right corner)
+                    if musicManager.isSpotifySource {
+                        SpotifyBadge()
+                            .offset(x: 5, y: 5)
+                    }
+                }
+                // Subtle border highlight
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                )
+                .compositingGroup()
+                .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+            }
+            .buttonStyle(.plain)
+            .scaleEffect(isAlbumArtPressed ? 0.96 : (isAlbumArtHovering ? 1.02 : 1.0))
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isAlbumArtPressed)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isAlbumArtHovering)
+            .onHover { hovering in
+                isAlbumArtHovering = hovering
+            }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        isAlbumArtPressed = true
+                    }
+                    .onEnded { _ in
+                        isAlbumArtPressed = false
+                    }
+            )
+        }
+        .animation(.easeInOut(duration: 0.4), value: musicManager.isPlaying)
+    }
+    
     // MARK: - Progress Slider
     
     private func progressSliderView(at date: Date) -> some View {
@@ -338,32 +421,31 @@ struct MediaPlayerView: View {
             let width = geo.size.width
             let currentProgress = progress(at: date)
             let progressWidth = max(0, min(width, width * currentProgress))
-            // Expand track height when dragging
-            let trackHeight: CGFloat = isDragging ? 6 : 4
+            // Expand track height when dragging (5pt → 9pt)
+            let trackHeight: CGFloat = isDragging ? 9 : 5
             
             ZStack(alignment: .leading) {
-                // Track background (dark gray)
+                // Track background (subtle, tinted by album art)
                 Capsule()
-                    .fill(Color.white.opacity(isDragging ? 0.3 : 0.2))
+                    .fill(visualizerColor.opacity(isDragging ? 0.3 : 0.15))
                     .frame(height: trackHeight)
                 
-                // Filled portion (white with glow when dragging)
+                // Filled portion (tinted by album art with glow when dragging)
                 if currentProgress > 0 {
                     Capsule()
-                        .fill(Color.white)
+                        .fill(visualizerColor.opacity(0.9))
                         .frame(width: max(trackHeight, progressWidth), height: trackHeight)
-                        .shadow(color: isDragging ? .white.opacity(0.4) : .clear, radius: isDragging ? 4 : 0)
+                        .shadow(color: isDragging ? visualizerColor.opacity(0.5) : .clear, radius: isDragging ? 6 : 0)
                 }
             }
             .frame(height: trackHeight)
             .frame(maxHeight: .infinity, alignment: .center)
-            .scaleEffect(y: isDragging ? 1.1 : 1.0, anchor: .center)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isDragging)
+            .animation(.spring(response: 0.2, dampingFraction: 0.75), value: isDragging)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) {
                             isDragging = true
                         }
                         let fraction = max(0, min(1, value.location.x / width))
@@ -373,7 +455,7 @@ struct MediaPlayerView: View {
                         let fraction = max(0, min(1, value.location.x / width))
                         let seekTime = Double(fraction) * musicManager.songDuration
                         musicManager.seek(to: seekTime)
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
                             isDragging = false
                         }
                         lastDragTime = Date()
@@ -462,6 +544,73 @@ struct MediaPlayerView: View {
         .animation(.spring(response: 0.25, dampingFraction: 0.8), value: inlineHUDType != nil)
         .allowsHitTesting(true)
     }
+    
+    // MARK: - Compact Controls Row (for horizontal layout)
+    
+    @ViewBuilder
+    private var controlsRowCompact: some View {
+        let isSpotify = musicManager.isSpotifySource
+        let spotify = musicManager.spotifyController
+        let spotifyGreen = Color(red: 0.11, green: 0.73, blue: 0.33)
+        
+        ZStack {
+            // Compact centered controls
+            HStack(spacing: 20) {
+                // Shuffle (Spotify only)
+                if isSpotify {
+                    SpotifyControlButton(
+                        icon: "shuffle",
+                        isActive: spotify.shuffleEnabled,
+                        accentColor: spotifyGreen,
+                        size: 16
+                    ) {
+                        spotify.toggleShuffle()
+                    }
+                }
+                
+                // Previous
+                MediaControlButton(icon: "backward.fill", size: 18, tapPadding: 6) {
+                    musicManager.previousTrack()
+                }
+                
+                // Play/Pause (slightly larger)
+                MediaControlButton(
+                    icon: musicManager.isPlaying ? "pause.fill" : "play.fill",
+                    size: 24,
+                    tapPadding: 6
+                ) {
+                    musicManager.togglePlay()
+                }
+                
+                // Next
+                MediaControlButton(icon: "forward.fill", size: 18, tapPadding: 6) {
+                    musicManager.nextTrack()
+                }
+                
+                // Repeat (Spotify only)
+                if isSpotify {
+                    SpotifyControlButton(
+                        icon: spotify.repeatMode.iconName,
+                        isActive: spotify.repeatMode != .off,
+                        accentColor: spotifyGreen,
+                        size: 16
+                    ) {
+                        spotify.cycleRepeatMode()
+                    }
+                }
+            }
+            .opacity(inlineHUDType != nil ? 0 : 1)
+            .scaleEffect(inlineHUDType != nil ? 0.9 : 1)
+            
+            // Inline HUD overlay
+            if let hudType = inlineHUDType {
+                InlineHUDView(type: hudType, value: inlineHUDValue)
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: inlineHUDType != nil)
+    }
 }
 
 // Components moved to MediaPlayerComponents.swift
@@ -469,10 +618,10 @@ struct MediaPlayerView: View {
 
 // MARK: - Preview
 
-#Preview("Media Player") {
+#Preview("Media Player - Horizontal Layout") {
     VStack {
         MediaPlayerView(musicManager: MusicManager.shared)
-            .frame(width: 350, height: 200)
+            .frame(width: 480, height: 130)
             .background(Color.black)
             .clipShape(RoundedRectangle(cornerRadius: 20))
     }

@@ -1082,6 +1082,7 @@ struct SettingsView: View {
     // MARK: - Clipboard
     @AppStorage("enableClipboardBeta") private var enableClipboard = true
     @AppStorage("clipboardHistoryLimit") private var clipboardHistoryLimit = 50
+    @AppStorage("clipboardAutoFocusSearch") private var autoFocusSearch = false
     @State private var currentShortcut: SavedShortcut?
     @State private var showAppPicker: Bool = false
     @ObservedObject private var clipboardManager = ClipboardManager.shared
@@ -1103,6 +1104,30 @@ struct SettingsView: View {
             // Update active monitor
             if enableClipboard {
                  ClipboardWindowController.shared.startMonitoringShortcut()
+            }
+        }
+    }
+    
+    // MARK: - Copy+Favorite Shortcut (Issue #43)
+    @AppStorage("clipboardCopyFavoriteEnabled") private var copyFavoriteEnabled = false
+    @State private var copyFavoriteShortcut: SavedShortcut?
+    
+    private func loadCopyFavoriteShortcut() {
+        if let data = UserDefaults.standard.data(forKey: "clipboardCopyFavoriteShortcut"),
+           let decoded = try? JSONDecoder().decode(SavedShortcut.self, from: data) {
+            copyFavoriteShortcut = decoded
+        } else {
+            // Default: Cmd+Shift+C
+            copyFavoriteShortcut = SavedShortcut(keyCode: 8, modifiers: NSEvent.ModifierFlags([.command, .shift]).rawValue)
+        }
+    }
+    
+    private func saveCopyFavoriteShortcut(_ shortcut: SavedShortcut?) {
+        if let s = shortcut, let encoded = try? JSONEncoder().encode(s) {
+            UserDefaults.standard.set(encoded, forKey: "clipboardCopyFavoriteShortcut")
+            // Restart the shortcut
+            if copyFavoriteEnabled {
+                ClipboardWindowController.shared.startCopyFavoriteShortcut()
             }
         }
     }
@@ -1181,6 +1206,50 @@ struct SettingsView: View {
                     }
                 }
                 
+                // Auto-focus search toggle (Issue #43)
+                Toggle(isOn: $autoFocusSearch) {
+                    VStack(alignment: .leading) {
+                        Text("Auto-Focus Search")
+                        Text("Open search bar automatically when clipboard opens")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                // Copy+Favorite Shortcut (Issue #43)
+                Divider()
+                    .padding(.vertical, 4)
+                
+                Toggle(isOn: $copyFavoriteEnabled) {
+                    VStack(alignment: .leading) {
+                        Text("Copy + Favorite Shortcut")
+                        Text("Global shortcut to copy and mark as favorite at once")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .onChange(of: copyFavoriteEnabled) { _, newValue in
+                    if newValue {
+                        ClipboardWindowController.shared.startCopyFavoriteShortcut()
+                    } else {
+                        ClipboardWindowController.shared.stopCopyFavoriteShortcut()
+                    }
+                }
+                
+                if copyFavoriteEnabled {
+                    HStack {
+                        Text("Shortcut")
+                        Spacer()
+                        KeyShortcutRecorder(shortcut: Binding(
+                            get: { copyFavoriteShortcut },
+                            set: { newVal in
+                                copyFavoriteShortcut = newVal
+                                saveCopyFavoriteShortcut(newVal)
+                            }
+                        ))
+                    }
+                }
+                
                 // MARK: - Excluded Apps Section
                 excludedAppsSection
             }
@@ -1191,6 +1260,7 @@ struct SettingsView: View {
         }
         .onAppear {
             loadShortcut()
+            loadCopyFavoriteShortcut()
         }
     }
     

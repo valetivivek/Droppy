@@ -12,6 +12,10 @@ class ClipboardWindowController: NSObject, NSWindowDelegate {
     private var globalEventMonitor: Any?
     private var localEventMonitor: Any?
     
+    // Copy+Favorite shortcut (Issue #43)
+    private var copyFavoriteHotKey: GlobalHotKey?
+    private var copyFavoriteLocalMonitor: Any?
+    
     private override init() {
         super.init()
         // Lazy setup when needed or on init? Let's do on init to be ready.
@@ -328,6 +332,9 @@ class ClipboardWindowController: NSObject, NSWindowDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in
             self?.checkPermissionsDebounced()
         }
+        
+        // 4. Start Copy+Favorite shortcut (Issue #43)
+        startCopyFavoriteShortcut()
     }
     
     /// Tracks last permission check to prevent rapid re-checks
@@ -397,6 +404,60 @@ class ClipboardWindowController: NSObject, NSWindowDelegate {
         if let monitor = localEventMonitor {
             NSEvent.removeMonitor(monitor)
             localEventMonitor = nil
+        }
+        
+        // Also stop Copy+Favorite shortcut
+        stopCopyFavoriteShortcut()
+    }
+    
+    // MARK: - Copy+Favorite Shortcut (Issue #43)
+    
+    func startCopyFavoriteShortcut() {
+        stopCopyFavoriteShortcut()
+        
+        // Check if enabled
+        guard UserDefaults.standard.bool(forKey: "clipboardCopyFavoriteEnabled") else { 
+            print("⌨️ Droppy: Copy+Favorite disabled")
+            return 
+        }
+        
+        // Load saved shortcut or use default (Cmd+Shift+C)
+        var targetKeyCode = 8 // C key
+        var targetModifiers: UInt = NSEvent.ModifierFlags([.command, .shift]).rawValue
+        
+        if let data = UserDefaults.standard.data(forKey: "clipboardCopyFavoriteShortcut"),
+           let decoded = try? JSONDecoder().decode(SavedShortcut.self, from: data) {
+            targetKeyCode = decoded.keyCode
+            targetModifiers = decoded.modifiers
+        }
+        
+        print("⌨️ Droppy: Registering Copy+Favorite shortcut - keyCode: \(targetKeyCode), modifiers: \(targetModifiers)")
+        
+        // Register Carbon HotKey for Copy+Favorite
+        copyFavoriteHotKey = GlobalHotKey(keyCode: targetKeyCode, modifiers: targetModifiers) {
+            print("⌨️ Droppy: Copy+Favorite Shortcut Triggered")
+            // Get the current clipboard content and favorite it
+            ClipboardManager.shared.copyAndFavoriteCurrentClipboard()
+        }
+        
+        // Local monitor to swallow the event
+        copyFavoriteLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if flags.rawValue == targetModifiers && event.keyCode == targetKeyCode {
+                return nil
+            }
+            return event
+        }
+        
+        print("⌨️ Droppy: Copy+Favorite Shortcut Registered")
+    }
+    
+    func stopCopyFavoriteShortcut() {
+        copyFavoriteHotKey = nil
+        
+        if let monitor = copyFavoriteLocalMonitor {
+            NSEvent.removeMonitor(monitor)
+            copyFavoriteLocalMonitor = nil
         }
     }
 }

@@ -20,6 +20,7 @@ class QuickLookDataSource: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDel
 struct ClipboardManagerView: View {
     @ObservedObject var manager = ClipboardManager.shared
     @AppStorage("useTransparentBackground") private var useTransparentBackground = false
+    @AppStorage("clipboardAutoFocusSearch") private var autoFocusSearch = false
     @State private var selectedItems: Set<UUID> = []
     @State private var isResetHovering = false
     @State private var scrollProxy: ScrollViewProxy?
@@ -212,8 +213,17 @@ struct ClipboardManagerView: View {
         // Issue #33: Always highlight the last copied item (first in list), not the last selected item
         // Also reset search state when opening
         searchText = ""
-        isSearchVisible = false
-        isSearchFocused = false
+        
+        // Issue #43: Auto-focus search if enabled
+        if autoFocusSearch {
+            isSearchVisible = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isSearchFocused = true
+            }
+        } else {
+            isSearchVisible = false
+            isSearchFocused = false
+        }
         
         // Logic change: "Last Copied" is the chronologically newest item.
         // Since manager.history is pre-sorted with Favorites at the top, we must search by date.

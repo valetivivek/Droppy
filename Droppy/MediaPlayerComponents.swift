@@ -181,6 +181,7 @@ struct SpotifyBadge: View {
 struct MediaControlButton: View {
     let icon: String
     let size: CGFloat
+    var tapPadding: CGFloat = 16  // Extra padding around icon for tap target (default: 16, compact: 8)
     let action: () -> Void
     
     @State private var isHovering = false
@@ -190,7 +191,7 @@ struct MediaControlButton: View {
             Image(systemName: icon)
                 .font(.system(size: size, weight: .bold))
                 .foregroundStyle(.white)
-                .frame(width: size + 16, height: size + 16)
+                .frame(width: size + tapPadding, height: size + tapPadding)
                 .contentShape(Rectangle())
                 .contentTransition(.symbolEffect(.replace))
         }
@@ -224,6 +225,7 @@ struct SpotifyControlButton: View {
     var isActive: Bool = false
     var isLoading: Bool = false
     var accentColor: Color = .white
+    var size: CGFloat = 16  // Icon size (tap target scales proportionally)
     let action: () -> Void
     
     @State private var isHovering = false
@@ -235,6 +237,10 @@ struct SpotifyControlButton: View {
         return .white.opacity(0.6)
     }
     
+    private var tapTargetSize: CGFloat {
+        size * 2.5  // Proportional tap target
+    }
+    
     var body: some View {
         Button(action: action) {
             ZStack {
@@ -244,12 +250,12 @@ struct SpotifyControlButton: View {
                         .progressViewStyle(.circular)
                 } else {
                     Image(systemName: icon)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: size, weight: .semibold))
                         .foregroundStyle(foregroundColor)
                         .contentTransition(.symbolEffect(.replace))
                 }
             }
-            .frame(width: 40, height: 40)  // Larger tap target
+            .frame(width: tapTargetSize, height: tapTargetSize)
             .background(
                 Circle()
                     .fill(isActive ? accentColor.opacity(0.15) : Color.white.opacity(isHovering ? 0.08 : 0))

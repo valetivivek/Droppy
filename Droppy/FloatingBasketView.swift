@@ -314,18 +314,9 @@ struct FloatingBasketView: View {
         if enableAirDropZone {
             // Split layout when AirDrop zone is enabled
             HStack(spacing: 0) {
-                // Main basket zone content
-                VStack(spacing: 12) {
-                    Image(systemName: state.isBasketTargeted ? "tray.and.arrow.down.fill" : "tray.and.arrow.down")
-                        .font(.system(size: 32, weight: .light))
-                        .foregroundStyle(state.isBasketTargeted ? .blue : .primary.opacity(0.7))
-                        .symbolEffect(.bounce, value: state.isBasketTargeted)
-                    
-                    Text(state.isBasketTargeted ? "Drop!" : "Drop files here")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(state.isBasketTargeted ? .primary : .secondary)
-                }
-                .frame(width: baseWidth)
+                // Main basket zone content - face reacts to hover
+                NotchFace(size: 50, isExcited: state.isBasketTargeted)
+                    .frame(width: baseWidth)
                 
                 // Empty space - the icon is already in airDropZoneBackground
                 Color.clear
@@ -333,18 +324,9 @@ struct FloatingBasketView: View {
             }
             .allowsHitTesting(false)
         } else {
-            // Original layout when AirDrop zone is disabled - unchanged from before
-            VStack(spacing: 12) {
-                Image(systemName: state.isBasketTargeted ? "tray.and.arrow.down.fill" : "tray.and.arrow.down")
-                    .font(.system(size: 32, weight: .light))
-                    .foregroundStyle(state.isBasketTargeted ? .blue : .primary.opacity(0.7))
-                    .symbolEffect(.bounce, value: state.isBasketTargeted)
-                
-                Text(state.isBasketTargeted ? "Drop!" : "Drop files here")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(state.isBasketTargeted ? .primary : .secondary)
-            }
-            .allowsHitTesting(false)
+            // Original layout when AirDrop zone is disabled
+            NotchFace(size: 50, isExcited: state.isBasketTargeted)
+                .allowsHitTesting(false)
         }
     }
     
@@ -472,8 +454,14 @@ struct FloatingBasketView: View {
                         BasketItemView(item: item, state: state, renamingItemId: $renamingItemId) {
                             state.removeBasketItem(item)
                         }
+                        // Smooth in-place morph matching shelf behavior
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
+                        ))
                     }
                 }
+                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: state.basketItems.count)
             }
             .padding(.horizontal, horizontalPadding)
             .padding(.bottom, 16)

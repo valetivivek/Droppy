@@ -138,6 +138,9 @@ class ClipboardManager: ObservableObject {
     @Published var showPasteFeedback: Bool = false
     @Published var isEditingContent: Bool = false  // Track if user is editing text content
     
+    /// Flag to mark next captured clipboard item as favorite (Issue #43 Copy+Favorite)
+    private var favoriteNextCapture: Bool = false
+    
     // MARK: - Settings (UserDefaults)
     // Using direct UserDefaults access instead of @AppStorage to avoid crashes in Timer callbacks
     
@@ -464,6 +467,14 @@ class ClipboardManager: ObservableObject {
 
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            
+            // Check if we should favorite the next capture (Issue #43)
+            let shouldFavorite = self.favoriteNextCapture
+            if shouldFavorite {
+                self.favoriteNextCapture = false
+                print("⭐ Droppy: Will favorite this capture")
+            }
+            
             for var item in newItems.reversed() {
                 // For images with files, skip duplicate detection (expensive to compare files)
                 // For text/url, check if content matches
@@ -480,6 +491,13 @@ class ClipboardManager: ObservableObject {
                         self.history.remove(at: index)
                     }
                 }
+                
+                // Issue #43: Mark as favorite if flag is set
+                if shouldFavorite {
+                    item.isFavorite = true
+                    print("⭐ Droppy: Favorited: \(item.title)")
+                }
+                
                 self.history.insert(item, at: 0)
             }
             self.enforceHistoryLimit()
@@ -690,6 +708,52 @@ class ClipboardManager: ObservableObject {
     
     func isAppExcluded(_ bundleID: String) -> Bool {
         excludedApps.contains(bundleID)
+    }
+    
+    // MARK: - Copy + Favorite (Issue #43)
+    
+    /// Simulates Cmd+C to copy current selection, then marks it as favorite
+    /// Called by the global Copy+Favorite shortcut
+    func copyAndFavoriteCurrentClipboard() {
+        print("⭐ Droppy: Copy+Favorite triggered")
+        
+        // Set flag to favorite the next captured item
+        favoriteNextCapture = true
+        
+        // Simulate Cmd+C to copy current selection
+        // The clipboard monitor will pick up the change and apply the favorite flag
+        simulateCopyCommand()
+    }
+    
+    /// Simulates Cmd+C key press to copy current selection
+    private func simulateCopyCommand() {
+        let source = CGEventSource(stateID: .hidSystemState)
+        let cmdKey: CGKeyCode = 55 // kVK_Command
+        let cKey: CGKeyCode = 8    // kVK_ANSI_C
+        
+        // 1. Cmd Down
+        guard let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: cmdKey, keyDown: true) else { return }
+        cmdDown.flags = .maskCommand
+        
+        // 2. C Down
+        guard let cDown = CGEvent(keyboardEventSource: source, virtualKey: cKey, keyDown: true) else { return }
+        cDown.flags = .maskCommand
+        
+        // 3. C Up
+        guard let cUp = CGEvent(keyboardEventSource: source, virtualKey: cKey, keyDown: false) else { return }
+        cUp.flags = .maskCommand
+        
+        // 4. Cmd Up
+        guard let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: cmdKey, keyDown: false) else { return }
+        
+        // Post events
+        let loc = CGEventTapLocation.cghidEventTap
+        cmdDown.post(tap: loc)
+        cDown.post(tap: loc)
+        cUp.post(tap: loc)
+        cmdUp.post(tap: loc)
+        
+        print("⭐ Droppy: Simulated Cmd+C")
     }
     
     // MARK: - Image Compression (for NEW entries only)
