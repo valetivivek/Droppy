@@ -35,13 +35,13 @@
 
 ## What is Droppy?
 
-Droppy started as a simple idea: make the MacBook notch actually useful. Drop files into it, drag them out later. That's it.
+Droppy turns your MacBook notch into something actually useful. Drop files into it, stash them, drag them out anywhere. That's the core — a fast, native file shelf that stays out of your way.
 
-Then it kept growing. Clipboard history felt obvious, so that went in. Then a media player that actually looks good. Then I thought — why am I opening five different apps for things that should just... work?
+Everything else is optional. Want clipboard history? Turn it on. Media controls with a live visualizer? It's there. Voice transcription, AI background removal, a terminal right in your notch, window snapping — all available as lightweight extensions you install only if you want them.
 
-So now Droppy does a lot: file stashing, clipboard manager, media controls with a live visualizer, system HUDs for volume and brightness, voice transcription, AI background removal, a quick terminal, window snapping, bulk file conversions, and shortcuts for basically everything. It all lives in your notch (or a Dynamic Island pill if you don't have one).
+The app itself is tiny. It launches instantly, never lags, and feels like it belongs on macOS because it's built entirely in Swift. No Electron, no web views.
 
-It's free. It's open-source. No subscriptions, no telemetry, no weird permissions you don't understand. Just one native Swift app that replaces a bunch of separate tools.
+Keep it minimal or stack it with everything. Either way, it's free, open-source, and replaces a dozen separate tools.
 
 ---
 
