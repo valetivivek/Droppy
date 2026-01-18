@@ -215,10 +215,11 @@ struct TerminalNotchView: View {
             Spacer(minLength: 0)
         }
         // CRITICAL: Use exact same padding as MediaPlayerView for alignment
+        // Bottom needs extra space (60pt) for floating buttons
         .padding(EdgeInsets(
             top: notchHeight > 0 ? notchHeight + 6 : 20,
             leading: 20,
-            bottom: 20,
+            bottom: 60,
             trailing: 20
         ))
     }
