@@ -18,6 +18,7 @@ struct TerminalNotchInfoView: View {
     @State private var isHoveringReset = false
     @State private var showReviewsSheet = false
     @State private var isRecordingShortcut = false
+    @State private var showShortcutInfo = false
     @State private var recordMonitor: Any?
     
     var installCount: Int?
@@ -204,6 +205,48 @@ struct TerminalNotchInfoView: View {
                     Text("Keyboard Shortcut")
                         .font(.headline)
                         .foregroundStyle(.primary)
+                    
+                    // Info button tooltip
+                    Button {
+                        showShortcutInfo.toggle()
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showShortcutInfo, arrowEdge: .trailing) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Accessing Termi-Notch")
+                                .font(.system(size: 15, weight: .semibold))
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "keyboard")
+                                        .foregroundStyle(.green)
+                                    Text("Use **shortcut** from anywhere")
+                                        .font(.system(size: 13))
+                                }
+                                
+                                HStack(spacing: 8) {
+                                    Image(systemName: "tray.and.arrow.down")
+                                        .foregroundStyle(.blue)
+                                    Text("**Click** terminal icon in expanded shelf")
+                                        .font(.system(size: 13))
+                                }
+                                
+                                HStack(spacing: 8) {
+                                    Image(systemName: "music.note")
+                                        .foregroundStyle(.pink)
+                                    Text("Also visible in **media HUD**")
+                                        .font(.system(size: 13))
+                                }
+                            }
+                            .foregroundStyle(.secondary)
+                        }
+                        .padding(16)
+                        .frame(width: 280)
+                    }
                     
                     Spacer()
                 }
