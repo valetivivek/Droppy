@@ -2408,7 +2408,7 @@ struct ProtectOriginalsWarningSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringConfirm = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringConfirm = h }
                 }
                 
                 Spacer()
@@ -2432,7 +2432,7 @@ struct ProtectOriginalsWarningSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringCancel = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringCancel = h }
                 }
             }
             .padding(16)
@@ -2562,7 +2562,7 @@ struct StabilizeMediaInfoSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringDisable = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringDisable = h }
                 }
                 
                 Spacer()
@@ -2585,7 +2585,7 @@ struct StabilizeMediaInfoSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringKeep = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringKeep = h }
                 }
             }
             .padding(16)
@@ -2715,7 +2715,7 @@ struct AutoFocusSearchInfoSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringDisable = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringDisable = h }
                 }
                 
                 Spacer()
@@ -2738,7 +2738,7 @@ struct AutoFocusSearchInfoSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringKeep = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringKeep = h }
                 }
             }
             .padding(16)
@@ -2821,7 +2821,7 @@ struct FullDiskAccessSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringCancel = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringCancel = h }
                 }
                 
                 Spacer()
@@ -2845,7 +2845,7 @@ struct FullDiskAccessSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringGranted = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringGranted = h }
                 }
                 
                 // Open Settings (primary - right)
@@ -2868,7 +2868,7 @@ struct FullDiskAccessSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringOpen = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringOpen = h }
                 }
             }
             .padding(16)
@@ -2980,7 +2980,7 @@ struct MenuBarHiddenSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringCancel = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringCancel = h }
                 }
                 
                 Spacer()
@@ -3004,7 +3004,7 @@ struct MenuBarHiddenSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringHide = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringHide = h }
                 }
             }
             .padding(16)
@@ -3486,7 +3486,7 @@ struct QuickActionsInfoSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringDisable = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringDisable = h }
                 }
                 
                 Spacer()
@@ -3509,7 +3509,7 @@ struct QuickActionsInfoSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringKeep = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringKeep = h }
                 }
             }
             .padding(16)

@@ -638,7 +638,7 @@ struct NotchItemView: View {
                     thumbnail = cached
                 } else if let asyncThumbnail = await ThumbnailCache.shared.loadThumbnailAsync(for: item, size: CGSize(width: 120, height: 120)) {
                     // Smooth swap to better thumbnail
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    withAnimation(DroppyAnimation.hover) {
                         thumbnail = asyncThumbnail
                     }
                 }

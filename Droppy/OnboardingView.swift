@@ -237,7 +237,7 @@ struct OnboardingView: View {
     
     private func navigateNext() {
         direction = 1
-        withAnimation(.easeInOut(duration: 0.25)) {
+        withAnimation(DroppyAnimation.state) {
             currentPage = OnboardingPage(rawValue: currentPage.rawValue + 1) ?? .ready
         }
         if currentPage == .ready {
@@ -247,7 +247,7 @@ struct OnboardingView: View {
     
     private func navigateBack() {
         direction = -1
-        withAnimation(.easeInOut(duration: 0.25)) {
+        withAnimation(DroppyAnimation.state) {
             currentPage = OnboardingPage(rawValue: currentPage.rawValue - 1) ?? .welcome
         }
     }

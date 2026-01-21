@@ -585,7 +585,7 @@ struct SmartExportInfoSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringDisable = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringDisable = h }
                 }
                 
                 Spacer()
@@ -612,7 +612,7 @@ struct SmartExportInfoSheet: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringConfigure = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringConfigure = h }
                 }
             }
             .padding(16)
