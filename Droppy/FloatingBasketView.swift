@@ -27,6 +27,7 @@ struct FloatingBasketView: View {
     @AppStorage(AppPreferenceKey.enableNotchShelf) private var enableNotchShelf = PreferenceDefault.enableNotchShelf
     @AppStorage(AppPreferenceKey.enableAutoClean) private var enableAutoClean = PreferenceDefault.enableAutoClean
     @AppStorage(AppPreferenceKey.enableAirDropZone) private var enableAirDropZone = PreferenceDefault.enableAirDropZone
+    @AppStorage(AppPreferenceKey.enableQuickActions) private var enableQuickActions = PreferenceDefault.enableQuickActions
     
     @State private var dashPhase: CGFloat = 0
     
@@ -97,7 +98,8 @@ struct FloatingBasketView: View {
     // Hover States for buttons
     @State private var isShelfButtonHovering = false
     @State private var isClipboardButtonHovering = false
-    @State private var isCloseButtonHovering = false
+    @State private var isSelectAllHovering = false
+    @State private var isDropHereHovering = false
     @State private var headerFrame: CGRect = .zero
     
     
@@ -106,86 +108,9 @@ struct FloatingBasketView: View {
             Color.clear
             
             VStack(spacing: 12) {
-            // Main Basket Content
-            ZStack {
-                    // Background (extracted to reduce type-checker complexity)
-                    basketBackground
-                    .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 6)
-
-                    
-                    // Content
-                    if state.basketItems.isEmpty {
-                        emptyContent
-                    } else {
-                        itemsContent
-                    }
-                    
-                    // Selection rectangle overlay
-                    if isDragSelecting {
-                        Rectangle()
-                            .fill(Color.blue.opacity(0.2))
-                            .overlay(
-                                Rectangle()
-                                    .stroke(Color.blue, lineWidth: 1)
-                            )
-                            .frame(width: selectionRect.width, height: selectionRect.height)
-                            .position(x: selectionRect.midX, y: selectionRect.midY)
-                    }
-                }
-                .frame(width: currentWidth, height: currentHeight)
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .scaleEffect((state.isBasketTargeted || state.isAirDropZoneTargeted) ? 1.03 : 1.0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isBasketTargeted)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isAirDropZoneTargeted)
-                // Use same spring animation as shelf for row expansion
-                .animation(.spring(response: 0.35, dampingFraction: 0.7), value: state.basketItems.count)
-                .coordinateSpace(name: "basketContainer")
-                .onPreferenceChange(ItemFramePreferenceKey.self) { frames in
-                    self.itemFrames = frames
-                }
-                .gesture(
-                    DragGesture(minimumDistance: 5, coordinateSpace: .local)
-                        .onChanged { value in
-                            if !isDragSelecting {
-                                // Ignore drags starting in the header (window drag area)
-                                if headerFrame.contains(value.startLocation) {
-                                    return
-                                }
-                                
-                                // Check if drag started on an item using robust geometry data
-                                for frame in itemFrames.values {
-                                    if frame.contains(value.startLocation) {
-                                        return
-                                    }
-                                }
-                                
-                                // Start selection
-                                isDragSelecting = true
-                                dragSelectionStart = value.startLocation
-                                state.deselectAllBasket()
-                            }
-                            dragSelectionCurrent = value.location
-                            
-                            // Update selection based on items intersecting the rectangle
-                            updateSelectionFromRect()
-                        }
-                        .onEnded { _ in
-                            isDragSelecting = false
-                        }
-                )
-                // Removed .onTapGesture from here to prevent swallowing touches on children
-                .onAppear {
-                    withAnimation(.linear(duration: 25).repeatForever(autoreverses: false)) {
-                        dashPhase -= 280 // Multiple of 14 (6+8) for smooth loop
-                    }
-                }
-                .onChange(of: state.basketItems.count) { oldCount, newCount in
-                    if newCount == 0 {
-                        FloatingBasketWindowController.shared.hideBasket()
-                    }
-                }
-            } // Close VStack
-        } // Close ZStack
+                mainBasketContainer
+            }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea()
         // MARK: - Auto-Hide Hover Tracking
@@ -204,6 +129,104 @@ struct FloatingBasketView: View {
             .keyboardShortcut("a", modifiers: .command)
             .opacity(0)
         }
+    }
+    
+    private var mainBasketContainer: some View {
+        ZStack {
+            // Background (extracted to reduce type-checker complexity)
+            basketBackground
+                .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 6)
+            
+            // Content
+            if state.basketItems.isEmpty {
+                emptyContent
+            } else {
+                itemsContent
+            }
+            
+            // Selection rectangle overlay
+            if isDragSelecting {
+                selectionRectangleOverlay
+            }
+        }
+        .frame(width: currentWidth, height: currentHeight)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .scaleEffect((state.isBasketTargeted || state.isAirDropZoneTargeted) ? 1.03 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isBasketTargeted)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isAirDropZoneTargeted)
+        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: state.basketItems.count)
+        .coordinateSpace(name: "basketContainer")
+        .onPreferenceChange(ItemFramePreferenceKey.self) { frames in
+            self.itemFrames = frames
+        }
+        .gesture(dragSelectionGesture)
+        .onAppear {
+            withAnimation(.linear(duration: 25).repeatForever(autoreverses: false)) {
+                dashPhase -= 280
+            }
+        }
+        .onChange(of: state.basketItems.count) { oldCount, newCount in
+            if newCount == 0 {
+                FloatingBasketWindowController.shared.hideBasket()
+            }
+        }
+        .contextMenu {
+            Button {
+                closeBasket()
+            } label: {
+                Label("Clear Basket", systemImage: "trash")
+            }
+            
+            Divider()
+            
+            Button {
+                SettingsWindowController.shared.showSettings()
+            } label: {
+                Label("Open Settings", systemImage: "gear")
+            }
+        }
+    }
+    
+    private var selectionRectangleOverlay: some View {
+        Rectangle()
+            .fill(Color.blue.opacity(0.2))
+            .overlay(
+                Rectangle()
+                    .stroke(Color.blue, lineWidth: 1)
+            )
+            .frame(width: selectionRect.width, height: selectionRect.height)
+            .position(x: selectionRect.midX, y: selectionRect.midY)
+    }
+    
+    private var dragSelectionGesture: some Gesture {
+        DragGesture(minimumDistance: 5, coordinateSpace: .local)
+            .onChanged { value in
+                if !isDragSelecting {
+                    // Ignore drags starting in the header (window drag area)
+                    if headerFrame.contains(value.startLocation) {
+                        return
+                    }
+                    
+                    // Check if drag started on an item using robust geometry data
+                    for frame in itemFrames.values {
+                        if frame.contains(value.startLocation) {
+                            return
+                        }
+                    }
+                    
+                    // Start selection
+                    isDragSelecting = true
+                    dragSelectionStart = value.startLocation
+                    state.deselectAllBasket()
+                }
+                dragSelectionCurrent = value.location
+                
+                // Update selection based on items intersecting the rectangle
+                updateSelectionFromRect()
+            }
+            .onEnded { _ in
+                isDragSelecting = false
+            }
     }
     
     private func updateSelectionFromRect() {
@@ -329,77 +352,63 @@ struct FloatingBasketView: View {
     }
     
     private var itemsContent: some View {
-        return VStack(spacing: 8) {
-            // Header
-            HStack {
-                Text("\(state.basketItems.count) item\(state.basketItems.count == 1 ? "" : "s")")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                
-                Spacer()
-                
-                // Move to shelf button (only when shelf is enabled)
-                if enableNotchShelf {
-                    Button {
-                        moveToShelf()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.up.to.line")
-                                .font(.system(size: 10, weight: .bold))
-                            Text("To Shelf")
-                                .font(.system(size: 10, weight: .semibold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.blue.opacity(isShelfButtonHovering ? 1.0 : 0.8))
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .onHover { isHovering in
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                            isShelfButtonHovering = isHovering
-                        }
-                    }
-                }
-                
-                // Clipboard button (optional)
-                if showClipboardButton {
-                    Button {
-                        ClipboardWindowController.shared.toggle()
-                    } label: {
-                        Image(systemName: "doc.on.clipboard")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(isClipboardButtonHovering ? .primary : .secondary)
-                            .frame(width: 32, height: 32)
-                            .background(Color.white.opacity(isClipboardButtonHovering ? 0.2 : 0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .onHover { isHovering in
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                            isClipboardButtonHovering = isHovering
-                        }
-                    }
-                }
-                
-                // Close button
+        VStack(spacing: 8) {
+            // Header toolbar (extracted for type-checker)
+            basketHeaderToolbar
+            
+            // Items grid - wrapped in ZStack with background tap handler for deselection
+            basketItemsGrid
+        }
+    }
+    
+    @ViewBuilder
+    private var basketHeaderToolbar: some View {
+        HStack {
+            Text("\(state.basketItems.count) item\(state.basketItems.count == 1 ? "" : "s")")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+            
+            Spacer()
+            
+            // Move to shelf button (only when shelf is enabled)
+            if enableNotchShelf {
                 Button {
-                    closeBasket()
+                    moveToShelf()
                 } label: {
-                    Image(systemName: "eraser.fill")
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.to.line")
+                            .font(.system(size: 10, weight: .bold))
+                        Text("To Shelf")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.blue.opacity(isShelfButtonHovering ? 1.0 : 0.8))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .onHover { isHovering in
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        isShelfButtonHovering = isHovering
+                    }
+                }
+            }
+            
+            // Clipboard button (optional)
+            if showClipboardButton {
+                Button {
+                    ClipboardWindowController.shared.toggle()
+                } label: {
+                    Image(systemName: "doc.on.clipboard")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(isCloseButtonHovering ? .primary : .secondary)
+                        .foregroundStyle(isClipboardButtonHovering ? .primary : .secondary)
                         .frame(width: 32, height: 32)
-                        .background(Color.white.opacity(isCloseButtonHovering ? 0.2 : 0.1))
+                        .background(Color.white.opacity(isClipboardButtonHovering ? 0.2 : 0.1))
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -409,61 +418,129 @@ struct FloatingBasketView: View {
                 .buttonStyle(.plain)
                 .onHover { isHovering in
                     withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                        isCloseButtonHovering = isHovering
+                        isClipboardButtonHovering = isHovering
                     }
                 }
             }
-            .padding(.horizontal, horizontalPadding)
-            .padding(.top, 22)
-
-            .background(WindowDragHandle()) // Allow dragging by header
-            .background(
-                GeometryReader { proxy in
-                    Color.clear
-                        .onAppear {
-                            headerFrame = proxy.frame(in: .named("basketContainer"))
-                        }
-                        .onChange(of: proxy.frame(in: .named("basketContainer"))) { _, newFrame in
-                            headerFrame = newFrame
-                        }
-                }
-            )
             
-            // Items grid - wrapped in ZStack with background tap handler for deselection
-            ZStack {
-                // Background tap handler - catches clicks on empty areas
+            // Quick Actions buttons (extracted for type-checker)
+            quickActionsButtons
+        }
+        .padding(.horizontal, horizontalPadding)
+        .padding(.top, 22)
+        .background(WindowDragHandle())
+        .background(
+            GeometryReader { proxy in
                 Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        state.deselectAllBasket()
-                        // If rename was active, end the file operation lock
-                        if renamingItemId != nil {
-                            state.isRenaming = false
-                            state.endFileOperation()
-                        }
-                        renamingItemId = nil
+                    .onAppear {
+                        headerFrame = proxy.frame(in: .named("basketContainer"))
                     }
-                
-                // Items grid using LazyVGrid for efficient rendering
-                let columns = Array(repeating: GridItem(.fixed(itemWidth), spacing: itemSpacing), count: columnsPerRow)
-                
-                LazyVGrid(columns: columns, spacing: itemSpacing) {
-                    ForEach(state.basketItems) { item in
-                        BasketItemView(item: item, state: state, renamingItemId: $renamingItemId) {
-                            state.removeBasketItem(item)
-                        }
-                        // Smooth in-place morph matching shelf behavior
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 0.8).combined(with: .opacity)
-                        ))
+                    .onChange(of: proxy.frame(in: .named("basketContainer"))) { _, newFrame in
+                        headerFrame = newFrame
+                    }
+            }
+        )
+    }
+    
+    @ViewBuilder
+    private var quickActionsButtons: some View {
+        if enableQuickActions {
+            let allSelected = !state.basketItems.isEmpty && state.selectedBasketItems.count == state.basketItems.count
+            
+            if allSelected {
+                // Add All button - copies all files to Finder folder
+                Button {
+                    dropSelectedToFinder()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 10, weight: .bold))
+                        Text("Add All")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.green.opacity(isDropHereHovering ? 1.0 : 0.8))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .onHover { isHovering in
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        isDropHereHovering = isHovering
                     }
                 }
-                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: state.basketItems.count)
+                .help("Copy all to Finder folder")
+            } else {
+                // Select All button
+                Button {
+                    state.selectAllBasket()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 10, weight: .bold))
+                        Text("Select All")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.blue.opacity(isSelectAllHovering ? 1.0 : 0.8))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .onHover { isHovering in
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        isSelectAllHovering = isHovering
+                    }
+                }
+                .help("Select All (⌘A)")
             }
-            .padding(.horizontal, horizontalPadding)
-            .padding(.bottom, 16)
         }
+    }
+    
+    private var basketItemsGrid: some View {
+        ZStack {
+            // Background tap handler - catches clicks on empty areas
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    state.deselectAllBasket()
+                    // If rename was active, end the file operation lock
+                    if renamingItemId != nil {
+                        state.isRenaming = false
+                        state.endFileOperation()
+                    }
+                    renamingItemId = nil
+                }
+            
+            // Items grid using LazyVGrid for efficient rendering
+            let columns = Array(repeating: GridItem(.fixed(itemWidth), spacing: itemSpacing), count: columnsPerRow)
+            
+            LazyVGrid(columns: columns, spacing: itemSpacing) {
+                ForEach(state.basketItems) { item in
+                    BasketItemView(item: item, state: state, renamingItemId: $renamingItemId) {
+                        state.removeBasketItem(item)
+                    }
+                    // Smooth in-place morph matching shelf behavior
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                        removal: .scale(scale: 0.8).combined(with: .opacity)
+                    ))
+                }
+            }
+            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: state.basketItems.count)
+        }
+        .padding(.horizontal, horizontalPadding)
+        .padding(.bottom, 16)
     }
     
     private func moveToShelf() {
@@ -492,6 +569,45 @@ struct FloatingBasketView: View {
     private func closeBasket() {
         state.clearBasket()
         FloatingBasketWindowController.shared.hideBasket()
+    }
+    
+    private func dropSelectedToFinder() {
+        guard let finderFolder = FinderFolderDetector.getCurrentFinderFolder() else {
+            // Show notification that no Finder folder is open
+            DroppyAlertController.shared.showSimple(
+                style: .info,
+                title: "No Finder folder open",
+                message: "Open a Finder window to drop files into"
+            )
+            return
+        }
+        
+        // Get selected items
+        let selectedItems = state.basketItems.filter { state.selectedBasketItems.contains($0.id) }
+        guard !selectedItems.isEmpty else { return }
+        
+        // Copy files to finder folder
+        let urls = selectedItems.map { $0.url }
+        let copied = FinderFolderDetector.copyFiles(urls, to: finderFolder)
+        
+        if copied > 0 {
+            // Remove from basket
+            for item in selectedItems {
+                state.removeBasketItem(item)
+            }
+            
+            // Show confirmation
+            DroppyAlertController.shared.showSimple(
+                style: .info,
+                title: "Copied \(copied) file\(copied == 1 ? "" : "s")",
+                message: "to \(finderFolder.lastPathComponent)"
+            )
+        }
+        
+        // Hide basket if empty
+        if state.basketItems.isEmpty {
+            FloatingBasketWindowController.shared.hideBasket()
+        }
     }
 }
 

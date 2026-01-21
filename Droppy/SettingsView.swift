@@ -14,6 +14,7 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKey.enableAirDropZone) private var enableAirDropZone = PreferenceDefault.enableAirDropZone
     @AppStorage(AppPreferenceKey.enableShelfAirDropZone) private var enableShelfAirDropZone = PreferenceDefault.enableShelfAirDropZone
     @AppStorage(AppPreferenceKey.enablePowerFolders) private var enablePowerFolders = PreferenceDefault.enablePowerFolders
+    @AppStorage(AppPreferenceKey.enableQuickActions) private var enableQuickActions = PreferenceDefault.enableQuickActions
     @AppStorage(AppPreferenceKey.basketAutoHideEdge) private var basketAutoHideEdge = PreferenceDefault.basketAutoHideEdge
     @AppStorage(AppPreferenceKey.instantBasketOnDrag) private var instantBasketOnDrag = PreferenceDefault.instantBasketOnDrag
     @AppStorage(AppPreferenceKey.instantBasketDelay) private var instantBasketDelay = PreferenceDefault.instantBasketDelay
@@ -54,6 +55,7 @@ struct SettingsView: View {
     @State private var showProtectOriginalsWarning = false  // Warning when disabling Protect Originals
     @State private var showStabilizeMediaWarning = false  // Warning when enabling Stabilize Media
     @State private var showAutoFocusSearchWarning = false  // Warning when enabling Auto-Focus Search
+    @State private var showQuickActionsWarning = false  // Warning when enabling Quick Actions
     
     // Hover states for sidebar items
     @State private var hoverFeatures = false
@@ -319,7 +321,23 @@ struct SettingsView: View {
                     }
                 }
                 
-                // Always Copy (affects actual files on disk) - Advanced setting
+                // Power Folders (affects both shelf and basket)
+                HStack(spacing: 8) {
+                    PowerFoldersInfoButton()
+                    Toggle(isOn: $enablePowerFolders) {
+                        VStack(alignment: .leading) {
+                            Text("Power Folders")
+                            Text("Pin folders and drop files directly into them")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                
+                // Smart Export (auto-save processed files)
+                SmartExportSettingsRow()
+                
+                // Always Copy (affects actual files on disk) - Advanced setting (at bottom)
                 HStack(spacing: 8) {
                     AlwaysCopyInfoButton()
                     Toggle(isOn: $alwaysCopyOnDrag) {
@@ -349,22 +367,6 @@ struct SettingsView: View {
                 .sheet(isPresented: $showProtectOriginalsWarning) {
                     ProtectOriginalsWarningSheet(alwaysCopyOnDrag: $alwaysCopyOnDrag)
                 }
-                
-                // Power Folders (affects both shelf and basket)
-                HStack(spacing: 8) {
-                    PowerFoldersInfoButton()
-                    Toggle(isOn: $enablePowerFolders) {
-                        VStack(alignment: .leading) {
-                            Text("Power Folders")
-                            Text("Pin folders and drop files directly into them")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                
-                // Smart Export (auto-save processed files)
-                SmartExportSettingsRow()
             } header: {
                 Text("Shared Features")
             } footer: {
@@ -487,6 +489,37 @@ struct SettingsView: View {
                         // Animated peek preview
                         PeekPreview(edge: basketAutoHideEdge)
                     }
+                    
+                    // Quick Actions (advanced feature - at bottom)
+                    HStack(spacing: 8) {
+                        QuickActionsInfoButton()
+                        Toggle(isOn: $enableQuickActions) {
+                            VStack(alignment: .leading) {
+                                HStack(alignment: .center, spacing: 6) {
+                                    Text("Quick Actions")
+                                    Text("advanced")
+                                        .font(.system(size: 9, weight: .medium))
+                                        .foregroundStyle(.white.opacity(0.7))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Capsule().fill(Color.white.opacity(0.08)))
+                                        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
+                                }
+                                Text("Select all and drop to Finder folder")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .onChange(of: enableQuickActions) { _, newValue in
+                            if newValue {
+                                // User is enabling - show explanation sheet
+                                showQuickActionsWarning = true
+                            }
+                        }
+                        .sheet(isPresented: $showQuickActionsWarning) {
+                            QuickActionsInfoSheet(enableQuickActions: $enableQuickActions)
+                        }
+                    }
                 }
             } header: {
                 Text("Floating Basket")
@@ -533,6 +566,25 @@ struct SettingsView: View {
                             }
                         }
                         
+                        // Real Audio Visualizer (opt-in for Screen Recording permission)
+                        Toggle(isOn: $enableRealAudioVisualizer) {
+                            VStack(alignment: .leading) {
+                                Text("Real Audio Visualizer")
+                                Text("Visualizer reacts to actual audio output")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .onChange(of: enableRealAudioVisualizer) { _, newValue in
+                            if newValue {
+                                // Request Screen Recording permission when enabled
+                                Task {
+                                    await SystemAudioAnalyzer.shared.requestPermission()
+                                }
+                            }
+                        }
+                        
+                        // Stabilize Media (advanced - at bottom)
                         Toggle(isOn: $debounceMediaChanges) {
                             VStack(alignment: .leading) {
                                 HStack(alignment: .center, spacing: 6) {
@@ -558,24 +610,6 @@ struct SettingsView: View {
                         }
                         .sheet(isPresented: $showStabilizeMediaWarning) {
                             StabilizeMediaInfoSheet(debounceMediaChanges: $debounceMediaChanges)
-                        }
-                        
-                        // Real Audio Visualizer (opt-in for Screen Recording permission)
-                        Toggle(isOn: $enableRealAudioVisualizer) {
-                            VStack(alignment: .leading) {
-                                Text("Real Audio Visualizer")
-                                Text("Visualizer reacts to actual audio output")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .onChange(of: enableRealAudioVisualizer) { _, newValue in
-                            if newValue {
-                                // Request Screen Recording permission when enabled
-                                Task {
-                                    await SystemAudioAnalyzer.shared.requestPermission()
-                                }
-                            }
                         }
                     }
                 } else {
@@ -1298,34 +1332,6 @@ struct SettingsView: View {
                     }
                 }
                 
-                // Auto-focus search toggle (Issue #43)
-                Toggle(isOn: $autoFocusSearch) {
-                    VStack(alignment: .leading) {
-                        HStack(alignment: .center, spacing: 6) {
-                            Text("Auto-Focus Search")
-                            Text("advanced")
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.7))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Capsule().fill(Color.white.opacity(0.08)))
-                                .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
-                        }
-                        Text("Open search bar automatically when clipboard opens")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .onChange(of: autoFocusSearch) { _, newValue in
-                    if newValue {
-                        // User is enabling - show explanation sheet
-                        showAutoFocusSearchWarning = true
-                    }
-                }
-                .sheet(isPresented: $showAutoFocusSearchWarning) {
-                    AutoFocusSearchInfoSheet(autoFocusSearch: $autoFocusSearch)
-                }
-                
                 // Copy+Favorite Shortcut (Issue #43)
                 Toggle(isOn: $copyFavoriteEnabled) {
                     VStack(alignment: .leading) {
@@ -1355,6 +1361,34 @@ struct SettingsView: View {
                             }
                         ))
                     }
+                }
+                
+                // Auto-focus search toggle (advanced - at bottom)
+                Toggle(isOn: $autoFocusSearch) {
+                    VStack(alignment: .leading) {
+                        HStack(alignment: .center, spacing: 6) {
+                            Text("Auto-Focus Search")
+                            Text("advanced")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.white.opacity(0.08)))
+                                .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
+                        }
+                        Text("Open search bar automatically when clipboard opens")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .onChange(of: autoFocusSearch) { _, newValue in
+                    if newValue {
+                        // User is enabling - show explanation sheet
+                        showAutoFocusSearchWarning = true
+                    }
+                }
+                .sheet(isPresented: $showAutoFocusSearchWarning) {
+                    AutoFocusSearchInfoSheet(autoFocusSearch: $autoFocusSearch)
                 }
                 
                 // MARK: - Excluded Apps Section
@@ -2839,7 +2873,7 @@ struct FullDiskAccessSheet: View {
             }
             .padding(16)
         }
-        .frame(width: 400)
+        .frame(width: 380)
         .fixedSize(horizontal: true, vertical: true)
         .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -3267,5 +3301,222 @@ struct ExternalDisplayInfoButton: View {
             .padding(20)
             .frame(width: 190)
         }
+    }
+}
+
+// MARK: - Quick Actions Info Button
+
+struct QuickActionsInfoButton: View {
+    @State private var showPopover = false
+    
+    var body: some View {
+        Button { showPopover.toggle() } label: {
+            Image(systemName: "info.circle")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
+            VStack(alignment: .center, spacing: 16) {
+                Text("Quick Actions")
+                    .font(.system(size: 15, weight: .semibold))
+                
+                // Visual demonstration
+                HStack(spacing: 12) {
+                    // Select All button
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.blue.opacity(0.15))
+                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color.blue.opacity(0.3), lineWidth: 1))
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Color.blue)
+                    }
+                    .frame(width: 36, height: 36)
+                    
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    
+                    // Add All button
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.green.opacity(0.15))
+                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color.green.opacity(0.3), lineWidth: 1))
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Color.green)
+                    }
+                    .frame(width: 36, height: 36)
+                }
+                .padding(.vertical, 4)
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Circle().fill(Color.blue).frame(width: 5, height: 5)
+                        Text("Select All selects all files")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 6) {
+                        Circle().fill(Color.green).frame(width: 5, height: 5)
+                        Text("Add All copies to Finder folder")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(20)
+            .frame(width: 210)
+        }
+    }
+}
+
+// MARK: - Quick Actions Info Sheet
+
+/// Info sheet shown when user enables Quick Actions (advanced feature)
+struct QuickActionsInfoSheet: View {
+    @Binding var enableQuickActions: Bool
+    @AppStorage(AppPreferenceKey.useTransparentBackground) private var useTransparentBackground = PreferenceDefault.useTransparentBackground
+    @Environment(\.dismiss) private var dismiss
+    @State private var isHoveringDisable = false
+    @State private var isHoveringKeep = false
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header with NotchFace
+            VStack(spacing: 16) {
+                NotchFace(size: 60, isExcited: true)
+                
+                Text("Quick Actions Enabled")
+                    .font(.title2.bold())
+                    .foregroundStyle(.primary)
+            }
+            .padding(.top, 28)
+            .padding(.bottom, 20)
+            
+            Divider()
+                .padding(.horizontal, 24)
+            
+            // Content
+            VStack(alignment: .center, spacing: 16) {
+                Text("What this does:")
+                    .font(.callout.weight(.medium))
+                
+                // Card with explanation items
+                VStack(spacing: 0) {
+                    // Info item 1 - Select All
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.blue)
+                            .font(.system(size: 14))
+                            .frame(width: 22)
+                        Text("\"Select All\" button selects all files in the basket")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.primary.opacity(0.85))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.white.opacity(0.02))
+                    .overlay(alignment: .bottom) {
+                        Rectangle().fill(Color.white.opacity(0.04)).frame(height: 0.5)
+                    }
+                    
+                    // Info item 2 - Add All
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.system(size: 14))
+                            .frame(width: 22)
+                        Text("When all selected, button becomes \"Add All\" to copy files to the frontmost Finder folder")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.primary.opacity(0.85))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.white.opacity(0.02))
+                    .overlay(alignment: .bottom) {
+                        Rectangle().fill(Color.white.opacity(0.04)).frame(height: 0.5)
+                    }
+                    
+                    // Info item 3 - Deselect
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "hand.tap.fill")
+                            .foregroundStyle(.orange)
+                            .font(.system(size: 14))
+                            .frame(width: 22)
+                        Text("Click anywhere in the basket to deselect all")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.primary.opacity(0.85))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.white.opacity(0.02))
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+            }
+            .padding(24)
+            
+            Divider()
+                .padding(.horizontal, 24)
+            
+            // Footer with buttons
+            HStack {
+                // Disable (secondary - left)
+                Button {
+                    enableQuickActions = false
+                    dismiss()
+                } label: {
+                    Text("Disable")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(isHoveringDisable ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .onHover { h in
+                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringDisable = h }
+                }
+                
+                Spacer()
+                
+                // Keep Enabled (primary - right)
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Got It")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.blue.opacity(isHoveringKeep ? 1.0 : 0.85))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .onHover { h in
+                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringKeep = h }
+                }
+            }
+            .padding(16)
+        }
+        .frame(width: 380)
+        .fixedSize(horizontal: true, vertical: true)
+        .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }

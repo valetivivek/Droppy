@@ -59,6 +59,7 @@ enum AppPreferenceKey {
     static let enableAirDropZone = "enableAirDropZone"
     static let enableShelfAirDropZone = "enableShelfAirDropZone"
     static let enablePowerFolders = "enablePowerFolders"
+    static let enableQuickActions = "enableQuickActions"
     
     // MARK: - Clipboard
     static let clipboardAutoFocusSearch = "clipboardAutoFocusSearch"
@@ -150,6 +151,7 @@ enum PreferenceDefault {
     static let enableAirDropZone = true
     static let enableShelfAirDropZone = true
     static let enablePowerFolders = true
+    static let enableQuickActions = false  // Advanced feature, opt-in
     
     // MARK: - Clipboard
     static let clipboardAutoFocusSearch = false

@@ -2,7 +2,7 @@
 //  MenuBarManager.swift
 //  Droppy
 //
-//  Menu Bar Manager - Hide/show menu bar icons using ICE-style divider expansion
+//  Menu Bar Manager - Hide/show menu bar icons using divider expansion
 //  Uses two NSStatusItems: a visible toggle button and an expanding divider
 //
 
@@ -44,7 +44,7 @@ final class MenuBarManager: ObservableObject {
     /// Standard length for divider (thin, almost invisible)
     private let dividerStandardLength: CGFloat = 1
     
-    /// Expanded length to push items off-screen (ICE uses 10,000)
+    /// Expanded length to push items off-screen
     private let dividerExpandedLength: CGFloat = 10_000
     
     // MARK: - Persistence Keys
