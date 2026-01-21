@@ -53,6 +53,16 @@ struct ClipboardManagerView: View {
         cachedSortedHistory
     }
     
+    /// Flagged items (shown in 2-column grid at top)
+    private var flaggedItems: [ClipboardItem] {
+        cachedSortedHistory.filter { $0.isFlagged }
+    }
+    
+    /// Non-flagged items (shown in regular list)
+    private var nonFlaggedItems: [ClipboardItem] {
+        cachedSortedHistory.filter { !$0.isFlagged }
+    }
+    
     /// Recompute sorted history (called only when history or search changes)
     private func updateSortedHistory() {
         let historySnapshot = manager.history
@@ -72,10 +82,11 @@ struct ClipboardManagerView: View {
             }
         }
         
-        // Sort: favorites first
-        let favorites = filtered.filter { $0.isFavorite }
-        let others = filtered.filter { !$0.isFavorite }
-        cachedSortedHistory = favorites + others
+        // Sort: flagged first, then favorites, then others
+        let flagged = filtered.filter { $0.isFlagged }
+        let favorites = filtered.filter { $0.isFavorite && !$0.isFlagged }
+        let others = filtered.filter { !$0.isFavorite && !$0.isFlagged }
+        cachedSortedHistory = flagged + favorites + others
     }
     
     // Actions passed from Controller
@@ -505,8 +516,42 @@ struct ClipboardManagerView: View {
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 8) {
-                            ForEach(sortedHistory) { item in
+                        VStack(spacing: 12) {
+                            // Flagged Items Section (2-column grid)
+                            if !flaggedItems.isEmpty {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    // Section header
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "flag.fill")
+                                            .foregroundStyle(.red)
+                                        Text("Important")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .padding(.horizontal, 4)
+                                    
+                                    // 2-column grid for flagged items
+                                    LazyVGrid(columns: [
+                                        GridItem(.flexible(), spacing: 8),
+                                        GridItem(.flexible(), spacing: 8)
+                                    ], spacing: 8) {
+                                        ForEach(flaggedItems) { item in
+                                            flaggedGridItem(for: item)
+                                        }
+                                    }
+                                }
+                                .padding(.bottom, 8)
+                                
+                                // Divider between flagged and regular items
+                                if !nonFlaggedItems.isEmpty {
+                                    Divider()
+                                        .padding(.horizontal, 20)
+                                }
+                            }
+                            
+                            // Regular Items List
+                            LazyVStack(spacing: 8) {
+                                ForEach(nonFlaggedItems) { item in
                                 DraggableArea(
                                     items: {
                                         // If this item is selected, drag all selected
@@ -628,6 +673,20 @@ struct ClipboardManagerView: View {
                                         } label: {
                                             Label(item.isFavorite ? "Unfavorite" : "Favorite", systemImage: item.isFavorite ? "star.slash" : "star")
                                         }
+                                        Button {
+                                            let willBeFlagged = !item.isFlagged
+                                            manager.toggleFlag(item)
+                                            // Scroll to the item after it moves to flagged section
+                                            if willBeFlagged {
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                                    withAnimation(.easeInOut(duration: 0.4)) {
+                                                        scrollProxy?.scrollTo(item.id, anchor: .top)
+                                                    }
+                                                }
+                                            }
+                                        } label: {
+                                            Label(item.isFlagged ? "Remove Flag" : "Flag as Important", systemImage: item.isFlagged ? "flag.slash" : "flag.fill")
+                                        }
                                         Divider()
                                         
                                         // Move to Shelf/Basket
@@ -680,6 +739,93 @@ struct ClipboardManagerView: View {
         }
         .frame(width: 400)
         .frame(maxHeight: .infinity) // Sidebar takes full height, but width fixed
+    }
+    
+    /// Compact grid item for flagged entries
+    @ViewBuilder
+    private func flaggedGridItem(for item: ClipboardItem) -> some View {
+        let isSelected = selectedItems.contains(item.id)
+        
+        Button {
+            selectedItems = [item.id]
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                // Icon + Title
+                HStack(spacing: 6) {
+                    clipboardItemIcon(for: item)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    
+                    Text(item.title)
+                        .font(.system(size: 12, weight: .medium))
+                        .lineLimit(1)
+                        .foregroundStyle(.primary)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "flag.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.red)
+                }
+                
+                // Time
+                Text(item.date, style: .time)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isSelected 
+                          ? Color.blue.opacity(0.8)
+                          : Color.red.opacity(0.15))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(isSelected ? Color.blue : Color.red.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .id(item.id)
+        .contextMenu {
+            Button { onPaste(item) } label: {
+                Label("Paste", systemImage: "doc.on.clipboard")
+            }
+            Button {
+                manager.toggleFlag(item)
+            } label: {
+                Label("Remove Flag", systemImage: "flag.slash")
+            }
+            Button {
+                manager.toggleFavorite(item)
+            } label: {
+                Label(item.isFavorite ? "Unfavorite" : "Favorite", systemImage: item.isFavorite ? "star.slash" : "star")
+            }
+            Divider()
+            Button(role: .destructive) {
+                manager.delete(item: item)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+    
+    /// Icon for clipboard item type
+    @ViewBuilder
+    private func clipboardItemIcon(for item: ClipboardItem) -> some View {
+        switch item.type {
+        case .text:
+            Image(systemName: "doc.text")
+        case .image:
+            Image(systemName: "photo")
+        case .file:
+            Image(systemName: "doc")
+        case .url:
+            Image(systemName: "link")
+        case .color:
+            Image(systemName: "paintpalette")
+        }
     }
     
     var accessibilityWarning: some View {
@@ -1025,11 +1171,16 @@ struct ClipboardItemRow: View {
             
             Spacer()
             
-            // Status icons (key + star)
+            // Status icons (key + flag + star)
             HStack(spacing: 4) {
                 if item.isConcealed {
                     Image(systemName: "key.fill")
                         .foregroundStyle(.secondary)
+                        .font(.system(size: 9))
+                }
+                if item.isFlagged {
+                    Image(systemName: "flag.fill")
+                        .foregroundStyle(.red)
                         .font(.system(size: 9))
                 }
                 if item.isFavorite {
@@ -1045,12 +1196,14 @@ struct ClipboardItemRow: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(isSelected 
                       ? Color.blue.opacity(isHovering ? 1.0 : 0.8) 
-                      : Color.white.opacity(isHovering ? 0.15 : 0.08))
+                      : item.isFlagged 
+                          ? Color.red.opacity(isHovering ? 0.25 : 0.15)
+                          : Color.white.opacity(isHovering ? 0.15 : 0.08))
         )
         .foregroundStyle(isSelected ? .white : .primary)
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                .stroke(item.isFlagged && !isSelected ? Color.red.opacity(0.3) : Color.white.opacity(0.2), lineWidth: 1)
         )
 
         .contentShape(Rectangle())
@@ -1085,8 +1238,10 @@ struct ClipboardPreviewView: View {
     @State private var isPasteHovering = false
     @State private var isCopyHovering = false
     @State private var isStarHovering = false
+    @State private var isFlagHovering = false
     @State private var isTrashHovering = false
     @State private var starAnimationTrigger = false
+    @State private var flagAnimationTrigger = false
     @State private var isDownloadHovering = false
     @State private var isSavingFile = false
     @State private var showSaveSuccess = false
@@ -1537,6 +1692,52 @@ struct ClipboardPreviewView: View {
                 .onHover { hovering in
                     withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
                         isStarHovering = hovering
+                    }
+                }
+                
+                // Flag Button - For important items
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                        flagAnimationTrigger.toggle()
+                    }
+                    let willBeFlagged = !item.isFlagged
+                    manager.toggleFlag(item)
+                    // Scroll to the item after it moves to flagged section
+                    if willBeFlagged {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            withAnimation(.easeInOut(duration: 0.4)) {
+                                scrollProxy?.scrollTo(item.id, anchor: .top)
+                            }
+                        }
+                    }
+                } label: {
+                    ZStack {
+                        // Background glow when flagged
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(Color.red.opacity(item.isFlagged ? 0.2 : 0))
+                            .blur(radius: 8)
+                            .scaleEffect(item.isFlagged ? 1.2 : 0.8)
+                        
+                        Image(systemName: item.isFlagged ? "flag.fill" : "flag")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(item.isFlagged ? .red : (isFlagHovering ? .red.opacity(0.7) : .secondary))
+                            .symbolEffect(.bounce, value: flagAnimationTrigger)
+                    }
+                    .frame(width: 44, height: 44)
+                    .background(isFlagHovering ? Color.red.opacity(0.1) : Color.clear)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(isFlagHovering ? Color.red.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1)
+                    )
+                    .scaleEffect(isFlagHovering ? 1.08 : 1.0)
+                }
+                .buttonStyle(.plain)
+                .help("Flag as Important")
+                .onHover { hovering in
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        isFlagHovering = hovering
                     }
                 }
                 

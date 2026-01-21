@@ -19,6 +19,7 @@ struct ClipboardItem: Identifiable, Codable, Hashable {
     var date: Date = Date()
     var sourceApp: String?
     var isFavorite: Bool = false
+    var isFlagged: Bool = false // Flag as important - appears at top with red tint
     var isConcealed: Bool = false // Password/sensitive content
     var customTitle: String? // User-defined title for easy finding
     
@@ -26,13 +27,13 @@ struct ClipboardItem: Identifiable, Codable, Hashable {
     
     // Custom Codable for backwards compatibility
     enum CodingKeys: String, CodingKey {
-        case id, type, content, imageData, imageFilePath, rtfData, date, sourceApp, isFavorite, isConcealed, customTitle
+        case id, type, content, imageData, imageFilePath, rtfData, date, sourceApp, isFavorite, isFlagged, isConcealed, customTitle
     }
     
     init(id: UUID = UUID(), type: ClipboardType, content: String? = nil, imageData: Data? = nil, 
          imageFilePath: String? = nil, rtfData: Data? = nil,
          date: Date = Date(), sourceApp: String? = nil, isFavorite: Bool = false, 
-         isConcealed: Bool = false, customTitle: String? = nil) {
+         isFlagged: Bool = false, isConcealed: Bool = false, customTitle: String? = nil) {
         self.id = id
         self.type = type
         self.content = content
@@ -42,6 +43,7 @@ struct ClipboardItem: Identifiable, Codable, Hashable {
         self.date = date
         self.sourceApp = sourceApp
         self.isFavorite = isFavorite
+        self.isFlagged = isFlagged
         self.isConcealed = isConcealed
         self.customTitle = customTitle
     }
@@ -57,6 +59,7 @@ struct ClipboardItem: Identifiable, Codable, Hashable {
         date = try container.decode(Date.self, forKey: .date)
         sourceApp = try container.decodeIfPresent(String.self, forKey: .sourceApp)
         isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+        isFlagged = try container.decodeIfPresent(Bool.self, forKey: .isFlagged) ?? false // Default for old data
         isConcealed = try container.decodeIfPresent(Bool.self, forKey: .isConcealed) ?? false // Default for old data
         customTitle = try container.decodeIfPresent(String.self, forKey: .customTitle)
     }
@@ -117,6 +120,7 @@ struct ClipboardItem: Identifiable, Codable, Hashable {
         // Compare by ID for identity, plus key properties for state changes
         lhs.id == rhs.id &&
         lhs.isFavorite == rhs.isFavorite &&
+        lhs.isFlagged == rhs.isFlagged &&
         lhs.customTitle == rhs.customTitle &&
         lhs.isConcealed == rhs.isConcealed
     }
@@ -392,22 +396,26 @@ class ClipboardManager: ObservableObject {
     }
     
     func enforceHistoryLimit() {
-        // Separate favorites from non-favorites
-        let favorites = history.filter { $0.isFavorite }
-        let nonFavorites = history.filter { !$0.isFavorite }
+        // Separate flagged, favorites, and regular items
+        let flagged = history.filter { $0.isFlagged }
+        let favorites = history.filter { $0.isFavorite && !$0.isFlagged }
+        let regular = history.filter { !$0.isFavorite && !$0.isFlagged }
         
-        // Calculate how many non-favorites we can keep
-        let nonFavoriteLimit = max(0, historyLimit - favorites.count)
-        let limitedNonFavorites = Array(nonFavorites.prefix(nonFavoriteLimit))
+        // Calculate how many regular items we can keep
+        let protectedCount = flagged.count + favorites.count
+        let regularLimit = max(0, historyLimit - protectedCount)
+        let limitedRegular = Array(regular.prefix(regularLimit))
         
         // Identify items being removed and cleanup their image files
-        let keptIds = Set(favorites.map { $0.id } + limitedNonFavorites.map { $0.id })
+        let keptIds = Set(flagged.map { $0.id } + favorites.map { $0.id } + limitedRegular.map { $0.id })
         for item in history where !keptIds.contains(item.id) {
             deleteImageFile(for: item)
         }
         
-        // Rebuild history: favorites first (sorted by date), then non-favorites
-        history = favorites.sorted { $0.date > $1.date } + limitedNonFavorites
+        // Rebuild history: flagged first, then favorites, then regular (all sorted by date)
+        history = flagged.sorted { $0.date > $1.date } + 
+                  favorites.sorted { $0.date > $1.date } + 
+                  limitedRegular
     }
 
     private func checkForChanges() {
@@ -670,10 +678,27 @@ class ClipboardManager: ObservableObject {
         }
     }
     
+    func toggleFlag(_ item: ClipboardItem) {
+        if let index = history.firstIndex(where: { $0.id == item.id }) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                history[index].isFlagged.toggle()
+                sortHistory()
+                // Force SwiftUI to detect the isFlagged change on rows
+                objectWillChange.send()
+            }
+        }
+    }
+    
     private func sortHistory() {
+        // Priority order: Flagged > Favorites > Regular (all sorted by date within group)
         history.sort { (a, b) -> Bool in
+            // Flagged items always come first
+            if a.isFlagged && !b.isFlagged { return true }
+            if !a.isFlagged && b.isFlagged { return false }
+            // Then favorites
             if a.isFavorite && !b.isFavorite { return true }
             if !a.isFavorite && b.isFavorite { return false }
+            // Finally by date
             return a.date > b.date
         }
     }
