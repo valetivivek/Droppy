@@ -197,7 +197,7 @@ struct MediaControlButton: View {
         }
         .buttonStyle(MediaButtonStyle(isHovering: isHovering))
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(DroppyAnimation.hover) {
                 isHovering = hovering
             }
         }
@@ -265,7 +265,7 @@ struct SpotifyControlButton: View {
         .buttonStyle(SpotifyButtonStyle(isHovering: isHovering))
         .disabled(isLoading)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(DroppyAnimation.hover) {
                 isHovering = hovering
             }
         }

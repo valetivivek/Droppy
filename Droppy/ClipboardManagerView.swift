@@ -242,7 +242,7 @@ struct ClipboardManagerView: View {
             selectedItems = [lastCopied.id]
             // Scroll to it in case it's below favorites
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.easeInOut(duration: 0.4)) {
+                withAnimation(DroppyAnimation.transition) {
                     scrollProxy?.scrollTo(lastCopied.id, anchor: .center)
                 }
             }
@@ -299,7 +299,7 @@ struct ClipboardManagerView: View {
               let currentItem = sortedHistory.first(where: { $0.id == firstSelected }),
               let index = sortedHistory.firstIndex(where: { $0.id == currentItem.id }) else {
             if let first = sortedHistory.first {
-                withAnimation(.easeInOut(duration: 0.15)) {
+                withAnimation(DroppyAnimation.hover) {
                     selectedItems = [first.id]
                 }
                 withAnimation(DroppyAnimation.easeInOut) {
@@ -665,7 +665,7 @@ struct ClipboardManagerView: View {
                                             // Scroll to the item after it moves to favorites section
                                             if willBeFavorite {
                                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                                                    withAnimation(.easeInOut(duration: 0.4)) {
+                                                    withAnimation(DroppyAnimation.transition) {
                                                         scrollProxy?.scrollTo(item.id, anchor: .top)
                                                     }
                                                 }
@@ -679,7 +679,7 @@ struct ClipboardManagerView: View {
                                             // Scroll to the item after it moves to flagged section
                                             if willBeFlagged {
                                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                                                    withAnimation(.easeInOut(duration: 0.4)) {
+                                                    withAnimation(DroppyAnimation.transition) {
                                                         scrollProxy?.scrollTo(item.id, anchor: .top)
                                                     }
                                                 }
@@ -1701,7 +1701,7 @@ struct ClipboardPreviewView: View {
                     // Scroll to the item after it moves to favorites section
                     if willBeFavorite {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                            withAnimation(.easeInOut(duration: 0.4)) {
+                            withAnimation(DroppyAnimation.transition) {
                                 scrollProxy?.scrollTo(item.id, anchor: .top)
                             }
                         }
@@ -1747,7 +1747,7 @@ struct ClipboardPreviewView: View {
                     // Scroll to the item after it moves to flagged section
                     if willBeFlagged {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                            withAnimation(.easeInOut(duration: 0.4)) {
+                            withAnimation(DroppyAnimation.transition) {
                                 scrollProxy?.scrollTo(item.id, anchor: .top)
                             }
                         }
