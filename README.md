@@ -65,7 +65,7 @@ Your notch becomes a **media powerhouse**. See stunning album art, control playb
 Never lose a copy again. Your **full clipboard history** with instant search, favorites, and rich previews. Push items to your shelf or basket, rename entries, extract text with **OCR**, and bulk-copy multiple items at once. Open with `⌘ + Shift + Space` (customizable).
 
 <p align="center">
-  <img src="docs/assets/images/clipboard-full.png" alt="Clipboard Manager" width="100%">
+  <img src="docs/assets/images/clipboard-demo.gif" alt="Clipboard Manager" width="100%">
 </p>
 
 ---
