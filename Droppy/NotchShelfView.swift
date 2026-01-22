@@ -1118,45 +1118,12 @@ struct NotchShelfView: View {
         }
     }
     
-    // MARK: - Morphing Outline
+    // MARK: - Morphing Outline (Disabled)
     
-    /// Premium hover indicator - subtle inner glow
+    /// Hover indicator removed - clean design without outline
+    /// Hover feedback is provided by scale/parallax effects instead
     private var morphingOutline: some View {
-        ZStack {
-            // Dynamic Island: Full rounded glow (all edges)
-            DynamicIslandShape(cornerRadius: isExpandedOnThisScreen ? 40 : 50)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.25),
-                            Color.white.opacity(0.1)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1.5
-                )
-                .opacity(isDynamicIslandMode ? 1 : 0)
-            
-            // Notch mode: U-shaped glow (left/right/bottom only - no top edge)
-            NotchOutlineShape(bottomRadius: isExpandedOnThisScreen ? 40 : 16)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.2),
-                            Color.white.opacity(0.08)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1.5
-                )
-                .opacity(isDynamicIslandMode ? 0 : 1)
-        }
-        // Show on hover/drag when collapsed (premium fade in/out)
-        .opacity((enableNotchShelf && shouldShowVisualNotch && !isExpandedOnThisScreen && (dragMonitor.isDragging || isHoveringOnThisScreen)) ? 1 : 0)
-        .animation(DroppyAnimation.hover, value: dragMonitor.isDragging)
-        .animation(DroppyAnimation.hover, value: isHoveringOnThisScreen)
+        EmptyView()
     }
 
     // MARK: - Drop Zone
