@@ -1086,7 +1086,7 @@ struct NotchShelfView: View {
         // UNIFIED PREMIUM ANIMATION: Single animation for all state changes
         // Using asymmetric expand/close prevents conflicting spring values
         .animation(state.isExpanded ? DroppyAnimation.expandOpen : DroppyAnimation.expandClose, value: state.isExpanded)
-        .animation(DroppyAnimation.hoverBouncy, value: isHoveringOnThisScreen) // Shadow visibility on hover
+        // NOTE: isHoveringOnThisScreen animation defined in dropZone to prevent duplicates
         .animation(DroppyAnimation.hoverBouncy, value: dragMonitor.isDragging)
         .animation(DroppyAnimation.hoverBouncy, value: hudIsVisible)
         .animation(DroppyAnimation.notchState, value: musicManager.isPlaying)
@@ -1194,8 +1194,8 @@ struct NotchShelfView: View {
             }
         }
         // STABLE ANIMATIONS: Applied at view level, not inside onHover
-        .animation(.bouncy.speed(1.2), value: isHoveringOnThisScreen)
-        .animation(.bouncy.speed(1.2), value: mediaHUDIsHovered)
+        .animation(DroppyAnimation.hoverBouncy, value: isHoveringOnThisScreen)
+        .animation(DroppyAnimation.hoverBouncy, value: mediaHUDIsHovered)
     }
     
     // MARK: - Indicators

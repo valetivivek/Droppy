@@ -218,34 +218,33 @@ extension View {
     }
 }
 
-// MARK: - View Extension for Animated Hover
+// MARK: - View Extension for Animated Hover (DEPRECATED)
 
 extension View {
-    /// Applies smooth hover state tracking with Apple's optimized timing.
-    /// Uses `.smooth(duration: 0.3)` on macOS 14+ for ProMotion displays.
-    /// - Parameters:
-    ///   - isHovering: Binding to the hover state.
-    ///   - animation: The animation to use (defaults to `.hoverSmooth`).
+    /// DEPRECATED: This pattern causes animation stacking when hovering rapidly.
+    /// Use `.animation(.bouncy.speed(1.2), value: hoverState)` at view level instead.
+    @available(*, deprecated, message: "Use view-level .animation() modifier instead of withAnimation inside onHover")
     func droppyHover(
         _ isHovering: Binding<Bool>,
         animation: Animation = DroppyAnimation.hoverSmooth
     ) -> some View {
         self.onHover { hovering in
-            withAnimation(animation) {
-                isHovering.wrappedValue = hovering
-            }
+            // Direct state update - no withAnimation to prevent stacking
+            isHovering.wrappedValue = hovering
         }
+        .animation(animation, value: isHovering.wrappedValue)
     }
     
-    /// Applies smooth hover tracking with callback instead of binding.
+    /// DEPRECATED: This pattern causes animation stacking when hovering rapidly.
+    /// Use `.animation(.bouncy.speed(1.2), value: hoverState)` at view level instead.
+    @available(*, deprecated, message: "Use view-level .animation() modifier instead of withAnimation inside onHover")
     func droppyHover(
         animation: Animation = DroppyAnimation.hoverSmooth,
         perform action: @escaping (Bool) -> Void
     ) -> some View {
         self.onHover { hovering in
-            withAnimation(animation) {
-                action(hovering)
-            }
+            // Direct state update - no withAnimation to prevent stacking
+            action(hovering)
         }
     }
 }
