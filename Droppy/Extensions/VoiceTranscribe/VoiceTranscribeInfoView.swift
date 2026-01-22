@@ -311,7 +311,7 @@ struct VoiceTranscribeInfoView: View {
                                         .frame(width: geo.size.width * max(0.02, manager.downloadProgress))
                                 }
                             }
-                            .animation(.easeInOut(duration: 0.3), value: manager.downloadProgress)
+                            .animation(DroppyAnimation.viewChange, value: manager.downloadProgress)
                         
                         // Label overlay
                         HStack(spacing: 6) {
@@ -439,7 +439,7 @@ struct VoiceTranscribeInfoView: View {
                         }
                         .buttonStyle(.plain)
                         .onHover { h in
-                            withAnimation(.easeInOut(duration: 0.15)) { isHoveringDelete = h }
+                            withAnimation(DroppyAnimation.hoverQuick) { isHoveringDelete = h }
                         }
                     }
                 }
@@ -477,7 +477,7 @@ struct VoiceTranscribeInfoView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.easeInOut(duration: 0.15)) { isHoveringCancel = h }
+                withAnimation(DroppyAnimation.hoverQuick) { isHoveringCancel = h }
             }
             
             Spacer()
@@ -500,7 +500,7 @@ struct VoiceTranscribeInfoView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.easeInOut(duration: 0.15)) { isHoveringReset = h }
+                withAnimation(DroppyAnimation.hoverQuick) { isHoveringReset = h }
             }
             .help("Reset Shortcuts")
             
@@ -567,7 +567,7 @@ struct VoiceTranscribeInfoView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringRecord[mode] = h }
+                    withAnimation(DroppyAnimation.hoverQuick) { isHoveringRecord[mode] = h }
                 }
             }
         }

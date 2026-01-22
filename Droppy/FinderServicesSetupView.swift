@@ -154,7 +154,7 @@ struct FinderServicesSetupView: View {
             }
         }
         .padding(16)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: hasOpenedSettings)
+        .animation(DroppyAnimation.transition, value: hasOpenedSettings)
     }
     
     private func openServicesSettings() {
@@ -309,7 +309,7 @@ struct FinderServicesSetupSheetView: View {
             }
         }
         .padding(16)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: hasOpenedSettings)
+        .animation(DroppyAnimation.transition, value: hasOpenedSettings)
     }
     
     private func openServicesSettings() {

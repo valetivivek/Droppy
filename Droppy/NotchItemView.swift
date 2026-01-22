@@ -1163,7 +1163,7 @@ private struct NotchItemContent: View {
                             MagicProcessingOverlay()
                                 .frame(width: 60, height: 60)
                                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                .transition(.opacity.animation(.easeInOut(duration: 0.3)))
+                                .transition(.opacity.animation(DroppyAnimation.viewChange))
                         }
                     }
                 

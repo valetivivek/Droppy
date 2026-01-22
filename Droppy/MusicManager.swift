@@ -88,6 +88,12 @@ final class MusicManager: ObservableObject {
     @Published private(set) var timestampDate: Date = .distantPast
     @Published private(set) var bundleIdentifier: String?
     
+    /// Direction of last track skip for directional album art flip
+    enum SkipDirection {
+        case forward, backward, none
+    }
+    @Published private(set) var lastSkipDirection: SkipDirection = .none
+    
     /// Whether media HUD is manually shown via swipe gesture (overrides auto-show logic)
     /// When true, shows media player even when paused (as long as there's a track to show)
     @Published var isMediaHUDForced: Bool = false
@@ -463,12 +469,14 @@ final class MusicManager: ObservableObject {
     /// Skip to next track
     func nextTrack() {
         guard let sendCommand = MRMediaRemoteSendCommandPtr else { return }
+        lastSkipDirection = .forward
         sendCommand(MRCommand.nextTrack.rawValue, nil)
     }
     
     /// Skip to previous track
     func previousTrack() {
         guard let sendCommand = MRMediaRemoteSendCommandPtr else { return }
+        lastSkipDirection = .backward
         sendCommand(MRCommand.previousTrack.rawValue, nil)
     }
     

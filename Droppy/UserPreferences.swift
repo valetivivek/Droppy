@@ -27,6 +27,9 @@ enum AppPreferenceKey {
     static let hideNotchFromScreenshots = "hideNotchFromScreenshots"
     static let isNotchHidden = "isNotchHidden"
     static let externalDisplayUseDynamicIsland = "externalDisplayUseDynamicIsland"
+    static let enableProgressiveBlur = "enableProgressiveBlur"
+    static let autoHideOnFullscreen = "autoHideOnFullscreen"
+    static let enableParallaxEffect = "enableParallaxEffect"
     
     // MARK: - Media Player
     static let showMediaPlayer = "showMediaPlayer"
@@ -119,6 +122,9 @@ enum PreferenceDefault {
     static let hideNotchFromScreenshots = false
     static let isNotchHidden = false
     static let externalDisplayUseDynamicIsland = true
+    static let enableProgressiveBlur = true  // iOS-style progressive blur around notch
+    static let autoHideOnFullscreen = true   // Hide notch in fullscreen apps/games
+    static let enableParallaxEffect = true   // 3D parallax tilt on hover (album art, etc.)
     
     // MARK: - Media Player
     static let showMediaPlayer = true

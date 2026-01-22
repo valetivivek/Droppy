@@ -65,7 +65,7 @@ struct NotchFace: View {
         .frame(width: size, height: size)
         .shadow(color: .black.opacity(0.25), radius: size * 0.03, y: size * 0.03)
         .scaleEffect(isExcited ? 1.1 : 1.0, anchor: .center)
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isExcited)
+        .animation(DroppyAnimation.transition, value: isExcited)
         .animation(.interpolatingSpring(stiffness: 180, damping: 14), value: eyeScale)
         .animation(.interpolatingSpring(stiffness: 180, damping: 14), value: smileScale)
         .onAppear { startWinking() }
@@ -90,7 +90,7 @@ struct NotchFace: View {
         // Wink animation works in all states (including excited)
         
         // Close eyes smoothly
-        withAnimation(.easeOut(duration: 0.1)) {
+        withAnimation(DroppyAnimation.hoverQuick) {
             eyeScale = 0.04
             smileScale = 1.08
         }

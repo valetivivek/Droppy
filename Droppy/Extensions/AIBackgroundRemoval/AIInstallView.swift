@@ -131,7 +131,7 @@ struct AIInstallView: View {
                         .frame(width: 76, height: 76)
                         .scaleEffect(showSuccessGlow ? 1.3 : 1.0)
                         .opacity(showSuccessGlow ? 0 : 1)
-                        .animation(.easeOut(duration: 0.8), value: showSuccessGlow)
+                        .animation(DroppyAnimation.transition, value: showSuccessGlow)
                 }
                 
                 // Pulse animation while installing
@@ -160,13 +160,13 @@ struct AIInstallView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .shadow(color: manager.isInstalled ? .green.opacity(0.4) : .blue.opacity(0.3), radius: 8, y: 4)
                 .scaleEffect(manager.isInstalled ? 1.05 : 1.0)
-                .animation(.spring(response: 0.4, dampingFraction: 0.6), value: manager.isInstalled)
+                .animation(DroppyAnimation.stateEmphasis, value: manager.isInstalled)
             }
             
             Text(statusTitle)
                 .font(.title2.bold())
                 .foregroundStyle(manager.isInstalled ? .green : .primary)
-                .animation(.easeInOut(duration: 0.3), value: manager.isInstalled)
+                .animation(DroppyAnimation.viewChange, value: manager.isInstalled)
             
             // Stats row: installs + rating + category badge
             HStack(spacing: 12) {
@@ -413,7 +413,7 @@ struct AIInstallView: View {
             DisableExtensionButton(extensionType: .aiBackgroundRemoval)
         }
         .padding(16)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: manager.isInstalled)
+        .animation(DroppyAnimation.transition, value: manager.isInstalled)
     }
 }
 

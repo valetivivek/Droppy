@@ -60,7 +60,7 @@ struct DisableExtensionButton: View {
         .buttonStyle(.plain)
         .disabled(isProcessing)
         .onHover { h in
-            withAnimation(.easeInOut(duration: 0.15)) { isHovering = h }
+            withAnimation(DroppyAnimation.hoverQuick) { isHovering = h }
         }
     }
     

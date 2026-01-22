@@ -576,7 +576,7 @@ struct FeaturedExtensionCard<DetailView: View>: View {
                     .stroke(Color.white.opacity(0.1), lineWidth: 1)
             )
             .scaleEffect(isHovering ? 1.01 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isHovering)
+            .animation(DroppyAnimation.hoverBouncy, value: isHovering)
         }
         .buttonStyle(.plain)
         .onHover { hovering in
@@ -700,7 +700,7 @@ struct FeaturedExtensionCardWide<DetailView: View>: View {
                     .stroke(Color.white.opacity(0.1), lineWidth: 1)
             )
             .scaleEffect(isHovering ? 1.01 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isHovering)
+            .animation(DroppyAnimation.hoverBouncy, value: isHovering)
         }
         .buttonStyle(.plain)
         .onHover { hovering in
@@ -829,7 +829,7 @@ struct FeaturedExtensionCardCompact<DetailView: View>: View {
                     .stroke(Color.white.opacity(0.1), lineWidth: 1)
             )
             .scaleEffect(isHovering ? 1.02 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isHovering)
+            .animation(DroppyAnimation.hoverBouncy, value: isHovering)
         }
         .buttonStyle(.plain)
         .onHover { hovering in
@@ -985,7 +985,7 @@ struct ExtensionCardStyle: ViewModifier {
                     .stroke(borderColor, lineWidth: 1)
             )
             .scaleEffect(isHovering ? 1.02 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isHovering)
+            .animation(DroppyAnimation.hoverBouncy, value: isHovering)
             .onHover { hovering in
                 isHovering = hovering
             }
@@ -1020,7 +1020,7 @@ struct AIExtensionCardStyle: ViewModifier {
                     )
             )
             .scaleEffect(isHovering ? 1.02 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isHovering)
+            .animation(DroppyAnimation.hoverBouncy, value: isHovering)
             .onHover { hovering in
                 isHovering = hovering
             }

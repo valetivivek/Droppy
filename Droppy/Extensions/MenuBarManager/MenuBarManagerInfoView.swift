@@ -212,7 +212,7 @@ struct MenuBarManagerInfoView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.easeInOut(duration: 0.15)) { isHoveringEnable = h }
+                withAnimation(DroppyAnimation.hoverQuick) { isHoveringEnable = h }
             }
         }
         .padding(20)
@@ -295,7 +295,7 @@ struct MenuBarManagerInfoView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.easeInOut(duration: 0.15)) { isHoveringClose = h }
+                withAnimation(DroppyAnimation.hoverQuick) { isHoveringClose = h }
             }
             
             Spacer()

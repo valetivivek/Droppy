@@ -56,8 +56,8 @@ struct AIStepRow: View {
                 }
             }
             .frame(width: 20, height: 20)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isComplete)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isCurrent)
+            .animation(DroppyAnimation.hover, value: isComplete)
+            .animation(DroppyAnimation.hover, value: isCurrent)
             
             Text(step.title)
                 .font(.system(size: 13, weight: isComplete ? .medium : (isCurrent ? .semibold : .regular)))
@@ -67,8 +67,8 @@ struct AIStepRow: View {
         }
         .padding(.vertical, 8)
         .opacity(isPending ? 0.5 : 1.0)
-        .animation(.easeInOut(duration: 0.2), value: isComplete)
-        .animation(.easeInOut(duration: 0.2), value: isCurrent)
+        .animation(DroppyAnimation.hoverQuick, value: isComplete)
+        .animation(DroppyAnimation.hoverQuick, value: isCurrent)
     }
 }
 

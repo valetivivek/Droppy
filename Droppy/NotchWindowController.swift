@@ -130,9 +130,10 @@ final class NotchWindowController: NSObject, ObservableObject {
     private func createWindowForScreen(_ screen: NSScreen) {
         let displayID = screen.displayID
         
-        // Window needs to be wide enough for expanded shelf and tall enough for glow + shelf
+        // Window needs to be wide enough for expanded shelf
+        // Height is limited to avoid false hover detection in empty areas
         let windowWidth: CGFloat = 500
-        let windowHeight: CGFloat = 200
+        let windowHeight: CGFloat = 280
 
         // Position at top center of screen (aligned with notch) using global coordinates
         let xPosition = screen.frame.origin.x + (screen.frame.width - windowWidth) / 2
@@ -304,8 +305,9 @@ final class NotchWindowController: NSObject, ObservableObject {
         }
     }
     
-    /// Repositions notch windows when screen configuration changes (dock/undock)
+    /// Repositions notch windows when screen configuration changes (dock/undock, resolution)
     /// Also adds/removes windows for screens based on current settings
+    /// NOTE: Resolution changes require recreating windows because SwiftUI caches the targetScreen reference
     private func repositionNotchWindow() {
         let hideOnExternal = UserDefaults.standard.bool(forKey: "hideNotchOnExternalDisplays")
         let connectedDisplayIDs = Set(NSScreen.screens.map { $0.displayID })
@@ -320,20 +322,37 @@ final class NotchWindowController: NSObject, ObservableObject {
             }
         }
         
-        // Add/remove/reposition windows for connected screens
+        // Add/remove/recreate windows for connected screens
         for screen in NSScreen.screens {
             let displayID = screen.displayID
             let shouldHaveWindow = !hideOnExternal || screen.isBuiltIn
             
             if shouldHaveWindow {
-                if let window = notchWindows[displayID] {
-                    // Reposition existing window
+                if let existingWindow = notchWindows[displayID] {
+                    // RESOLUTION CHANGE FIX: Check if screen horizontal center changed
+                    // Only check X position since height is dynamically managed based on content
                     let windowWidth: CGFloat = 500
-                    let windowHeight: CGFloat = 500
-                    let xPosition = screen.frame.origin.x + (screen.frame.width - windowWidth) / 2
-                    let yPosition = screen.frame.origin.y + screen.frame.height - windowHeight
-                    let newFrame = NSRect(x: xPosition, y: yPosition, width: windowWidth, height: windowHeight)
-                    window.setFrame(newFrame, display: true, animate: false)
+                    let expectedCenterX = screen.frame.origin.x + screen.frame.width / 2
+                    let currentCenterX = existingWindow.frame.midX
+                    
+                    // If horizontal center shifted significantly, screen changed - recreate window
+                    let horizontalDelta = abs(currentCenterX - expectedCenterX)
+                    
+                    if horizontalDelta > 50 {  // More than 50 pixels = likely different screen/resolution
+                        print("🔄 Screen \(displayID) resolution/position changed - recreating window")
+                        existingWindow.isValid = false
+                        existingWindow.close()
+                        notchWindows.removeValue(forKey: displayID)
+                        createWindowForScreen(screen)
+                    } else {
+                        // Just update X position, keep current height (managed by updateAllWindowsSize)
+                        let expectedX = screen.frame.origin.x + (screen.frame.width - windowWidth) / 2
+                        if abs(existingWindow.frame.origin.x - expectedX) > 2 {
+                            var newFrame = existingWindow.frame
+                            newFrame.origin.x = expectedX
+                            existingWindow.setFrame(newFrame, display: false, animate: false)
+                        }
+                    }
                 } else {
                     // Create new window for this screen
                     createWindowForScreen(screen)
@@ -455,7 +474,15 @@ final class NotchWindowController: NSObject, ObservableObject {
             let isInExpandedShelfZone = isExpanded && expandedShelfZone.contains(mouseLocation)
 
             if isInNotchZone {
-                // Click on notch - toggle shelf for THIS screen only
+                // Click on notch zone
+                // CRITICAL FIX: When shelf is expanded WITH ITEMS, don't intercept clicks!
+                // Let them pass through to SwiftUI item buttons (like the X to delete a file).
+                // Only toggle when collapsed OR when expanded but empty.
+                let hasItems = !DroppyState.shared.items.isEmpty
+                if isExpanded && hasItems {
+                    // Shelf is expanded with items - let SwiftUI handle the click
+                    return
+                }
                 DispatchQueue.main.async {
                     withAnimation(DroppyAnimation.transition) {
                         DroppyState.shared.toggleShelfExpansion(for: targetScreen.displayID)
@@ -608,7 +635,14 @@ final class NotchWindowController: NSObject, ObservableObject {
                 let isInExpandedShelfZone = isExpanded && expandedShelfZone.contains(mouseLocation)
 
                 if isInNotchZone {
-                    // Click on notch - toggle shelf for THIS screen only
+                    // Click on notch zone
+                    // CRITICAL FIX: When shelf is expanded WITH ITEMS, don't intercept clicks!
+                    // Let them pass through to SwiftUI item buttons (like the X to delete a file).
+                    let hasItems = !DroppyState.shared.items.isEmpty
+                    if isExpanded && hasItems {
+                        // Shelf is expanded with items - let SwiftUI handle the click
+                        return event
+                    }
                     DispatchQueue.main.async {
                         withAnimation(DroppyAnimation.transition) {
                             DroppyState.shared.toggleShelfExpansion(for: targetScreen.displayID)
@@ -750,7 +784,7 @@ final class NotchWindowController: NSObject, ObservableObject {
                     let displayID = screen.displayID  // Capture for async block
                     DispatchQueue.main.async { [weak self] in
                         DroppyState.shared.validateItems()
-                        withAnimation(DroppyAnimation.hover) {
+                        withAnimation(DroppyAnimation.hoverBouncy) {
                             DroppyState.shared.setHovering(for: displayID, isHovering: true)
                         }
                         // Start auto-expand timer with screen context
@@ -799,6 +833,7 @@ final class NotchWindowController: NSObject, ObservableObject {
             _ = DroppyState.shared.isExpanded
             _ = DroppyState.shared.isMouseHovering
             _ = DroppyState.shared.isDropTargeted
+            _ = DroppyState.shared.items.count  // Track item count for dynamic window sizing
         } onChange: {
             // onChange fires BEFORE the property changes.
             // dispatch async to run update AFTER the change is applied.
@@ -807,8 +842,36 @@ final class NotchWindowController: NSObject, ObservableObject {
                 guard let self = self, !self.isTemporarilyHidden else { return }
                 
                 self.updateAllWindowsMouseEventHandling()
+                self.updateAllWindowsSize()  // Resize windows to fit content
                 // Must re-register observation after it fires (one-shot)
                 self.setupStateObservation()
+            }
+        }
+    }
+    
+    /// Dynamically resizes all notch windows to fit current shelf content
+    private func updateAllWindowsSize() {
+        for (displayID, window) in notchWindows {
+            guard let screen = NSScreen.screens.first(where: { $0.displayID == displayID }) else { continue }
+            
+            // Calculate required height based on current content
+            let requiredHeight = DroppyState.expandedShelfHeight(for: screen)
+            
+            // Add buffer for floating buttons (already included in expandedShelfHeight, but ensure minimum)
+            let minWindowHeight: CGFloat = 280
+            let newHeight = max(minWindowHeight, requiredHeight)
+            
+            // Only resize if significantly different (avoid constant small updates)
+            let currentHeight = window.frame.height
+            if abs(newHeight - currentHeight) > 10 {
+                // Resize from top - keep window anchored at screen top
+                let newFrame = NSRect(
+                    x: window.frame.origin.x,
+                    y: screen.frame.origin.y + screen.frame.height - newHeight,
+                    width: window.frame.width,
+                    height: newHeight
+                )
+                window.setFrame(newFrame, display: false, animate: false)
             }
         }
     }
@@ -973,6 +1036,7 @@ final class NotchWindowController: NSObject, ObservableObject {
     
     /// Validates and self-heals window state if stuck
     /// Called periodically by watchdog timer
+    private static var lastWatchdogLogTime: Date?
     private func validateWindowState() {
         // Skip if intentionally hidden
         guard !isTemporarilyHidden else { return }
@@ -989,7 +1053,12 @@ final class NotchWindowController: NSObject, ObservableObject {
                 
                 // If shelf is expanded or mouse is hovering, window SHOULD accept events
                 if isExpanded || isHovering {
-                    print("⚠️ Watchdog: Self-healing - window stuck with ignoresMouseEvents=true")
+                    // Throttle log to once per minute to avoid console spam
+                    let now = Date()
+                    if Self.lastWatchdogLogTime == nil || now.timeIntervalSince(Self.lastWatchdogLogTime!) > 60 {
+                        print("⚠️ Watchdog: Self-healing - window stuck with ignoresMouseEvents=true")
+                        Self.lastWatchdogLogTime = now
+                    }
                     window.ignoresMouseEvents = false
                     window.updateMouseEventHandling()
                 }
@@ -1062,7 +1131,7 @@ final class NotchWindowController: NSObject, ObservableObject {
             // and ensures hover state doesn't get stuck when mouse leaves all notch areas
             if DroppyState.shared.isMouseHovering {
                 DispatchQueue.main.async {
-                    withAnimation(DroppyAnimation.hover) {
+                    withAnimation(DroppyAnimation.hoverBouncy) {
                         DroppyState.shared.isMouseHovering = false
                     }
                 }
@@ -1141,22 +1210,20 @@ final class NotchWindowController: NSObject, ObservableObject {
         if accumulatedScrollX < -threshold {
             // Swipe LEFT -> Show MEDIA player
             accumulatedScrollX = 0  // Reset after action
-            DispatchQueue.main.async {
-                withAnimation(DroppyAnimation.transition) {
-                    // Show media: set forced true, hidden false
-                    musicManager.isMediaHUDForced = true
-                    musicManager.isMediaHUDHidden = false
-                }
+            // Force immediate SwiftUI update (fixes delay when cursor is stationary)
+            musicManager.objectWillChange.send()
+            withAnimation(DroppyAnimation.transition) {
+                musicManager.isMediaHUDForced = true
+                musicManager.isMediaHUDHidden = false
             }
         } else if accumulatedScrollX > threshold {
             // Swipe RIGHT -> Show SHELF (hide media)
             accumulatedScrollX = 0  // Reset after action
-            DispatchQueue.main.async {
-                withAnimation(DroppyAnimation.transition) {
-                    // Hide media: set forced false, hidden true
-                    musicManager.isMediaHUDForced = false
-                    musicManager.isMediaHUDHidden = true
-                }
+            // Force immediate SwiftUI update (fixes delay when cursor is stationary)
+            musicManager.objectWillChange.send()
+            withAnimation(DroppyAnimation.transition) {
+                musicManager.isMediaHUDForced = false
+                musicManager.isMediaHUDHidden = true
             }
         }
     }
@@ -1472,7 +1539,7 @@ class NotchWindow: NSPanel {
                     // Validate items before showing shelf (remove ghost files)
                     DroppyState.shared.validateItems()
 
-                    withAnimation(DroppyAnimation.hover) {
+                    withAnimation(DroppyAnimation.hoverBouncy) {
                         DroppyState.shared.setHovering(for: targetScreen.displayID, isHovering: true)
                     }
                     // Start auto-expand timer with THIS screen's displayID
@@ -1482,7 +1549,7 @@ class NotchWindow: NSPanel {
             } else if !isOverNotch && currentlyHovering && !DroppyState.shared.isExpanded {
                 // Only reset hover if not expanded (expanded has its own area)
                 DispatchQueue.main.async {
-                    withAnimation(DroppyAnimation.hover) {
+                    withAnimation(DroppyAnimation.hoverBouncy) {
                         DroppyState.shared.setHovering(for: targetScreen.displayID, isHovering: false)
                     }
                     NotchWindowController.shared.cancelAutoExpandTimer()
@@ -1611,25 +1678,82 @@ class NotchWindow: NSPanel {
     }
     
     func checkForFullscreen() {
+        // CRITICAL: Never hide during drag operations - user needs to drop files!
+        if DragMonitor.shared.isDragging {
+            if targetAlpha != 1.0 {
+                targetAlpha = 1.0
+                alphaValue = 1.0
+            }
+            return
+        }
+        
+        // Check if auto-hide is enabled
+        let autoHideEnabled = (UserDefaults.standard.object(forKey: AppPreferenceKey.autoHideOnFullscreen) as? Bool) ?? PreferenceDefault.autoHideOnFullscreen
+        guard autoHideEnabled else {
+            // Setting disabled - ensure window is visible
+            if targetAlpha != 1.0 {
+                targetAlpha = 1.0
+                alphaValue = 1.0
+            }
+            return
+        }
+        
         // Use notchScreen for multi-monitor support
         guard let screen = notchScreen else { return }
 
-        // 1. Check basic visible frame (Standard Spaces Fullscreen)
+        // Multiple fullscreen detection methods:
+        
+        // 1. Native macOS fullscreen (Spaces) - visibleFrame equals full frame
         let isNativeFullscreen = screen.visibleFrame.equalTo(screen.frame)
         
-        // 2. Check frontmost application presentation options (Games/Video Players)
-        // Note: NSRunningApplication does not expose presentationOptions. 
-        // We rely on visibleFrame check which detects if Menu Bar / Dock are hidden.
+        // 2. Legacy fullscreen detection - window covering the entire screen at/above our level
+        // This catches games and video players that use older fullscreen APIs
+        var isLegacyFullscreen = false
+        if let frontApp = NSWorkspace.shared.frontmostApplication {
+            // Get windows of frontmost app that cover this screen
+            let pid = frontApp.processIdentifier
+            if let windowInfoList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] {
+                for windowInfo in windowInfoList {
+                    guard let ownerPID = windowInfo[kCGWindowOwnerPID as String] as? pid_t,
+                          ownerPID == pid,
+                          let windowBounds = windowInfo[kCGWindowBounds as String] as? [String: Any],
+                          let x = windowBounds["X"] as? CGFloat,
+                          let y = windowBounds["Y"] as? CGFloat,
+                          let width = windowBounds["Width"] as? CGFloat,
+                          let height = windowBounds["Height"] as? CGFloat else { continue }
+                    
+                    // CGWindowBounds uses top-left origin, convert to NS coordinates
+                    let windowRect = CGRect(x: x, y: y, width: width, height: height)
+                    
+                    // Check if this window covers the entire screen (with small tolerance)
+                    let screenRect = screen.frame
+                    // Convert NS frame to CG frame for comparison (flip Y)
+                    guard let mainScreen = NSScreen.screens.first else { continue }
+                    let cgScreenRect = CGRect(
+                        x: screenRect.origin.x,
+                        y: mainScreen.frame.height - screenRect.origin.y - screenRect.height,
+                        width: screenRect.width,
+                        height: screenRect.height
+                    )
+                    
+                    // Fullscreen if window covers most of the screen
+                    if windowRect.width >= cgScreenRect.width - 10 &&
+                       windowRect.height >= cgScreenRect.height - 10 {
+                        isLegacyFullscreen = true
+                        break
+                    }
+                }
+            }
+        }
         
-        let shouldHide = isNativeFullscreen
+        let shouldHide = isNativeFullscreen || isLegacyFullscreen
         let newTargetAlpha: CGFloat = shouldHide ? 0.0 : 1.0
         
-        // Only trigger animation if the TARGET has changed, not just because current alpha is in flux
+        // Only trigger animation if the TARGET has changed
         if self.targetAlpha != newTargetAlpha {
             self.targetAlpha = newTargetAlpha
             
-            // Directly set alpha without animation to prevent Core Animation / WindowServer crashes
-            // The previous NSAnimationContext approach caused 'stepTransactionFlush' crashes on some systems
+            // Directly set alpha without animation to prevent Core Animation crashes
             self.alphaValue = newTargetAlpha
         }
     }

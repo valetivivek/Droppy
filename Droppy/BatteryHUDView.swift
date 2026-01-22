@@ -107,7 +107,7 @@ struct BatteryHUDView: View {
                             .foregroundStyle(accentColor)
                             .monospacedDigit()
                             .contentTransition(.numericText(value: Double(batteryManager.batteryLevel)))
-                            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: batteryManager.batteryLevel)
+                            .animation(DroppyAnimation.notchState, value: batteryManager.batteryLevel)
                     }
                     .padding(.trailing, symmetricPadding)
                     .frame(width: wingWidth)

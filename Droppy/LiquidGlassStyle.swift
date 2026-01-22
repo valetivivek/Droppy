@@ -158,7 +158,7 @@ struct LiquidTextField: View {
                 .stroke(Color.accentColor.opacity(isFocused ? 0.5 : 0), lineWidth: 1.5)
                 .shadow(color: Color.accentColor.opacity(isFocused ? 0.4 : 0), radius: 8)
         )
-        .animation(.easeInOut(duration: 0.2), value: isFocused)
+        .animation(DroppyAnimation.hoverQuick, value: isFocused)
         .frame(width: 300)
     }
 }

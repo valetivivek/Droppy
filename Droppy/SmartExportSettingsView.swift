@@ -205,7 +205,7 @@ struct SmartExportSettingsView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: enabled.wrappedValue)
+        .animation(DroppyAnimation.state, value: enabled.wrappedValue)
     }
     
     // MARK: - Footer

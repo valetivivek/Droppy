@@ -7,6 +7,104 @@
 //
 
 import SwiftUI
+import AppKit
+
+// MARK: - Scroll Wheel Capture (fixes swipe not working when cursor stationary)
+
+/// Captures scroll wheel events using NSEvent local monitor
+/// This fixes the bug where horizontal swipe only works after moving the cursor
+private struct ScrollWheelCaptureModifier: ViewModifier {
+    var onHorizontalScroll: (CGFloat) -> Void
+    @State private var monitor: Any?
+    @State private var accumulatedScrollX: CGFloat = 0
+    @State private var lastScrollTime: Date = .distantPast
+    @State private var viewFrame: CGRect = .zero
+    
+    func body(content: Content) -> some View {
+        content
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .preference(key: FramePreferenceKey.self, value: geo.frame(in: .global))
+                }
+            )
+            .onPreferenceChange(FramePreferenceKey.self) { frame in
+                viewFrame = frame
+            }
+            .onAppear {
+                setupMonitor()
+            }
+            .onDisappear {
+                removeMonitor()
+            }
+    }
+    
+    private func setupMonitor() {
+        guard monitor == nil else { return }
+        
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [self] event in
+            // Check if mouse is over this view's frame
+            let mouseLocation = NSEvent.mouseLocation
+            
+            // Convert to same coordinate system
+            guard let screen = NSScreen.main else { return event }
+            let screenFrame = screen.frame
+            let flippedY = screenFrame.height - mouseLocation.y
+            let flippedLocation = CGPoint(x: mouseLocation.x, y: flippedY)
+            
+            // Check if mouse is in the view
+            guard viewFrame.contains(flippedLocation) || viewFrame.contains(mouseLocation) else {
+                return event
+            }
+            
+            // Reset accumulated scroll if too much time passed
+            if Date().timeIntervalSince(lastScrollTime) > 0.3 {
+                accumulatedScrollX = 0
+            }
+            lastScrollTime = Date()
+            
+            // Accumulate horizontal scroll
+            accumulatedScrollX += event.scrollingDeltaX
+            
+            // Only handle when clearly horizontal swipe
+            guard abs(accumulatedScrollX) > abs(event.scrollingDeltaY) * 1.5 else {
+                return event
+            }
+            
+            let threshold: CGFloat = 30
+            
+            if abs(accumulatedScrollX) > threshold {
+                let scrollValue = accumulatedScrollX
+                accumulatedScrollX = 0
+                DispatchQueue.main.async {
+                    onHorizontalScroll(scrollValue)
+                }
+            }
+            
+            return event
+        }
+    }
+    
+    private func removeMonitor() {
+        if let m = monitor {
+            NSEvent.removeMonitor(m)
+            monitor = nil
+        }
+    }
+}
+
+private struct FramePreferenceKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+private extension View {
+    func captureHorizontalScroll(action: @escaping (CGFloat) -> Void) -> some View {
+        modifier(ScrollWheelCaptureModifier(onHorizontalScroll: action))
+    }
+}
 
 // MARK: - Inline HUD Type
 
@@ -89,6 +187,8 @@ struct MediaPlayerView: View {
     @State private var lastDragTime: Date = .distantPast
     @State private var isAlbumArtPressed: Bool = false
     @State private var isAlbumArtHovering: Bool = false
+    @State private var albumArtFlipAngle: Double = 0  // For track change flip animation
+    @State private var albumArtPauseScale: CGFloat = 1.0  // For pause/play scale animation
     
     // MARK: - Observed Managers for Fast HUD Updates
     @ObservedObject private var volumeManager = VolumeManager.shared
@@ -230,6 +330,49 @@ struct MediaPlayerView: View {
         .onChange(of: dndManager.lastChangeAt) { _, _ in
             triggerInlineHUD(.focus, value: dndManager.isDNDActive ? 1.0 : 0.0)
         }
+        // MARK: - Album Art Flip on Track Change (directional)
+        .onChange(of: musicManager.songTitle) { _, _ in
+            // PREMIUM: Directional flip - right for forward, left for backward
+            let flipAngle: Double = switch musicManager.lastSkipDirection {
+            case .forward: 25
+            case .backward: -25
+            case .none: 25  // Default to forward
+            }
+            
+            // Quick flip out with snappy spring
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                albumArtFlipAngle = flipAngle
+            }
+            // Settle back smoothly after a brief pause
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                    albumArtFlipAngle = 0
+                }
+            }
+        }
+        // MARK: - Album Art Scale on Pause/Play
+        .onChange(of: musicManager.isPlaying) { _, isPlaying in
+            // PREMIUM: Smooth scale with damping - shrink slightly when paused
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                albumArtPauseScale = isPlaying ? 1.0 : 0.95
+            }
+        }
+        // MARK: - Horizontal Swipe to Toggle Media/Shelf
+        // Captures scroll wheel directly to fix swipe not working when cursor stationary
+        .captureHorizontalScroll { scrollX in
+            // Swipe LEFT (negative) = Show media, Swipe RIGHT (positive) = Show shelf
+            withAnimation(DroppyAnimation.transition) {
+                if scrollX < 0 {
+                    // Swipe LEFT -> Show MEDIA player
+                    musicManager.isMediaHUDForced = true
+                    musicManager.isMediaHUDHidden = false
+                } else {
+                    // Swipe RIGHT -> Show SHELF (hide media)
+                    musicManager.isMediaHUDForced = false
+                    musicManager.isMediaHUDHidden = true
+                }
+            }
+        }
         // Right-click context menu to hide the notch/island (same as notch background)
         .contextMenu {
             Button {
@@ -275,7 +418,7 @@ struct MediaPlayerView: View {
         
         // Hide after duration (same as regular HUD: easeOut 0.3)
         let workItem = DispatchWorkItem { [self] in
-            withAnimation(.easeOut(duration: 0.3)) {
+            withAnimation(DroppyAnimation.viewChange) {
                 inlineHUDType = nil
             }
         }
@@ -324,9 +467,16 @@ struct MediaPlayerView: View {
             .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
         }
         .buttonStyle(.plain)
-        .scaleEffect(isAlbumArtPressed ? 0.95 : (isAlbumArtHovering ? 1.02 : 1.0))
-        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isAlbumArtPressed)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isAlbumArtHovering)
+        .scaleEffect((isAlbumArtPressed ? 0.95 : (isAlbumArtHovering ? 1.02 : 1.0)) * albumArtPauseScale)
+        // Premium 3D flip on track change (Y-axis rotation)
+        .rotation3DEffect(
+            .degrees(albumArtFlipAngle),
+            axis: (x: 0, y: 1, z: 0),
+            perspective: 0.5
+        )
+        .parallax3D(magnitude: 12, enableOverride: true) // Premium 3D tilt on hover
+        .animation(DroppyAnimation.hoverBouncy, value: isAlbumArtPressed)
+        .animation(DroppyAnimation.hover, value: isAlbumArtHovering)
         .onHover { hovering in
             isAlbumArtHovering = hovering
         }
@@ -394,9 +544,16 @@ struct MediaPlayerView: View {
                 .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
             }
             .buttonStyle(.plain)
-            .scaleEffect(isAlbumArtPressed ? 0.96 : (isAlbumArtHovering ? 1.02 : 1.0))
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isAlbumArtPressed)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isAlbumArtHovering)
+            .scaleEffect((isAlbumArtPressed ? 0.96 : (isAlbumArtHovering ? 1.02 : 1.0)) * albumArtPauseScale)
+            // Premium 3D flip on track change (Y-axis rotation)
+            .rotation3DEffect(
+                .degrees(albumArtFlipAngle),
+                axis: (x: 0, y: 1, z: 0),
+                perspective: 0.5
+            )
+            .parallax3D(magnitude: 12, enableOverride: true) // Premium 3D tilt on hover
+            .animation(DroppyAnimation.hoverBouncy, value: isAlbumArtPressed)
+            .animation(DroppyAnimation.hover, value: isAlbumArtHovering)
             .onHover { hovering in
                 isAlbumArtHovering = hovering
             }
@@ -410,7 +567,7 @@ struct MediaPlayerView: View {
                     }
             )
         }
-        .animation(.easeInOut(duration: 0.4), value: musicManager.isPlaying)
+        .animation(DroppyAnimation.viewChange, value: musicManager.isPlaying)
     }
     
     // MARK: - Progress Slider
@@ -420,31 +577,57 @@ struct MediaPlayerView: View {
             let width = geo.size.width
             let currentProgress = progress(at: date)
             let progressWidth = max(0, min(width, width * currentProgress))
-            // Expand track height when dragging (5pt → 9pt)
-            let trackHeight: CGFloat = isDragging ? 9 : 5
+            // THINNER: 4pt → 6pt when dragging
+            let trackHeight: CGFloat = isDragging ? 6 : 4
             
             ZStack(alignment: .leading) {
-                // Track background (subtle, tinted by album art)
+                // Track background (simple, no mask/blur)
                 Capsule()
-                    .fill(visualizerColor.opacity(isDragging ? 0.3 : 0.15))
+                    .fill(Color.white.opacity(0.1))
                     .frame(height: trackHeight)
                 
-                // Filled portion (tinted by album art with glow when dragging)
+                // PREMIUM: Gradient fill with glow
                 if currentProgress > 0 {
                     Capsule()
-                        .fill(visualizerColor.opacity(0.9))
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    visualizerColor,
+                                    visualizerColor.opacity(0.85)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
                         .frame(width: max(trackHeight, progressWidth), height: trackHeight)
-                        .shadow(color: isDragging ? visualizerColor.opacity(0.5) : .clear, radius: isDragging ? 6 : 0)
+                        // Top highlight stroke (no mask)
+                        .overlay(
+                            Capsule()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.4), .clear],
+                                        startPoint: .top,
+                                        endPoint: .center
+                                    ),
+                                    lineWidth: 0.5
+                                )
+                        )
+                        // PREMIUM BLOOM: Multi-layer glow
+                        .shadow(color: visualizerColor.opacity(0.3), radius: 1)
+                        .shadow(color: visualizerColor.opacity(0.15 + (currentProgress * 0.15)), radius: 3)
+                        .shadow(color: visualizerColor.opacity(0.1 + (currentProgress * 0.1)), radius: 5 + (currentProgress * 3))
+                        .animation(.interpolatingSpring(stiffness: 350, damping: 28), value: currentProgress)
                 }
             }
             .frame(height: trackHeight)
             .frame(maxHeight: .infinity, alignment: .center)
-            .animation(.spring(response: 0.2, dampingFraction: 0.75), value: isDragging)
+            .scaleEffect(y: isDragging ? 1.08 : 1.0, anchor: .center)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isDragging)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        withAnimation(DroppyAnimation.press) {
+                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
                             isDragging = true
                         }
                         let fraction = max(0, min(1, value.location.x / width))
@@ -454,7 +637,7 @@ struct MediaPlayerView: View {
                         let fraction = max(0, min(1, value.location.x / width))
                         let seekTime = Double(fraction) * musicManager.songDuration
                         musicManager.seek(to: seekTime)
-                        withAnimation(DroppyAnimation.hover) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             isDragging = false
                         }
                         lastDragTime = Date()
@@ -540,7 +723,7 @@ struct MediaPlayerView: View {
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
         }
-        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: inlineHUDType != nil)
+        .animation(DroppyAnimation.notchState, value: inlineHUDType != nil)
         .allowsHitTesting(true)
     }
     
@@ -567,22 +750,23 @@ struct MediaPlayerView: View {
                     }
                 }
                 
-                // Previous
-                MediaControlButton(icon: "backward.fill", size: 18, tapPadding: 6) {
+                // Previous (nudges left)
+                MediaControlButton(icon: "backward.fill", size: 18, tapPadding: 6, nudgeDirection: .left) {
                     musicManager.previousTrack()
                 }
                 
-                // Play/Pause (slightly larger)
+                // Play/Pause (wiggles - slightly larger)
                 MediaControlButton(
                     icon: musicManager.isPlaying ? "pause.fill" : "play.fill",
                     size: 24,
-                    tapPadding: 6
+                    tapPadding: 6,
+                    nudgeDirection: .none
                 ) {
                     musicManager.togglePlay()
                 }
                 
-                // Next
-                MediaControlButton(icon: "forward.fill", size: 18, tapPadding: 6) {
+                // Next (nudges right)
+                MediaControlButton(icon: "forward.fill", size: 18, tapPadding: 6, nudgeDirection: .right) {
                     musicManager.nextTrack()
                 }
                 
@@ -608,7 +792,7 @@ struct MediaPlayerView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
-        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: inlineHUDType != nil)
+        .animation(DroppyAnimation.notchState, value: inlineHUDType != nil)
     }
 }
 

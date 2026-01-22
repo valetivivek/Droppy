@@ -160,7 +160,7 @@ struct OnboardingView: View {
             ForEach(OnboardingPage.allCases, id: \.rawValue) { page in
                 if page == currentPage {
                     pageContent(for: page)
-                        .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                        .transition(.opacity.animation(DroppyAnimation.hoverQuick))
                 }
             }
         }
@@ -203,7 +203,7 @@ struct OnboardingView: View {
                     Circle()
                         .fill(page == currentPage ? Color.white : Color.white.opacity(0.25))
                         .frame(width: page == currentPage ? 8 : 6, height: page == currentPage ? 8 : 6)
-                        .animation(.easeOut(duration: 0.15), value: currentPage)
+                        .animation(DroppyAnimation.hoverQuick, value: currentPage)
                 }
             }
             
@@ -479,7 +479,7 @@ private struct ShelfContent: View {
                 }
             }
             .frame(width: 400)
-            .animation(.easeOut(duration: 0.15), value: enableShelf)
+            .animation(DroppyAnimation.hoverQuick, value: enableShelf)
             
             HStack(spacing: 14) {
                 FeatureChip(icon: "folder.fill", text: "Pin folders")
@@ -521,7 +521,7 @@ private struct BasketContent: View {
                 }
             }
             .frame(width: 400)
-            .animation(.easeOut(duration: 0.15), value: enableBasket)
+            .animation(DroppyAnimation.hoverQuick, value: enableBasket)
             
             HStack(spacing: 14) {
                 FeatureChip(icon: "hand.draw.fill", text: instantBasketOnDrag ? "Appears on drag" : "Shake to summon")
@@ -882,7 +882,7 @@ private struct ReadyContent: View {
                     .frame(width: 90, height: 90)
                     .blur(radius: 20)
                     .scaleEffect(showCheckmark ? 1 : 0.5)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.6), value: showCheckmark)
+                    .animation(DroppyAnimation.bouncy, value: showCheckmark)
                 
                 // Checkmark
                 Image(systemName: "checkmark.circle.fill")
@@ -890,7 +890,7 @@ private struct ReadyContent: View {
                     .foregroundStyle(.green)
                     .scaleEffect(showCheckmark ? 1 : 0)
                     .rotationEffect(.degrees(showCheckmark ? 0 : -30))
-                    .animation(.spring(response: 0.4, dampingFraction: 0.5).delay(0.1), value: showCheckmark)
+                    .animation(DroppyAnimation.bouncy.delay(0.1), value: showCheckmark)
             }
             
             // Quick start guide
@@ -900,28 +900,28 @@ private struct ReadyContent: View {
                     .foregroundStyle(.secondary)
                     .opacity(showGuide ? 1 : 0)
                     .offset(y: showGuide ? 0 : 10)
-                    .animation(.easeOut(duration: 0.3).delay(0.4), value: showGuide)
+                    .animation(DroppyAnimation.viewChange.delay(0.4), value: showGuide)
                 
                 VStack(spacing: 0) {
                     GuideRow(icon: "cursorarrow.motionlines", color: .blue, action: "Move mouse to notch", result: "Opens shelf", isFirst: true)
                         .opacity(showRows[0] ? 1 : 0)
                         .offset(x: showRows[0] ? 0 : -20)
-                        .animation(.spring(response: 0.35, dampingFraction: 0.7).delay(0.5), value: showRows[0])
+                        .animation(DroppyAnimation.notchState.delay(0.5), value: showRows[0])
                     
                     GuideRow(icon: "hand.draw.fill", color: .purple, action: "Shake while dragging", result: "Summons basket")
                         .opacity(showRows[1] ? 1 : 0)
                         .offset(x: showRows[1] ? 0 : -20)
-                        .animation(.spring(response: 0.35, dampingFraction: 0.7).delay(0.6), value: showRows[1])
+                        .animation(DroppyAnimation.notchState.delay(0.6), value: showRows[1])
                     
                     GuideRow(icon: "command", color: .cyan, action: "Press ⌘⇧Space", result: "Opens clipboard")
                         .opacity(showRows[2] ? 1 : 0)
                         .offset(x: showRows[2] ? 0 : -20)
-                        .animation(.spring(response: 0.35, dampingFraction: 0.7).delay(0.7), value: showRows[2])
+                        .animation(DroppyAnimation.notchState.delay(0.7), value: showRows[2])
                     
                     GuideRow(icon: "gearshape.fill", color: .gray, action: "Right-click notch", result: "Opens settings", isLast: true)
                         .opacity(showRows[3] ? 1 : 0)
                         .offset(x: showRows[3] ? 0 : -20)
-                        .animation(.spring(response: 0.35, dampingFraction: 0.7).delay(0.8), value: showRows[3])
+                        .animation(DroppyAnimation.notchState.delay(0.8), value: showRows[3])
                 }
                 .background(Color.white.opacity(0.03))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -1053,7 +1053,7 @@ private struct StyleButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.1), value: hovering)
+        .animation(DroppyAnimation.hoverQuick, value: hovering)
     }
 }
 

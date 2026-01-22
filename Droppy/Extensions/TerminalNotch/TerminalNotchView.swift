@@ -53,7 +53,7 @@ struct TerminalNotchView: View {
                         style: StrokeStyle(lineWidth: 3, lineCap: .round)
                     )
                     .blur(radius: 2)
-                    .animation(.easeInOut(duration: 0.5), value: manager.pulsePosition)
+                    .animation(DroppyAnimation.viewChange, value: manager.pulsePosition)
             }
         }
         // No external styling - terminal lives inside shelf's content area

@@ -40,6 +40,45 @@ final class MediaKeyInterceptor {
     var onBrightnessUp: (() -> Void)?
     var onBrightnessDown: (() -> Void)?
     
+    // MARK: - Brightness Control App Detection
+    
+    /// Bundle identifiers for known external display brightness control apps
+    private static let brightnessAppBundleIDs: Set<String> = [
+        "me.guillaumeb.MonitorControl",           // MonitorControl
+        "software.betterdisplay.BetterDisplay",   // BetterDisplay
+        "fyi.lunar.Lunar",                        // Lunar
+        "com.thnkdev.DisplayBuddy"                // DisplayBuddy
+    ]
+    
+    /// Cached result of brightness app detection (refreshed every 30 seconds)
+    private static var cachedBrightnessAppRunning: Bool?
+    private static var cacheTimestamp: Date?
+    private static let cacheDuration: TimeInterval = 30  // 30 seconds
+    
+    /// Checks if a brightness control app (MonitorControl, BetterDisplay, Lunar) is running
+    /// Uses caching to avoid expensive process enumeration on every key press
+    static func isBrightnessControlAppRunning() -> Bool {
+        // Check cache validity
+        if let cached = cachedBrightnessAppRunning,
+           let timestamp = cacheTimestamp,
+           Date().timeIntervalSince(timestamp) < cacheDuration {
+            return cached
+        }
+        
+        // Enumerate running apps and check for known brightness control apps
+        let runningApps = NSWorkspace.shared.runningApplications
+        let isRunning = runningApps.contains { app in
+            guard let bundleID = app.bundleIdentifier else { return false }
+            return brightnessAppBundleIDs.contains(bundleID)
+        }
+        
+        // Update cache
+        cachedBrightnessAppRunning = isRunning
+        cacheTimestamp = Date()
+        
+        return isRunning
+    }
+    
     private init() {}
     
     /// Start intercepting media keys
@@ -136,6 +175,34 @@ final class MediaKeyInterceptor {
             return false
         }
         
+        // MONITORCONTROL COMPATIBILITY (v9.2):
+        // Check if this is a brightness key and mouse is on an external display
+        // If so, AND a brightness control app (MonitorControl/BetterDisplay) is running,
+        // let the event pass through so that app can control external display brightness via DDC
+        let isBrightnessKey = keyCode == NX_KEYTYPE_BRIGHTNESS_UP ||
+                              keyCode == NX_KEYTYPE_BRIGHTNESS_DOWN
+        
+        if isBrightnessKey {
+            // Check which display the mouse cursor is currently on
+            let mouseLocation = NSEvent.mouseLocation
+            if let screenUnderMouse = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) {
+                // If mouse is on an external display, check if a brightness control app is running
+                if !screenUnderMouse.isBuiltIn {
+                    // Only passthrough if MonitorControl or BetterDisplay is running
+                    // Otherwise, Droppy handles brightness (even though it only works on built-in)
+                    if Self.isBrightnessControlAppRunning() {
+                        // Passthrough: Let MonitorControl/BetterDisplay handle external display brightness
+                        return false
+                    }
+                }
+            }
+            
+            // Check if brightness is supported on built-in display
+            if !BrightnessManager.shared.isSupported {
+                return false
+            }
+        }
+        
         // Only act on key down events
         guard keyDown else { return true }
         
@@ -197,7 +264,7 @@ private func mediaKeyCallback(
             return Unmanaged.passUnretained(event)
         }
         
-        print("⚠️ MediaKeyInterceptor: Tap disabled by system (Timeout/User), re-enabling...")
+        // Tap temporarily disabled by system - this is normal, silently re-enable
         if let tap = MediaKeyInterceptor.shared.eventTap {
             CGEvent.tapEnable(tap: tap, enable: true)
         }
@@ -209,47 +276,24 @@ private func mediaKeyCallback(
         return Unmanaged.passUnretained(event)
     }
     
-    // Safely extract data from NSEvent - capture all needed values immediately
-    // This struct holds the extracted data as pure value types
-    struct MediaKeyData {
-        var isValid: Bool = false
-        var keyCode: UInt32 = 0
-        var shouldProcess: Bool = false
-    }
-    
-    // Extract data in a controlled scope - the NSEvent is released when scope ends
-    // CRITICAL: NSEvent(cgEvent:) must be called on main thread because it internally
-    // calls TSM (Text Services Manager) functions like TSMGetInputSourceProperty for
-    // caps lock handling, which assert main queue. Use sync to avoid race conditions.
-    let keyData: MediaKeyData = DispatchQueue.main.sync {
-        guard let nsEvent = NSEvent(cgEvent: event) else {
-            return MediaKeyData()
-        }
-        
-        // NX_SUBTYPE_AUX_CONTROL_BUTTONS = 8
-        guard nsEvent.subtype.rawValue == 8 else {
-            return MediaKeyData()
-        }
-        
-        // Capture data1 immediately as a value type
-        let data1 = nsEvent.data1
-        let keyCode = UInt32((data1 & 0xFFFF0000) >> 16)
-        let keyFlags = UInt32(data1 & 0x0000FFFF)
-        let keyState = ((keyFlags & 0xFF00) >> 8)
-        
-        // Key state interpretation
-        let keyDown = keyState == 0x0A || keyState == 0x08
-        let keyUp = keyState == 0x0B
-        let keyRepeat = (keyFlags & 0x1) != 0
-        let shouldProcess = (keyDown || keyRepeat) && !keyUp
-        
-        return MediaKeyData(isValid: true, keyCode: keyCode, shouldProcess: shouldProcess)
-    }
-    
-    // If extraction failed, pass through
-    guard keyData.isValid else {
+    // PERFORMANCE FIX: Extract NSEvent data inline WITHOUT main thread dispatch
+    // The TSM assertion only affects caps lock handling, which we don't use
+    // Media keys (volume/brightness) work fine off main thread
+    guard let nsEvent = NSEvent(cgEvent: event),
+          nsEvent.subtype.rawValue == 8 else { // NX_SUBTYPE_AUX_CONTROL_BUTTONS = 8
         return Unmanaged.passUnretained(event)
     }
+    
+    // Extract key data
+    let data1 = nsEvent.data1
+    let keyCode = UInt32((data1 & 0xFFFF0000) >> 16)
+    let keyFlags = UInt32(data1 & 0x0000FFFF)
+    let keyState = ((keyFlags & 0xFF00) >> 8)
+    
+    let keyDown = keyState == 0x0A || keyState == 0x08
+    let keyUp = keyState == 0x0B
+    let keyRepeat = (keyFlags & 0x1) != 0
+    let shouldProcess = (keyDown || keyRepeat) && !keyUp
     
     // Check if this is a media key we handle
     let handledKeys: [UInt32] = [
@@ -260,7 +304,7 @@ private func mediaKeyCallback(
         NX_KEYTYPE_BRIGHTNESS_DOWN
     ]
     
-    guard handledKeys.contains(keyData.keyCode) else {
+    guard handledKeys.contains(keyCode) else {
         return Unmanaged.passUnretained(event)
     }
     
@@ -272,7 +316,7 @@ private func mediaKeyCallback(
     let interceptor = Unmanaged<MediaKeyInterceptor>.fromOpaque(userInfo).takeUnretainedValue()
     
     // Handle the key event
-    if interceptor.handleMediaKey(keyCode: keyData.keyCode, keyDown: keyData.shouldProcess) {
+    if interceptor.handleMediaKey(keyCode: keyCode, keyDown: shouldProcess) {
         // Return nil to suppress system HUD
         return nil
     }

@@ -152,9 +152,9 @@ struct FloatingBasketView: View {
         .frame(width: currentWidth, height: currentHeight)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .scaleEffect((state.isBasketTargeted || state.isAirDropZoneTargeted) ? 1.03 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isBasketTargeted)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isAirDropZoneTargeted)
-        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: state.basketItems.count)
+        .animation(DroppyAnimation.bouncy, value: state.isBasketTargeted)
+        .animation(DroppyAnimation.bouncy, value: state.isAirDropZoneTargeted)
+        .animation(DroppyAnimation.bouncy, value: state.basketItems.count)
         .coordinateSpace(name: "basketContainer")
         .onPreferenceChange(ItemFramePreferenceKey.self) { frames in
             self.itemFrames = frames
@@ -295,7 +295,7 @@ struct FloatingBasketView: View {
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 40, height: 40)
                     .scaleEffect(state.isAirDropZoneTargeted ? 1.1 : 1.0)
-                    .animation(.spring(response: 0.35, dampingFraction: 0.65), value: state.isAirDropZoneTargeted)
+                    .animation(DroppyAnimation.bouncy, value: state.isAirDropZoneTargeted)
                     .frame(width: airDropZoneWidth - 15, height: currentHeight - 20)
                     .offset(x: baseWidth + 5)
             }
@@ -537,7 +537,7 @@ struct FloatingBasketView: View {
                     ))
                 }
             }
-            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: state.basketItems.count)
+            .animation(DroppyAnimation.bouncy, value: state.basketItems.count)
         }
         .padding(.horizontal, horizontalPadding)
         .padding(.bottom, 16)
@@ -559,6 +559,56 @@ struct FloatingBasketView: View {
             state.removeBasketItemForTransfer(item)
         }
         state.deselectAllBasket()
+        
+        // PREMIUM: Haptic confirms items moved to shelf
+        if !itemsToMove.isEmpty {
+            HapticFeedback.drop()
+        }
+        
+        // Auto-expand shelf on the CORRECT screen:
+        // Priority order:
+        // 1. If a shelf is already expanded on any screen, use that screen
+        // 2. Use the screen where the BASKET WINDOW is located (most reliable)
+        // 3. Use the screen where the mouse is currently located
+        // 4. Fall back to main screen only as last resort
+        if !itemsToMove.isEmpty {
+            let targetDisplayID: CGDirectDisplayID
+            
+            if let currentExpandedDisplayID = state.expandedDisplayID {
+                // Use the screen where the shelf is already expanded
+                targetDisplayID = currentExpandedDisplayID
+            } else if let basketWindow = FloatingBasketWindowController.shared.basketWindow,
+                      let basketScreen = basketWindow.screen {
+                // Use the screen where the basket window is displayed
+                // This is the most reliable way since the user is interacting with the basket
+                targetDisplayID = basketScreen.displayID
+            } else {
+                // Fallback: Find screen containing mouse using flipped coordinates
+                let mouseLocation = NSEvent.mouseLocation
+                var foundScreen: NSScreen?
+                
+                for screen in NSScreen.screens {
+                    // NSEvent.mouseLocation uses bottom-left origin, same as NSScreen.frame
+                    if screen.frame.contains(mouseLocation) {
+                        foundScreen = screen
+                        break
+                    }
+                }
+                
+                if let mouseScreen = foundScreen {
+                    targetDisplayID = mouseScreen.displayID
+                } else if let mainScreen = NSScreen.main {
+                    // Last resort: main screen
+                    targetDisplayID = mainScreen.displayID
+                } else {
+                    return
+                }
+            }
+            
+            withAnimation(DroppyAnimation.interactive) {
+                state.expandShelf(for: targetDisplayID)
+            }
+        }
         
         // Hide basket if empty after move
         if state.basketItems.isEmpty {

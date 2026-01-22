@@ -32,6 +32,10 @@ final class DroppyState {
     /// Whether the drop zone is currently targeted (hovered with files)
     var isDropTargeted: Bool = false
     
+    /// Which screen (displayID) is currently being drop-targeted
+    /// Used to ensure only the correct screen's shelf expands when items are dropped
+    var dropTargetDisplayID: CGDirectDisplayID? = nil
+    
     /// Tracks which screen (by displayID) has mouse hovering over the notch
     /// Only one screen can show hover effect at a time
     var hoveringDisplayID: CGDirectDisplayID? = nil
@@ -81,6 +85,7 @@ final class DroppyState {
     /// Expands the shelf on a specific screen (collapses any other expanded shelf)
     func expandShelf(for displayID: CGDirectDisplayID) {
         expandedDisplayID = displayID
+        HapticFeedback.expand()
     }
     
     /// Checks if a specific screen has the expanded shelf
@@ -92,6 +97,7 @@ final class DroppyState {
     func collapseShelf(for displayID: CGDirectDisplayID) {
         if expandedDisplayID == displayID {
             expandedDisplayID = nil
+            HapticFeedback.expand()
         }
     }
     
@@ -188,7 +194,7 @@ final class DroppyState {
     static func expandedShelfHeight(for screen: NSScreen) -> CGFloat {
         let notchHeight = screen.safeAreaInsets.top
         let isDynamicIsland = notchHeight <= 0 || UserDefaults.standard.bool(forKey: "forceDynamicIslandTest")
-        let topPaddingDelta: CGFloat = isDynamicIsland ? 0 : (notchHeight - 14)
+        let topPaddingDelta: CGFloat = isDynamicIsland ? 0 : (notchHeight - 20)
         let notchCompensation: CGFloat = isDynamicIsland ? 0 : notchHeight
         
         // Calculate ALL possible content heights
@@ -201,8 +207,8 @@ final class DroppyState {
         var height = max(terminalHeight, max(mediaPlayerHeight, shelfHeight))
         
         // ALWAYS include generous buffer for floating buttons
-        // Button offset (8/12) + button height (46) + extra padding = 70pt
-        height += 70
+        // Button offset (12 gap + 6 island) + button height (46) + extra margin = 100pt
+        height += 100
         
         return height
     }
@@ -219,6 +225,7 @@ final class DroppyState {
         // Avoid duplicates
         guard !items.contains(where: { $0.url == item.url }) else { return }
         items.append(item)
+        HapticFeedback.drop()
     }
     
     /// Adds multiple items from file URLs
@@ -235,6 +242,7 @@ final class DroppyState {
         items.removeAll { $0.id == item.id }
         selectedItems.remove(item.id)
         cleanupTempFoldersIfEmpty()
+        HapticFeedback.delete()
     }
     
     /// Removes selected items
@@ -265,10 +273,12 @@ final class DroppyState {
         if let index = items.firstIndex(where: { $0.id == item.id }) {
             items[index].isPinned.toggle()
             savePinnedFolders()
+            HapticFeedback.pin()
         }
         if let index = basketItems.firstIndex(where: { $0.id == item.id }) {
             basketItems[index].isPinned.toggle()
             savePinnedFolders()
+            HapticFeedback.pin()
         }
     }
     
@@ -415,6 +425,7 @@ final class DroppyState {
         // Avoid duplicates
         guard !basketItems.contains(where: { $0.url == item.url }) else { return }
         basketItems.append(item)
+        HapticFeedback.drop()
     }
     
     /// Adds multiple items to the basket from file URLs
@@ -435,6 +446,7 @@ final class DroppyState {
         basketItems.removeAll { $0.id == item.id }
         selectedBasketItems.remove(item.id)
         cleanupTempFoldersIfEmpty()
+        HapticFeedback.delete()
     }
     
     /// Removes an item from the basket WITHOUT cleanup (for transfers to shelf)
@@ -593,6 +605,7 @@ final class DroppyState {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.writeObjects(itemsToCopy.map { $0.url as NSURL })
+        HapticFeedback.copy()
     }
     
     // MARK: - Shelf Visibility

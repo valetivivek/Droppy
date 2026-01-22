@@ -92,7 +92,7 @@ final class AirPodsManager {
     func triggerTestHUD() {
         let testAirPods = ConnectedAirPods(
             name: "Test AirPods Pro",
-            type: .pro,
+            type: .airpodsPro,
             batteryLevel: 85,
             leftBattery: 80,
             rightBattery: 90,
@@ -129,18 +129,18 @@ final class AirPodsManager {
     // MARK: - Bluetooth Callback
     
     @objc private func handleDeviceConnection(_ notification: IOBluetoothUserNotification?, device: IOBluetoothDevice?) {
-        guard let device = device, device.isConnected() else { return }
+        guard let btDevice = device, btDevice.isConnected() else { return }
         
-        // Check if this is an AirPods device
-        guard let airPods = identifyAirPods(device) else {
-            print("[AirPods] Device connected but not AirPods: \(device.name ?? "Unknown")")
+        // Check if this is a Bluetooth audio device
+        guard let audioDevice = identifyAirPods(btDevice) else {
+            print("[Audio] Device connected but not audio: \(btDevice.name ?? "Unknown")")
             return
         }
         
         // Check if we've already shown HUD for this device (avoid duplicate triggers)
-        if let address = device.addressString {
+        if let address = btDevice.addressString {
             if shownDeviceAddresses.contains(address) {
-                print("[AirPods] Already shown HUD for: \(airPods.name), skipping")
+                print("[Audio] Already shown HUD for: \(audioDevice.name), skipping")
                 return
             }
             shownDeviceAddresses.insert(address)
@@ -151,42 +151,78 @@ final class AirPodsManager {
             }
         }
         
-        print("[AirPods] Detected connection: \(airPods.name) - Battery: \(airPods.batteryLevel)%")
+        print("[Audio] Detected connection: \(audioDevice.name) (\(audioDevice.type.displayName)) - Battery: \(audioDevice.batteryLevel)%")
         
-        // Debounce rapid reconnections (AirPods can connect/disconnect in quick succession)
+        // Debounce rapid reconnections (devices can connect/disconnect in quick succession)
         debounceWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
-            self?.showHUD(for: airPods)
+            self?.showHUD(for: audioDevice)
         }
         debounceWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
     }
     
-    // MARK: - AirPods Identification
+    // MARK: - Device Identification (AirPods + Generic Headphones)
     
+    /// Identify Bluetooth audio device and determine its type
     private func identifyAirPods(_ device: IOBluetoothDevice) -> ConnectedAirPods? {
         guard let name = device.name?.lowercased() else { return nil }
         
-        // Check if device name contains AirPods indicators
-        guard name.contains("airpods") else { return nil }
+        // Determine device type based on name
+        let type: ConnectedAirPods.DeviceType
         
-        // Determine type based on name
-        let type: ConnectedAirPods.AirPodsType
-        if name.contains("max") {
-            type = .max
-        } else if name.contains("pro") {
-            type = .pro
-        } else if name.contains("3") || name.contains("gen 3") || name.contains("third") {
-            type = .gen3
-        } else {
-            type = .standard
+        // === AirPods Family ===
+        if name.contains("airpods") {
+            if name.contains("max") {
+                type = .airpodsMax
+            } else if name.contains("pro") {
+                type = .airpodsPro
+            } else if name.contains("3") || name.contains("gen 3") || name.contains("third") {
+                type = .airpodsGen3
+            } else {
+                type = .airpods
+            }
+        }
+        // === Beats Products ===
+        else if name.contains("beats") || name.contains("powerbeats") || name.contains("studio buds") {
+            type = .beats
+        }
+        // === Generic Earbuds (wireless earbuds from various brands) ===
+        else if name.contains("buds") || name.contains("earbuds") || name.contains("earbud") ||
+                name.contains("galaxy buds") || name.contains("pixel buds") || 
+                name.contains("jabra") || name.contains("wf-") { // Sony WF- series
+            type = .earbuds
+        }
+        // === Generic Headphones (over-ear/on-ear) ===
+        else if name.contains("headphone") || name.contains("wh-") || // Sony WH- series
+                name.contains("bose") || name.contains("quietcomfort") ||
+                name.contains("sennheiser") || name.contains("momentum") ||
+                name.contains("jbl") || name.contains("skullcandy") ||
+                name.contains("audio-technica") || name.contains("anker") ||
+                name.contains("soundcore") {
+            type = .headphones
+        }
+        // === Not a recognized audio device ===
+        else {
+            // Check device class for audio devices
+            let deviceClass = device.classOfDevice
+            let majorClass = (deviceClass >> 8) & 0x1F
+            let isAudioDevice = majorClass == 0x04 // Audio/Video device class
+            
+            if isAudioDevice {
+                // It's an audio device but we don't recognize the brand - use generic headphones
+                type = .headphones
+            } else {
+                // Not an audio device
+                return nil
+            }
         }
         
         // Get battery levels using private API
         let batteryInfo = getBatteryLevels(from: device, type: type)
         
         return ConnectedAirPods(
-            name: device.name ?? "AirPods",
+            name: device.name ?? "Headphones",
             type: type,
             batteryLevel: batteryInfo.combined,
             leftBattery: batteryInfo.left,
@@ -199,7 +235,7 @@ final class AirPodsManager {
     
     /// Extract battery levels using IOBluetoothDevice's private selectors
     /// These are undocumented but used by apps like AirBuddy
-    private func getBatteryLevels(from device: IOBluetoothDevice, type: ConnectedAirPods.AirPodsType) -> (combined: Int, left: Int?, right: Int?, case: Int?) {
+    private func getBatteryLevels(from device: IOBluetoothDevice, type: ConnectedAirPods.DeviceType) -> (combined: Int, left: Int?, right: Int?, case: Int?) {
         var leftBattery: Int?
         var rightBattery: Int?
         var caseBattery: Int?
@@ -238,8 +274,8 @@ final class AirPodsManager {
         
         // Calculate combined battery display value
         let combined: Int
-        if type == .max {
-            // AirPods Max uses single battery
+        if type == .airpodsMax || type == .headphones {
+            // AirPods Max and over-ear headphones use single battery
             combined = singleBattery ?? 100
         } else if let left = leftBattery, let right = rightBattery {
             // Average of left and right for regular AirPods

@@ -87,7 +87,7 @@ struct CapsLockHUDView: View {
                             .font(.system(size: layout.labelFontSize, weight: .semibold))
                             .foregroundStyle(accentColor)
                             .contentTransition(.interpolate)
-                            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: capsLockManager.isCapsLockOn)
+                            .animation(DroppyAnimation.notchState, value: capsLockManager.isCapsLockOn)
                     }
                     .padding(.trailing, symmetricPadding)
                     .frame(width: wingWidth)

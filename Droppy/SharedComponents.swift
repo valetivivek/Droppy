@@ -27,7 +27,7 @@ struct OptionButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: configuration.isPressed)
+            .animation(DroppyAnimation.stateEmphasis, value: configuration.isPressed)
             .contentShape(Rectangle())
     }
 }
@@ -90,7 +90,7 @@ struct AnimatedHUDToggle: View {
                     .stroke(isOn ? color.opacity(0.3) : Color.white.opacity(0.08), lineWidth: 1)
             )
             .scaleEffect(isHovering ? 1.02 : 1.0)
-            .animation(.spring(response: DesignConstants.springResponse, dampingFraction: DesignConstants.springDamping), value: isHovering)
+            .animation(DroppyAnimation.hover, value: isHovering)
         }
         .buttonStyle(OptionButtonStyle())
         .contentShape(Rectangle())
@@ -167,7 +167,7 @@ struct AnimatedHUDToggleWithSubtitle: View {
             )
             .opacity(isEnabled ? 1 : 0.4)
             .scaleEffect(isHovering && isEnabled ? 1.02 : 1.0)
-            .animation(.spring(response: DesignConstants.springResponse, dampingFraction: DesignConstants.springDamping), value: isHovering)
+            .animation(DroppyAnimation.hover, value: isHovering)
         }
         .buttonStyle(OptionButtonStyle())
         .contentShape(Rectangle())
@@ -257,7 +257,7 @@ struct VolumeAndBrightnessToggle: View {
                     .stroke(isEnabled ? AdaptiveColors.subtleBorderAuto : Color.white.opacity(0.08), lineWidth: 1)
             )
             .scaleEffect(isHovering ? 1.02 : 1.0)
-            .animation(.spring(response: DesignConstants.springResponse, dampingFraction: DesignConstants.springDamping), value: isHovering)
+            .animation(DroppyAnimation.hover, value: isHovering)
         }
         .buttonStyle(OptionButtonStyle())
         .contentShape(Rectangle())
@@ -342,8 +342,8 @@ struct DisplayModeButton<Icon: View>: View {
                     .stroke(isSelected ? Color.blue.opacity(0.3) : Color.white.opacity(0.08), lineWidth: 1)
             )
             .scaleEffect(isPressed ? 0.97 : (isHovering ? 1.02 : 1.0))
-            .animation(.spring(response: DesignConstants.springResponse, dampingFraction: DesignConstants.springDamping), value: isHovering)
-            .animation(.spring(response: 0.15, dampingFraction: 0.6), value: isPressed)
+            .animation(DroppyAnimation.hover, value: isHovering)
+            .animation(DroppyAnimation.press, value: isPressed)
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
@@ -421,7 +421,7 @@ struct AnimatedSubSettingToggle: View {
                     .stroke(isOn ? color.opacity(0.3) : Color.white.opacity(0.08), lineWidth: 1)
             )
             .scaleEffect(isHovering ? 1.02 : 1.0)
-            .animation(.spring(response: DesignConstants.springResponse, dampingFraction: DesignConstants.springDamping), value: isHovering)
+            .animation(DroppyAnimation.hover, value: isHovering)
         }
         .buttonStyle(OptionButtonStyle())
         .contentShape(Rectangle())

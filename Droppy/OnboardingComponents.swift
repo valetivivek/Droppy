@@ -297,18 +297,55 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         // Store reference AFTER setup
         window = newWindow
         
-        // Fade in - use deferred makeKey to avoid NotchWindow conflicts
+        // PREMIUM: Start scaled down and invisible for spring animation
         newWindow.alphaValue = 0
+        if let contentView = newWindow.contentView {
+            contentView.wantsLayer = true
+            contentView.layer?.transform = CATransform3DMakeScale(0.85, 0.85, 1.0)
+            contentView.layer?.opacity = 0
+        }
+        
+        // Show window - use deferred makeKey to avoid NotchWindow conflicts
         newWindow.orderFront(nil)
         DispatchQueue.main.async {
             NSApp.activate(ignoringOtherApps: true)
             newWindow.makeKeyAndOrderFront(nil)
         }
         
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.3
-            newWindow.animator().alphaValue = 1.0
+        // PREMIUM: CASpringAnimation for bouncy appear
+        if let layer = newWindow.contentView?.layer {
+            // Fade in
+            let fadeAnim = CABasicAnimation(keyPath: "opacity")
+            fadeAnim.fromValue = 0
+            fadeAnim.toValue = 1
+            fadeAnim.duration = 0.25
+            fadeAnim.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            fadeAnim.fillMode = .forwards
+            fadeAnim.isRemovedOnCompletion = false
+            layer.add(fadeAnim, forKey: "fadeIn")
+            layer.opacity = 1
+            
+            // Scale with spring overshoot
+            let scaleAnim = CASpringAnimation(keyPath: "transform.scale")
+            scaleAnim.fromValue = 0.85
+            scaleAnim.toValue = 1.0
+            scaleAnim.mass = 1.0
+            scaleAnim.stiffness = 250  // Slightly softer for larger window
+            scaleAnim.damping = 22
+            scaleAnim.initialVelocity = 6
+            scaleAnim.duration = scaleAnim.settlingDuration
+            scaleAnim.fillMode = .forwards
+            scaleAnim.isRemovedOnCompletion = false
+            layer.add(scaleAnim, forKey: "scaleSpring")
+            layer.transform = CATransform3DIdentity
         }
+        
+        // Fade window alpha
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.25
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            newWindow.animator().alphaValue = 1.0
+        })
     }
     
     func close() {

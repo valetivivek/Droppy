@@ -378,7 +378,7 @@ struct NotchShelfView: View {
             return mediaPlayerContentHeight + topPaddingDelta
         }
         
-        // SHELF: DYNAMIC height (grows with files, small when empty)
+        // SHELF: DYNAMIC height (grows with files)
         // No header row anymore - auto-collapse handles hiding
         let rowCount = (Double(state.items.count) / 5.0).rounded(.up)
         let baseHeight = max(1, rowCount) * 110 // 110 per row, no header
@@ -467,7 +467,7 @@ struct NotchShelfView: View {
         
         if shouldShow {
             NotchFace(size: 40)
-                .transition(.scale(scale: 0.5).combined(with: .opacity).animation(.spring(response: 0.3, dampingFraction: 0.7)))
+                .transition(.scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.hoverBouncy))
                 .zIndex(1)
         }
     }
@@ -558,7 +558,7 @@ struct NotchShelfView: View {
                 .offset(y: currentExpandedHeight + NotchLayoutConstants.floatingButtonGap + (isDynamicIslandMode ? NotchLayoutConstants.floatingButtonIslandCompensation : 0))
                 .opacity(notchController.isTemporarilyHidden ? 0 : 1)
                 .scaleEffect(notchController.isTemporarilyHidden ? 0.5 : 1)
-                .animation(.spring(response: 0.35, dampingFraction: 0.7), value: notchController.isTemporarilyHidden)
+                .animation(DroppyAnimation.notchState, value: notchController.isTemporarilyHidden)
                 .zIndex(100)
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
@@ -578,23 +578,27 @@ struct NotchShelfView: View {
             contentOverlay
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: notchController.isTemporarilyHidden)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showMediaPlayer)
-        .animation(.easeOut(duration: 0.4), value: mediaHUDFadedOut)
+        // PREMIUM: compositingGroup() renders all content as a single composited image
+        // This ensures background + content animate together as one unified object
+        .compositingGroup()
+        // PREMIUM: Asymmetric animation - bouncy open, critically damped close
+        .animation(state.isExpanded ? DroppyAnimation.expandOpen : DroppyAnimation.expandClose, value: state.isExpanded)
+        // PREMIUM: Fast notch state animation (.spring.speed(1.2))
+        .animation(DroppyAnimation.notchState, value: notchController.isTemporarilyHidden)
+        .animation(DroppyAnimation.notchState, value: showMediaPlayer)
+        // PREMIUM: DroppyAnimation.viewChange for content view changes
+        .animation(DroppyAnimation.viewChange, value: mediaHUDFadedOut)
     }
     
     private var shelfContentWithItemObservers: some View {
         shelfContentBase
             .onChange(of: state.items.count) { oldCount, newCount in
-                if newCount > oldCount && !isExpandedOnThisScreen {
-                    if let displayID = targetScreen?.displayID {
-                        withAnimation(DroppyAnimation.transition) {
-                            state.expandShelf(for: displayID)
-                        }
-                    }
-                }
+                // NOTE: Auto-expand removed - drop handlers now explicitly expand the correct display
+                // This prevents multiple screens from racing to expand when items are added
+                
+                // Auto-collapse when shelf becomes empty
                 if newCount == 0 && state.isExpanded {
-                    withAnimation(DroppyAnimation.listChange) {
+                    withAnimation(DroppyAnimation.expandClose) {
                         state.expandedDisplayID = nil
                     }
                 }
@@ -743,7 +747,7 @@ struct NotchShelfView: View {
         }
         
         let workItem = DispatchWorkItem { [self] in
-            withAnimation(.easeOut(duration: 0.3)) {
+            withAnimation(DroppyAnimation.viewChange) {
                 hudIsVisible = false
             }
         }
@@ -763,7 +767,7 @@ struct NotchShelfView: View {
         }
         
         let workItem = DispatchWorkItem { [self] in
-            withAnimation(.easeOut(duration: 0.3)) {
+            withAnimation(DroppyAnimation.viewChange) {
                 hudIsVisible = false
             }
         }
@@ -882,11 +886,12 @@ struct NotchShelfView: View {
             // MARK: - Expanded Shelf Content
             if isExpandedOnThisScreen && enableNotchShelf {
                 expandedShelfContent
-                    .transition(.scale(scale: 0.85).combined(with: .opacity).animation(.spring(response: 0.3, dampingFraction: 0.8)))
+                    .transition(.scale(scale: 0.85).combined(with: .opacity).animation(DroppyAnimation.expandOpen))
                     .frame(width: expandedWidth, height: currentExpandedHeight)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.85), value: currentExpandedHeight)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.85), value: musicManager.isMediaHUDForced)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.85), value: musicManager.isMediaHUDHidden)
+                    // UNIFIED: Use single notchState animation for all height changes
+                    .animation(DroppyAnimation.notchState, value: currentExpandedHeight)
+                    .animation(DroppyAnimation.notchState, value: musicManager.isMediaHUDForced)
+                    .animation(DroppyAnimation.notchState, value: musicManager.isMediaHUDHidden)
                     .clipShape(isDynamicIslandMode ? AnyShape(DynamicIslandShape(cornerRadius: 40)) : AnyShape(NotchShape(bottomRadius: 40)))
                     .geometryGroup()
                     .zIndex(2)
@@ -931,7 +936,7 @@ struct NotchShelfView: View {
                 }
             )
             .frame(width: currentHudTypeWidth, height: notchHeight)
-            .transition(.scale(scale: 0.8).combined(with: .opacity).animation(.spring(response: 0.25, dampingFraction: 0.8)))
+            .transition(.scale(scale: 0.8).combined(with: .opacity).animation(DroppyAnimation.notchState))
             .zIndex(3)
         }
         
@@ -943,7 +948,7 @@ struct NotchShelfView: View {
                 targetScreen: targetScreen
             )
             .frame(width: batteryHudWidth, height: notchHeight)
-            .transition(.scale(scale: 0.8).combined(with: .opacity).animation(.spring(response: 0.25, dampingFraction: 0.8)))
+            .transition(.scale(scale: 0.8).combined(with: .opacity).animation(DroppyAnimation.notchState))
             .zIndex(4)
         }
         
@@ -955,7 +960,7 @@ struct NotchShelfView: View {
                 targetScreen: targetScreen
             )
             .frame(width: batteryHudWidth, height: notchHeight)
-            .transition(.scale(scale: 0.8).combined(with: .opacity).animation(.spring(response: 0.25, dampingFraction: 0.8)))
+            .transition(.scale(scale: 0.8).combined(with: .opacity).animation(DroppyAnimation.notchState))
             .zIndex(5)
         }
         
@@ -967,7 +972,7 @@ struct NotchShelfView: View {
                 targetScreen: targetScreen
             )
             .frame(width: batteryHudWidth, height: notchHeight)
-            .transition(.scale(scale: 0.8).combined(with: .opacity).animation(.spring(response: 0.25, dampingFraction: 0.8)))
+            .transition(.scale(scale: 0.8).combined(with: .opacity).animation(DroppyAnimation.notchState))
             .zIndex(5.5)
         }
         
@@ -979,7 +984,7 @@ struct NotchShelfView: View {
                 targetScreen: targetScreen
             )
             .frame(width: hudWidth, height: notchHeight)
-            .transition(.scale(scale: 0.8).combined(with: .opacity).animation(.spring(response: 0.25, dampingFraction: 0.8)))
+            .transition(.scale(scale: 0.8).combined(with: .opacity).animation(DroppyAnimation.notchState))
             .zIndex(6)
         }
         
@@ -991,7 +996,7 @@ struct NotchShelfView: View {
                 targetScreen: targetScreen
             )
             .frame(width: batteryHudWidth, height: notchHeight)
-            .transition(.scale(scale: 0.8).combined(with: .opacity).animation(.spring(response: 0.25, dampingFraction: 0.8)))
+            .transition(.scale(scale: 0.8).combined(with: .opacity).animation(DroppyAnimation.notchState))
             .zIndex(7)
         }
     }
@@ -1016,7 +1021,7 @@ struct NotchShelfView: View {
             MediaHUDView(musicManager: musicManager, isHovered: $mediaHUDIsHovered, notchWidth: notchWidth, notchHeight: notchHeight, hudWidth: hudWidth, targetScreen: targetScreen)
                 .frame(width: hudWidth, alignment: .top)
                 .clipShape(isDynamicIslandMode ? AnyShape(DynamicIslandShape(cornerRadius: 50)) : AnyShape(NotchShape(bottomRadius: 18)))
-                .transition(.scale(scale: 0.8).combined(with: .opacity).animation(.spring(response: 0.25, dampingFraction: 0.8)))
+                .transition(.scale(scale: 0.8).combined(with: .opacity).animation(DroppyAnimation.notchState))
                 .zIndex(3)
         }
     }
@@ -1035,13 +1040,6 @@ struct NotchShelfView: View {
             // When transparent DI is enabled, use glass material instead of black
             DynamicIslandShape(cornerRadius: isExpandedOnThisScreen ? 40 : 50)
                 .fill(shouldUseDynamicIslandTransparent ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
-                // Shadow scales with expanded state for proper depth perception
-                .shadow(
-                    color: Color.black.opacity(isDynamicIslandMode ? (isExpandedOnThisScreen ? 0.3 : 0.25) : 0),
-                    radius: isExpandedOnThisScreen ? 12 : 6,
-                    x: 0,
-                    y: isExpandedOnThisScreen ? 6 : 3
-                )
                 .opacity(isDynamicIslandMode ? 1 : 0)
                 .scaleEffect(isDynamicIslandMode ? 1 : 0.85)
             
@@ -1052,6 +1050,24 @@ struct NotchShelfView: View {
                 .fill(shouldUseExternalNotchTransparent ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
                 .opacity(isDynamicIslandMode ? 0 : 1)
                 .scaleEffect(isDynamicIslandMode ? 0.85 : 1)
+        }
+        // PREMIUM shadow applied OUTSIDE the ZStack so it follows the clipped shape
+        // This ensures proper rounded shadow that respects the shape, not a square
+        // NOTE: Shadow is disabled in transparent mode (glass effect doesn't need shadow)
+        .background {
+            if isDynamicIslandMode && !shouldUseDynamicIslandTransparent {
+                // Premium pill shadow for Dynamic Island (only when NOT transparent)
+                // Shadow visible when expanded OR hovering (premium depth effect)
+                let showShadow = isExpandedOnThisScreen || isHoveringOnThisScreen
+                DynamicIslandShape(cornerRadius: isExpandedOnThisScreen ? 40 : 50)
+                    .fill(Color.black)
+                    .shadow(
+                        color: showShadow ? Color.black.opacity(isExpandedOnThisScreen ? 0.5 : 0.4) : .clear,
+                        radius: isExpandedOnThisScreen ? 12 : 6,
+                        x: 0,
+                        y: isExpandedOnThisScreen ? 6 : 3
+                    )
+            }
         }
         // Add bottom padding to prevent shadow clipping when expanded
         // Shadow extends: radius (12) + y-offset (6) = 18px downward
@@ -1064,13 +1080,16 @@ struct NotchShelfView: View {
         // Note: Idle indicator removed - island is now completely invisible when idle
         // Only appears on hover, drag, or when HUDs/media are active
         .overlay(morphingOutline)
-        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: state.isExpanded)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragMonitor.isDragging)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: hudIsVisible)
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: musicManager.isPlaying)
-        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isSongTransitioning)
-        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: state.items.count)
-        .animation(.spring(response: 0.4, dampingFraction: 0.75), value: useDynamicIslandStyle)
+        // UNIFIED PREMIUM ANIMATION: Single animation for all state changes
+        // Using asymmetric expand/close prevents conflicting spring values
+        .animation(state.isExpanded ? DroppyAnimation.expandOpen : DroppyAnimation.expandClose, value: state.isExpanded)
+        .animation(DroppyAnimation.hoverBouncy, value: isHoveringOnThisScreen) // Shadow visibility on hover
+        .animation(DroppyAnimation.hoverBouncy, value: dragMonitor.isDragging)
+        .animation(DroppyAnimation.hoverBouncy, value: hudIsVisible)
+        .animation(DroppyAnimation.notchState, value: musicManager.isPlaying)
+        .animation(DroppyAnimation.notchState, value: isSongTransitioning)
+        .animation(DroppyAnimation.notchState, value: state.items.count)
+        .animation(DroppyAnimation.viewChange, value: useDynamicIslandStyle)
         .padding(.top, isDynamicIslandMode ? dynamicIslandTopMargin : 0)
         .contextMenu {
             if showClipboardButton {
@@ -1131,8 +1150,8 @@ struct NotchShelfView: View {
                 .opacity(isDynamicIslandMode ? 0 : 1)
         }
         .opacity((enableNotchShelf && shouldShowVisualNotch && !isExpandedOnThisScreen && (dragMonitor.isDragging || isHoveringOnThisScreen)) ? 1 : 0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragMonitor.isDragging)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHoveringOnThisScreen)
+        .animation(DroppyAnimation.hoverBouncy, value: dragMonitor.isDragging)
+        .animation(DroppyAnimation.hoverBouncy, value: isHoveringOnThisScreen)
     }
 
     // MARK: - Drop Zone
@@ -1163,10 +1182,13 @@ struct NotchShelfView: View {
         .onTapGesture {
             // Only allow expanding shelf when shelf is enabled
             guard enableNotchShelf else { return }
-            // Toggle expansion on this specific screen
+            // CRITICAL: Only OPEN the shelf when collapsed - when expanded, clicks should go to items
+            // This prevents the tap gesture from swallowing X button clicks in Dynamic Island mode
+            guard !isExpandedOnThisScreen else { return }
+            // Expand on this specific screen
             if let displayID = targetScreen?.displayID {
                 withAnimation(DroppyAnimation.transition) {
-                    state.toggleShelfExpansion(for: displayID)
+                    state.expandShelf(for: displayID)
                 }
             }
         }
@@ -1203,7 +1225,7 @@ struct NotchShelfView: View {
         }
         // NOTE: isDropTargeted animation REMOVED to prevent sliding effect
         // Visual feedback handled by internal transitions in emptyShelfContent
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHoveringOnThisScreen)
+        .animation(DroppyAnimation.hoverBouncy, value: isHoveringOnThisScreen)
     }
     
     // MARK: - Indicators
@@ -1297,11 +1319,10 @@ struct NotchShelfView: View {
                                             .frame(height: currentExpandedHeight)
                         // Stable identity for animation
                         .id("empty-shelf-view")
-                        // Carousel Symmetry Standard: Slides from LEFT (opposite to media which slides from RIGHT)
-                        // This creates a seamless handoff without ghosting artifacts
+                        // Scale transition matching basket pattern for polished appearance
                         .transition(.asymmetric(
-                            insertion: .move(edge: .leading).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
+                            insertion: .scale(scale: 0.9).combined(with: .opacity),
+                            removal: .scale(scale: 0.9).combined(with: .opacity)
                         ))
                 }
                 // Show items grid when items exist
@@ -1310,23 +1331,22 @@ struct NotchShelfView: View {
                                             .frame(height: currentExpandedHeight)
                         // Stable identity for animation
                         .id("items-grid-view")
-                        // Carousel Symmetry Standard: Slides from LEFT (opposite to media which slides from RIGHT)
-                        // This creates a seamless handoff without ghosting artifacts
+                        // Scale transition matching basket pattern for polished appearance
                         .transition(.asymmetric(
-                            insertion: .move(edge: .leading).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
+                            insertion: .scale(scale: 0.9).combined(with: .opacity),
+                            removal: .scale(scale: 0.9).combined(with: .opacity)
                         ))
             }
             
 
         }
-        // Smoother, more premium animation for media state changes
+        // UNIFIED: premium notchState animation for all media state changes
         // NOTE: isDropTargeted animation REMOVED to prevent sliding effect when files hover over shelf
         // Internal transitions handle content animations instead
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: musicManager.isPlaying)
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: musicManager.wasRecentlyPlaying)
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: musicManager.isMediaHUDForced)
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: musicManager.isMediaHUDHidden)
+        .animation(DroppyAnimation.notchState, value: musicManager.isPlaying)
+        .animation(DroppyAnimation.notchState, value: musicManager.wasRecentlyPlaying)
+        .animation(DroppyAnimation.notchState, value: musicManager.isMediaHUDForced)
+        .animation(DroppyAnimation.notchState, value: musicManager.isMediaHUDHidden)
         .onHover { isHovering in
             
             // Track hover state for the auto-shrink timer
@@ -1643,7 +1663,7 @@ extension NotchShelfView {
                             dashPhase: dropZoneDashPhase
                         )
                     )
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isDropTargeted)
+            .animation(DroppyAnimation.hoverBouncy, value: state.isDropTargeted)
             )
             
             // AirDrop zone (right side, only when enabled)
@@ -1655,7 +1675,7 @@ extension NotchShelfView {
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 40, height: 40)
                         .scaleEffect(state.isShelfAirDropZoneTargeted ? 1.1 : 1.0)
-                        .animation(.spring(response: 0.35, dampingFraction: 0.65), value: state.isShelfAirDropZoneTargeted)
+                        .animation(DroppyAnimation.stateEmphasis, value: state.isShelfAirDropZoneTargeted)
                 }
                 .frame(maxWidth: 90, maxHeight: .infinity)
                 .padding(10) // Match main zone padding
@@ -1671,14 +1691,14 @@ extension NotchShelfView {
                                 dashPhase: dropZoneDashPhase
                             )
                         )
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isShelfAirDropZoneTargeted)
+                        .animation(DroppyAnimation.hoverBouncy, value: state.isShelfAirDropZoneTargeted)
                 )
             }
         }
         // Whole shelf content zooms when either zone is targeted (matches basket behavior)
         .scaleEffect((state.isDropTargeted || state.isShelfAirDropZoneTargeted) ? 1.03 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isDropTargeted)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state.isShelfAirDropZoneTargeted)
+        .animation(DroppyAnimation.hoverBouncy, value: state.isDropTargeted)
+        .animation(DroppyAnimation.hoverBouncy, value: state.isShelfAirDropZoneTargeted)
         // Use SSOT for consistent padding across all expanded views
         // Island mode: 20pt uniform on ALL sides
         // Notch mode: top = notchHeight (just below physical notch), 20pt on left/right/bottom

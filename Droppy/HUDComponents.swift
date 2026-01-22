@@ -20,29 +20,51 @@ struct HUDSlider: View {
             let width = geo.size.width
             let progress = max(0, min(1, value))
             let progressWidth = max(0, min(width, width * progress))
-            // Expand track height when active/dragging
-            let trackHeight: CGFloat = isExpanded ? 6 : 4
+            let trackHeight: CGFloat = isExpanded ? 5 : 4
             
             ZStack(alignment: .leading) {
-                // Track background (dark gray, matches seek slider)
+                // Track background (simple, no mask/blur)
                 Capsule()
-                    .fill(accentColor.opacity(isExpanded ? 0.3 : 0.2))
+                    .fill(Color.white.opacity(0.1))
                     .frame(height: trackHeight)
                 
-                // Filled portion with ultra-smooth animation
+                // PREMIUM: Gradient fill with glow
                 if progress > 0 {
                     Capsule()
-                        .fill(accentColor)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    accentColor,
+                                    accentColor.opacity(0.85)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
                         .frame(width: max(trackHeight, progressWidth), height: trackHeight)
-                        .shadow(color: isExpanded ? accentColor.opacity(0.4) : .clear, radius: isExpanded ? 4 : 0)
-                        // Fast interpolating spring for buttery smooth fill
-                        .animation(.interpolatingSpring(stiffness: 300, damping: 25), value: progress)
+                        // Top highlight stroke (no mask)
+                        .overlay(
+                            Capsule()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.4), .clear],
+                                        startPoint: .top,
+                                        endPoint: .center
+                                    ),
+                                    lineWidth: 0.5
+                                )
+                        )
+                        // PREMIUM BLOOM: Multi-layer glow
+                        .shadow(color: accentColor.opacity(0.3), radius: 1)
+                        .shadow(color: accentColor.opacity(0.15 + (progress * 0.15)), radius: 3)
+                        .shadow(color: accentColor.opacity(0.1 + (progress * 0.1)), radius: 5 + (progress * 3))
+                        .animation(.interpolatingSpring(stiffness: 350, damping: 28), value: progress)
                 }
             }
             .frame(height: trackHeight)
             .frame(maxHeight: .infinity, alignment: .center)
-            .scaleEffect(y: isExpanded ? 1.1 : 1.0, anchor: .center)
-            .animation(.spring(response: 0.2, dampingFraction: 0.75), value: isExpanded)
+            .scaleEffect(y: isExpanded ? 1.08 : 1.0, anchor: .center)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isExpanded)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
@@ -232,7 +254,7 @@ struct MediaHUDView: View {
                     ))
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isHovered)
+        .animation(DroppyAnimation.state, value: isHovered)
         .allowsHitTesting(true)
         .onTapGesture {
             withAnimation(DroppyAnimation.state) {
@@ -442,7 +464,7 @@ struct ProgressSlider: View {
                             x: 2,
                             y: 0
                         )
-                        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: safeProgress)
+                        .animation(DroppyAnimation.notchState, value: safeProgress)
                 }
             }
             .frame(height: height)

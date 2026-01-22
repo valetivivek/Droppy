@@ -9,36 +9,67 @@
 
 import SwiftUI
 
-/// Model representing connected AirPods
+/// Model representing connected Bluetooth audio device (AirPods or headphones)
 struct ConnectedAirPods: Equatable {
     let name: String
-    let type: AirPodsType
+    let type: DeviceType
     let batteryLevel: Int // Combined battery percentage (0-100)
     let leftBattery: Int?
     let rightBattery: Int?
     let caseBattery: Int?
     
-    enum AirPodsType: String, CaseIterable {
-        case standard = "airpods"
-        case pro = "airpodspro"
-        case max = "airpodsmax"
-        case gen3 = "airpods.gen3"
+    /// Device type - supports AirPods variants and generic headphones
+    enum DeviceType: String, CaseIterable {
+        // AirPods family
+        case airpods = "airpods"
+        case airpodsPro = "airpodspro"
+        case airpodsMax = "airpodsmax"
+        case airpodsGen3 = "airpods.gen3"
         
-        /// SF Symbol name for this AirPods type
+        // Generic headphones
+        case headphones = "headphones"
+        case beats = "beats.headphones"
+        case earbuds = "earbuds"
+        
+        /// SF Symbol name for this device type
         var symbolName: String {
-            return rawValue
+            switch self {
+            case .airpods: return "airpods"
+            case .airpodsPro: return "airpodspro"
+            case .airpodsMax: return "airpodsmax"
+            case .airpodsGen3: return "airpods.gen3"
+            case .headphones: return "headphones"
+            case .beats: return "beats.headphones"
+            case .earbuds: return "earbuds"
+            }
         }
         
-        /// Display name for this AirPods type
+        /// Display name for this device type
         var displayName: String {
             switch self {
-            case .standard: return "AirPods"
-            case .pro: return "AirPods Pro"
-            case .max: return "AirPods Max"
-            case .gen3: return "AirPods 3"
+            case .airpods: return "AirPods"
+            case .airpodsPro: return "AirPods Pro"
+            case .airpodsMax: return "AirPods Max"
+            case .airpodsGen3: return "AirPods 3"
+            case .headphones: return "Headphones"
+            case .beats: return "Beats"
+            case .earbuds: return "Earbuds"
+            }
+        }
+        
+        /// Whether this is an AirPods type (vs generic headphones)
+        var isAirPods: Bool {
+            switch self {
+            case .airpods, .airpodsPro, .airpodsMax, .airpodsGen3:
+                return true
+            case .headphones, .beats, .earbuds:
+                return false
             }
         }
     }
+    
+    // Legacy alias for backwards compatibility
+    typealias AirPodsType = DeviceType
 }
 
 /// AirPods connection HUD mimicking iPhone's popup animation
@@ -203,43 +234,45 @@ struct AirPodsHUDView: View {
         .scaleEffect(batteryScale)
     }
     
-    // MARK: - iPhone-Style Animation Sequence
+    // MARK: - iPhone-Style Animation Sequence (BUTTERY SMOOTH)
     
     private func startIPhoneStyleAnimation() {
-        // === PHASE 1: Icon appears with spring ===
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0)) {
+        // === PHASE 1: Icon appears with premium spring ===
+        // Using premium-style interactiveSpring for buttery smoothness
+        withAnimation(.interactiveSpring(response: 0.5, dampingFraction: 0.7, blendDuration: 0)) {
             iconScale = 1.0
             iconOpacity = 1.0
         }
         
-        // === PHASE 2: Start slow 3D rotation ===
+        // === PHASE 2: Start slow 3D rotation with wobble ===
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation(.easeInOut(duration: 3.5)) {
+            // Initial full rotation - slower and more elegant
+            withAnimation(.timingCurve(0.25, 0.1, 0.25, 1, duration: 4.0)) {
                 rotationAngle = 360
             }
             
-            // After full rotation, do a gentle settle oscillation
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+            // After full rotation, gentle continuous wobble (premium iOS feel)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
                 withAnimation(
-                    .easeInOut(duration: 2.0)
+                    .interactiveSpring(response: 2.5, dampingFraction: 0.3, blendDuration: 0)
                     .repeatForever(autoreverses: true)
                 ) {
-                    rotationAngle = 380
+                    rotationAngle = 375
                 }
             }
         }
         
-        // === PHASE 3: Battery info fades in ===
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            withAnimation(.easeOut(duration: 0.4)) {
+        // === PHASE 3: Battery info fades in with bounce ===
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.65, blendDuration: 0)) {
                 batteryOpacity = 1.0
                 batteryScale = 1.0
             }
         }
         
-        // === PHASE 4: Battery ring fills ===
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            withAnimation(.easeOut(duration: 0.8)) {
+        // === PHASE 4: Battery ring fills with smooth curve ===
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation(.interactiveSpring(response: 0.8, dampingFraction: 0.85, blendDuration: 0)) {
                 ringProgress = CGFloat(airPods.batteryLevel) / 100
             }
         }
@@ -254,7 +287,7 @@ struct AirPodsHUDView: View {
         AirPodsHUDView(
             airPods: ConnectedAirPods(
                 name: "Jordy's AirPods Pro",
-                type: .pro,
+                type: .airpodsPro,
                 batteryLevel: 85,
                 leftBattery: 85,
                 rightBattery: 90,
@@ -272,7 +305,7 @@ struct AirPodsHUDView: View {
         AirPodsHUDView(
             airPods: ConnectedAirPods(
                 name: "Jordy's AirPods Pro",
-                type: .pro,
+                type: .airpodsPro,
                 batteryLevel: 45,
                 leftBattery: 45,
                 rightBattery: 50,
@@ -284,13 +317,49 @@ struct AirPodsHUDView: View {
     .frame(width: 320, height: 60)
 }
 
-#Preview("Low Battery") {
+#Preview("Generic Headphones") {
+    ZStack {
+        Color.black
+        AirPodsHUDView(
+            airPods: ConnectedAirPods(
+                name: "Sony WH-1000XM5",
+                type: .headphones,
+                batteryLevel: 72,
+                leftBattery: nil,
+                rightBattery: nil,
+                caseBattery: nil
+            ),
+            hudWidth: 280
+        )
+    }
+    .frame(width: 320, height: 60)
+}
+
+#Preview("Beats Headphones") {
+    ZStack {
+        Color.black
+        AirPodsHUDView(
+            airPods: ConnectedAirPods(
+                name: "Beats Studio Pro",
+                type: .beats,
+                batteryLevel: 60,
+                leftBattery: nil,
+                rightBattery: nil,
+                caseBattery: nil
+            ),
+            hudWidth: 280
+        )
+    }
+    .frame(width: 320, height: 60)
+}
+
+#Preview("Low Battery AirPods") {
     ZStack {
         Color.black
         AirPodsHUDView(
             airPods: ConnectedAirPods(
                 name: "AirPods",
-                type: .standard,
+                type: .airpods,
                 batteryLevel: 15,
                 leftBattery: 10,
                 rightBattery: 20,

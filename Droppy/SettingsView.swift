@@ -57,9 +57,11 @@ struct SettingsView: View {
     @State private var showAutoFocusSearchWarning = false  // Warning when enabling Auto-Focus Search
     @State private var showQuickActionsWarning = false  // Warning when enabling Quick Actions
     
-    // Hover states for sidebar items
-    @State private var hoverFeatures = false
-    @State private var hoverAppearance = false
+    // Hover states for sidebar items (6 tabs)
+    @State private var hoverShelf = false
+    @State private var hoverBasket = false
+    @State private var hoverClipboard = false
+    @State private var hoverHUDs = false
     @State private var hoverExtensions = false
     @State private var hoverAbout = false
     @State private var isCoffeeHovering = false
@@ -89,8 +91,9 @@ struct SettingsView: View {
         ZStack {
             NavigationSplitView {
                 VStack(spacing: 6) {
-                    sidebarButton(title: "Features", icon: "star.fill", tag: "Features", isHovering: $hoverFeatures)
-                    sidebarButton(title: "Appearance", icon: "paintbrush.fill", tag: "Appearance", isHovering: $hoverAppearance)
+                    sidebarButton(title: "Shelf & Basket", icon: "star.fill", tag: "Features", isHovering: $hoverShelf)
+                    sidebarButton(title: "Clipboard", icon: "clipboard.fill", tag: "Clipboard", isHovering: $hoverClipboard)
+                    sidebarButton(title: "HUDs", icon: "dial.medium.fill", tag: "HUDs", isHovering: $hoverHUDs)
                     sidebarButton(title: "Extensions", icon: "puzzlepiece.extension.fill", tag: "Extensions", isHovering: $hoverExtensions)
                     sidebarButton(title: "About", icon: "info.circle.fill", tag: "About", isHovering: $hoverAbout)
                     
@@ -156,8 +159,10 @@ struct SettingsView: View {
                     Form {
                         if selectedTab == "Features" {
                             featuresSettings
-                        } else if selectedTab == "Appearance" {
-                            appearanceSettings
+                        } else if selectedTab == "Clipboard" {
+                            clipboardSettings
+                        } else if selectedTab == "HUDs" {
+                            hudSettings
                         } else if selectedTab == "Extensions" {
                             integrationsSettings
                         } else if selectedTab == "About" {
@@ -202,7 +207,7 @@ struct SettingsView: View {
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
                     .opacity(scrollOffset < -10 ? 1 : 0)
-                    .animation(.easeInOut(duration: 0.2), value: scrollOffset < -10)
+                    .animation(DroppyAnimation.hoverQuick, value: scrollOffset < -10)
                 }
             }
         }
@@ -284,12 +289,202 @@ struct SettingsView: View {
     
     // MARK: - Sections
     
+    // MARK: Features Tab (Shelf + Basket + Shared)
     private var featuresSettings: some View {
         Group {
-            // MARK: Shared Features Section
+            // MARK: Notch Shelf Section
+            Section {
+                HStack(spacing: 8) {
+                    NotchShelfInfoButton()
+                    Toggle(isOn: $enableNotchShelf) {
+                        VStack(alignment: .leading) {
+                            Text("Notch Shelf")
+                            Text("Drop zone at the top of your screen")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .onChange(of: enableNotchShelf) { oldValue, newValue in
+                    if newValue {
+                        NotchWindowController.shared.setupNotchWindow()
+                    } else {
+                        // Only close if HUD replacement and Media Player are ALSO disabled
+                        // The notch window is still needed for HUD/Media features
+                        if !enableHUDReplacement && !showMediaPlayer {
+                            NotchWindowController.shared.closeWindow()
+                        }
+                    }
+                }
+                
+                if enableNotchShelf {
+                    NotchShelfPreview()
+                }
+            } header: {
+                Text("Notch Shelf")
+            }
+            
+            // MARK: Display Style
+            // Visual Style settings (from Appearance)
+            Section {
+                Toggle(isOn: $useTransparentBackground) {
+                    VStack(alignment: .leading) {
+                        Text("Transparent Background")
+                        Text("Use glass effect for windows")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                HStack(spacing: 8) {
+                    ExternalDisplayInfoButton()
+                    Toggle(isOn: $hideNotchOnExternalDisplays) {
+                        VStack(alignment: .leading) {
+                            Text("Hide on External Displays")
+                            Text("Disable notch shelf on external monitors")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                
+                // Show external display mode picker when not hidden
+                if !hideNotchOnExternalDisplays {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("External Display Style")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        
+                        HStack(spacing: 12) {
+                            DisplayModeButton(
+                                title: "Notch",
+                                isSelected: !externalDisplayUseDynamicIsland,
+                                icon: {
+                                    UShape()
+                                        .fill(!externalDisplayUseDynamicIsland ? Color.blue : Color.white.opacity(0.5))
+                                        .frame(width: 60, height: 18)
+                                }
+                            ) {
+                                externalDisplayUseDynamicIsland = false
+                            }
+                            
+                            DisplayModeButton(
+                                title: "Dynamic Island",
+                                isSelected: externalDisplayUseDynamicIsland,
+                                icon: {
+                                    Capsule()
+                                        .fill(externalDisplayUseDynamicIsland ? Color.blue : Color.white.opacity(0.5))
+                                        .frame(width: 50, height: 16)
+                                }
+                            ) {
+                                externalDisplayUseDynamicIsland = true
+                            }
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+            } header: {
+                Text("Display")
+            }
+            
+            // MARK: Display Mode (Non-notch displays only)
+            if !hasPhysicalNotch {
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Display Mode")
+                            .font(.headline)
+                        
+                        Text("Choose how Droppy appears at the top of your screen")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        // Mode picker with visual icons
+                        HStack(spacing: 12) {
+                            DisplayModeButton(
+                                title: "Notch",
+                                isSelected: !useDynamicIslandStyle,
+                                icon: {
+                                    UShape()
+                                        .fill(!useDynamicIslandStyle ? Color.blue : Color.white.opacity(0.5))
+                                        .frame(width: 60, height: 18)
+                                }
+                            ) {
+                                useDynamicIslandStyle = false
+                            }
+                            
+                            DisplayModeButton(
+                                title: "Dynamic Island",
+                                isSelected: useDynamicIslandStyle,
+                                icon: {
+                                    Capsule()
+                                        .fill(useDynamicIslandStyle ? Color.blue : Color.white.opacity(0.5))
+                                        .frame(width: 50, height: 16)
+                                }
+                            ) {
+                                useDynamicIslandStyle = true
+                            }
+                        }
+                    }
+                    .padding(.vertical, 8)
+                } header: {
+                    Text("Display Mode")
+                }
+            }
+            
+            // MARK: Shelf Behavior
+            Section {
+                // Auto-Collapse toggle with delay slider
+                Toggle(isOn: $autoCollapseShelf) {
+                    VStack(alignment: .leading) {
+                        Text("Auto-Collapse")
+                        Text("Shrink shelf when mouse leaves")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                if autoCollapseShelf {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Collapse Delay")
+                            Spacer()
+                            Text(String(format: "%.1fs", autoCollapseDelay))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        Slider(value: $autoCollapseDelay, in: 0.5...2.0, step: 0.5)
+                    }
+                }
+                
+                // Auto-Expand can be toggled, with delay slider
+                Toggle(isOn: $autoExpandShelf) {
+                    VStack(alignment: .leading) {
+                        Text("Auto-Expand")
+                        Text("Expand shelf when hovering over notch")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                if autoExpandShelf {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Expand Delay")
+                            Spacer()
+                            Text(String(format: "%.1fs", autoExpandDelay))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        Slider(value: $autoExpandDelay, in: 0.5...2.0, step: 0.5)
+                    }
+                }
+            } header: {
+                Text("Shelf Behavior")
+            }
+            
+            // MARK: Shared Features
             Section {
                 // AirDrop Zone (affects both shelf and basket)
-                // Uses || so existing users with mixed settings see ON (not stuck)
                 HStack(spacing: 8) {
                     AirDropZoneInfoButton()
                     Toggle(isOn: Binding(
@@ -373,38 +568,152 @@ struct SettingsView: View {
                 Text("These features apply to both Notch Shelf and Floating Basket.")
             }
             
-            // MARK: Notch Shelf Section
+            // MARK: Floating Basket Section
+            basketSections
+            
+            // MARK: Accessibility
+            indicatorsSettings
+        }
+    }
+    
+    // Helper view for Basket sections (included in Features tab)
+    @ViewBuilder
+    private var basketSections: some View {
+        Section {
+            HStack(spacing: 8) {
+                BasketGestureInfoButton()
+                Toggle(isOn: $enableFloatingBasket) {
+                    VStack(alignment: .leading) {
+                        Text("Floating Basket")
+                        Text(instantBasketOnDrag 
+                            ? "Appears instantly when dragging files anywhere" 
+                            : "Appears when you jiggle files anywhere on screen")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .onChange(of: enableFloatingBasket) { oldValue, newValue in
+                if !newValue {
+                    FloatingBasketWindowController.shared.hideBasket()
+                }
+            }
+            
+            if enableFloatingBasket {
+                FloatingBasketPreview()
+            }
+        } header: {
+            Text("Floating Basket")
+        }
+        
+        if enableFloatingBasket {
+            // MARK: Appearance Settings
             Section {
+                // Instant appear toggle
                 HStack(spacing: 8) {
-                    NotchShelfInfoButton()
-                    Toggle(isOn: $enableNotchShelf) {
+                    InstantAppearInfoButton()
+                    Toggle(isOn: $instantBasketOnDrag) {
                         VStack(alignment: .leading) {
-                            Text("Notch Shelf")
-                            Text("Drop zone at the top of your screen")
+                            Text("Instant Appear")
+                            Text("Show basket immediately when dragging files")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
-                .onChange(of: enableNotchShelf) { oldValue, newValue in
-                    if newValue {
-                        NotchWindowController.shared.setupNotchWindow()
-                    } else {
-                        // Only close if HUD replacement and Media Player are ALSO disabled
-                        // The notch window is still needed for HUD/Media features
-                        if !enableHUDReplacement && !showMediaPlayer {
-                            NotchWindowController.shared.closeWindow()
+                
+                // Delay slider (only when instant appear is enabled)
+                if instantBasketOnDrag {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Delay")
+                            Spacer()
+                            Text(instantBasketDelay < 0.2 ? "Instant" : String(format: "%.1fs", instantBasketDelay))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        Slider(value: $instantBasketDelay, in: 0.15...3.0, step: 0.1)
+                    }
+                    .padding(.leading, 28)
+                }
+            } header: {
+                Text("Basket Appearance")
+            }
+            
+            // MARK: Auto-Hide Settings
+            Section {
+                HStack(spacing: 8) {
+                    PeekModeInfoButton()
+                    Toggle(isOn: $enableBasketAutoHide) {
+                        VStack(alignment: .leading) {
+                            Text("Auto-Hide with Peek")
+                            Text("Basket slides to edge when cursor leaves, hover to reveal")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
                 
-                if enableNotchShelf {
-                    NotchShelfPreview()
+                if enableBasketAutoHide {
+                    Picker(selection: $basketAutoHideEdge) {
+                        Text("Left Edge").tag("left")
+                        Text("Right Edge").tag("right")
+                        Text("Bottom Edge").tag("bottom")
+                    } label: {
+                        VStack(alignment: .leading) {
+                            Text("Hide Edge")
+                            Text("Which edge the basket slides to")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    
+                    PeekPreview(edge: basketAutoHideEdge)
                 }
             } header: {
-                Text("Notch Shelf")
+                Text("Auto-Hide")
             }
             
+            // MARK: Basket Advanced
+            Section {
+                HStack(spacing: 8) {
+                    QuickActionsInfoButton()
+                    Toggle(isOn: $enableQuickActions) {
+                        VStack(alignment: .leading) {
+                            HStack(alignment: .center, spacing: 6) {
+                                Text("Quick Actions")
+                                Text("advanced")
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.7))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(Color.white.opacity(0.08)))
+                                    .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
+                            }
+                            Text("Select all and drop to Finder folder")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .onChange(of: enableQuickActions) { _, newValue in
+                        if newValue {
+                            showQuickActionsWarning = true
+                        }
+                    }
+                    .sheet(isPresented: $showQuickActionsWarning) {
+                        QuickActionsInfoSheet(enableQuickActions: $enableQuickActions)
+                    }
+                }
+            } header: {
+                Text("Basket Advanced")
+            }
+        }
+    }
+    
+    // MARK: Basket Tab (kept for reference but not used in sidebar)
+    private var basketSettings: some View {
+        Group {
             // MARK: Floating Basket Section
             Section {
                 HStack(spacing: 8) {
@@ -428,7 +737,14 @@ struct SettingsView: View {
                 
                 if enableFloatingBasket {
                     FloatingBasketPreview()
-                    
+                }
+            } header: {
+                Text("Floating Basket")
+            }
+            
+            if enableFloatingBasket {
+                // MARK: Appearance Settings
+                Section {
                     // Instant appear toggle
                     HStack(spacing: 8) {
                         InstantAppearInfoButton()
@@ -456,7 +772,12 @@ struct SettingsView: View {
                         }
                         .padding(.leading, 28)  // Align with toggle content
                     }
-                    
+                } header: {
+                    Text("Appearance")
+                }
+                
+                // MARK: Auto-Hide Settings
+                Section {
                     // Auto-hide with peek toggle
                     HStack(spacing: 8) {
                         PeekModeInfoButton()
@@ -489,7 +810,12 @@ struct SettingsView: View {
                         // Animated peek preview
                         PeekPreview(edge: basketAutoHideEdge)
                     }
-                    
+                } header: {
+                    Text("Auto-Hide")
+                }
+                
+                // MARK: Advanced
+                Section {
                     // Quick Actions (advanced feature - at bottom)
                     HStack(spacing: 8) {
                         QuickActionsInfoButton()
@@ -520,23 +846,30 @@ struct SettingsView: View {
                             QuickActionsInfoSheet(enableQuickActions: $enableQuickActions)
                         }
                     }
+                } header: {
+                    Text("Advanced")
                 }
-            } header: {
-                Text("Floating Basket")
             }
-            
-            // MARK: Media Player
+        }
+    }
+    
+    // MARK: HUDs Tab
+    private var hudSettings: some View {
+        Group {
+            // MARK: Media Player (Now Playing) - TOP PRIORITY
             Section {
                 // Media Player requires macOS 15.0+ due to MediaRemoteAdapter.framework
                 if #available(macOS 15.0, *) {
-                    HStack(spacing: 8) {
-                        // Info button with swipe gesture tooltip
-                        SwipeGestureInfoButton()
+                    HStack(spacing: 12) {
+                        MediaPlayerHUDIcon()
                         
                         Toggle(isOn: $showMediaPlayer) {
-                            VStack(alignment: .leading) {
-                                Text("Now Playing")
-                                Text("Show current song in the notch")
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 8) {
+                                    Text("Now Playing")
+                                    SwipeGestureInfoButton()
+                                }
+                                Text("Show current song with album art")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -544,10 +877,8 @@ struct SettingsView: View {
                     }
                     .onChange(of: showMediaPlayer) { _, newValue in
                         if newValue {
-                            // Ensure notch window exists (needed even if shelf is disabled)
                             NotchWindowController.shared.setupNotchWindow()
                         } else {
-                            // Close window only if shelf and HUD are also disabled
                             if !enableNotchShelf && !enableHUDReplacement {
                                 NotchWindowController.shared.closeWindow()
                             }
@@ -555,10 +886,8 @@ struct SettingsView: View {
                     }
                     
                     if showMediaPlayer {
-                        MediaPlayerPreview()
-                        
                         Toggle(isOn: $autoFadeMediaHUD) {
-                            VStack(alignment: .leading) {
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text("Auto-Hide Preview")
                                 Text("Fade out mini player after 5 seconds")
                                     .font(.caption)
@@ -566,28 +895,25 @@ struct SettingsView: View {
                             }
                         }
                         
-                        // Real Audio Visualizer (opt-in for Screen Recording permission)
                         Toggle(isOn: $enableRealAudioVisualizer) {
-                            VStack(alignment: .leading) {
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text("Real Audio Visualizer")
-                                Text("Visualizer reacts to actual audio output")
+                                Text("Visualizer reacts to actual audio")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
                         .onChange(of: enableRealAudioVisualizer) { _, newValue in
                             if newValue {
-                                // Request Screen Recording permission when enabled
                                 Task {
                                     await SystemAudioAnalyzer.shared.requestPermission()
                                 }
                             }
                         }
                         
-                        // Stabilize Media (advanced - at bottom)
                         Toggle(isOn: $debounceMediaChanges) {
-                            VStack(alignment: .leading) {
-                                HStack(alignment: .center, spacing: 6) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
                                     Text("Stabilize Media")
                                     Text("advanced")
                                         .font(.system(size: 9, weight: .medium))
@@ -597,14 +923,13 @@ struct SettingsView: View {
                                         .background(Capsule().fill(Color.white.opacity(0.08)))
                                         .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
                                 }
-                                Text("Prevent flickering when apps rapidly change songs")
+                                Text("Prevent flickering from rapid song changes")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
                         .onChange(of: debounceMediaChanges) { _, newValue in
                             if newValue {
-                                // User is enabling - show explanation sheet
                                 showStabilizeMediaWarning = true
                             }
                         }
@@ -614,164 +939,202 @@ struct SettingsView: View {
                     }
                 } else {
                     // macOS 14 - feature not available
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: "music.note")
-                                .foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        Image(systemName: "music.note.tv")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 40, height: 40)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
                             Text("Now Playing")
                                 .foregroundStyle(.secondary)
-                            Spacer()
                             Text("Requires macOS 15")
                                 .font(.caption)
                                 .foregroundStyle(.orange)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .fill(Color.orange.opacity(0.15))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                                )
                         }
-                        Text("Media player features require macOS 15.0 (Sequoia) or later.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 4)
                 }
             } header: {
                 Text("Media")
             }
             
-            // MARK: System HUD
+            // MARK: System HUDs
             Section {
-                // 2x2 Grid of HUD toggle buttons
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 12),
-                    GridItem(.flexible(), spacing: 12)
-                ], spacing: 12) {
-                    // Volume/Brightness HUD - special morph animation
-                    VolumeAndBrightnessToggle(isEnabled: $enableHUDReplacement)
-                    .onChange(of: enableHUDReplacement) { _, newValue in
-                        if newValue {
-                            NotchWindowController.shared.setupNotchWindow()
-                            MediaKeyInterceptor.shared.start()
-                        } else {
-                            MediaKeyInterceptor.shared.stop()
-                            if !enableNotchShelf && !showMediaPlayer {
-                                NotchWindowController.shared.closeWindow()
-                            }
-                        }
-                    }
+                // Volume & Brightness
+                HStack(spacing: 12) {
+                    VolumeHUDIcon()
                     
-                    // Battery HUD
-                    HUDToggleButton(
-                        title: "Battery",
-                        icon: "battery.100.bolt",
-                        isEnabled: $enableBatteryHUD,
-                        color: .green
-                    )
-                    .onChange(of: enableBatteryHUD) { _, newValue in
-                        if newValue {
-                            NotchWindowController.shared.setupNotchWindow()
-                        } else {
-                            if !enableNotchShelf && !enableHUDReplacement && !showMediaPlayer {
-                                NotchWindowController.shared.closeWindow()
-                            }
+                    Toggle(isOn: $enableHUDReplacement) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Volume & Brightness")
+                            Text("Replace system OSD")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                    }
-                    
-                    // Caps Lock HUD
-                    HUDToggleButton(
-                        title: "Caps Lock",
-                        icon: "capslock.fill",
-                        isEnabled: $enableCapsLockHUD,
-                        color: .orange
-                    )
-                    .onChange(of: enableCapsLockHUD) { _, newValue in
-                        if newValue {
-                            NotchWindowController.shared.setupNotchWindow()
-                        } else {
-                            if !enableNotchShelf && !enableHUDReplacement && !showMediaPlayer && !enableBatteryHUD {
-                                NotchWindowController.shared.closeWindow()
-                            }
-                        }
-                    }
-                    
-                    // AirPods HUD
-                    HUDToggleButton(
-                        title: "AirPods",
-                        icon: "airpods",
-                        isEnabled: $enableAirPodsHUD,
-                        color: .white
-                    )
-                    .onChange(of: enableAirPodsHUD) { _, newValue in
-                        if newValue {
-                            NotchWindowController.shared.setupNotchWindow()
-                            AirPodsManager.shared.startMonitoring()
-                        } else {
-                            AirPodsManager.shared.stopMonitoring()
-                            if !enableNotchShelf && !enableHUDReplacement && !showMediaPlayer && !enableBatteryHUD && !enableCapsLockHUD {
-                                NotchWindowController.shared.closeWindow()
-                            }
-                        }
-                    }
-                    
-                    // Lock Screen HUD
-                    HUDToggleButton(
-                        title: "Lock Screen",
-                        icon: "lock.fill",
-                        isEnabled: $enableLockScreenHUD,
-                        color: .purple
-                    )
-                    .onChange(of: enableLockScreenHUD) { _, newValue in
-                        if newValue {
-                            NotchWindowController.shared.setupNotchWindow()
-                        } else {
-                            if !enableNotchShelf && !enableHUDReplacement && !showMediaPlayer && !enableBatteryHUD && !enableCapsLockHUD && !enableAirPodsHUD {
-                                NotchWindowController.shared.closeWindow()
-                            }
-                        }
-                    }
-                    
-                    // Focus/DND HUD
-                    HUDToggleButton(
-                        title: DNDManager.shared.hasAccess ? "Focus Mode" : "Focus Mode ⚠️",
-                        icon: "moon.fill",
-                        isEnabled: $enableDNDHUD,
-                        color: Color(red: 0.55, green: 0.35, blue: 0.95)
-                    )
-                    .onChange(of: enableDNDHUD) { _, newValue in
-                        if newValue {
-                            NotchWindowController.shared.setupNotchWindow()
-                            // Only show alert if we don't have access
-                            if !DNDManager.shared.hasAccess {
-                                showDNDAccessAlert = true
-                            }
-                        } else {
-                            if !enableNotchShelf && !enableHUDReplacement && !showMediaPlayer && !enableBatteryHUD && !enableCapsLockHUD && !enableAirPodsHUD && !enableLockScreenHUD {
-                                NotchWindowController.shared.closeWindow()
-                            }
-                        }
-                    }
-                    .sheet(isPresented: $showDNDAccessAlert) {
-                        FullDiskAccessSheet(
-                            enableDNDHUD: $enableDNDHUD,
-                            isPresented: $showDNDAccessAlert
-                        )
                     }
                 }
-                .padding(.vertical, 4)
+                .onChange(of: enableHUDReplacement) { _, newValue in
+                    if newValue {
+                        NotchWindowController.shared.setupNotchWindow()
+                        MediaKeyInterceptor.shared.start()
+                    } else {
+                        MediaKeyInterceptor.shared.stop()
+                        if !enableNotchShelf && !showMediaPlayer {
+                            NotchWindowController.shared.closeWindow()
+                        }
+                    }
+                }
+                
+                // Battery
+                HStack(spacing: 12) {
+                    BatteryHUDIcon()
+                    
+                    Toggle(isOn: $enableBatteryHUD) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Battery Status")
+                            Text("Show when charging")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .onChange(of: enableBatteryHUD) { _, newValue in
+                    if newValue {
+                        NotchWindowController.shared.setupNotchWindow()
+                    } else {
+                        if !enableNotchShelf && !enableHUDReplacement && !showMediaPlayer {
+                            NotchWindowController.shared.closeWindow()
+                        }
+                    }
+                }
+                
+                // Caps Lock
+                HStack(spacing: 12) {
+                    CapsLockHUDIcon()
+                    
+                    Toggle(isOn: $enableCapsLockHUD) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Caps Lock")
+                            Text("Show indicator")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .onChange(of: enableCapsLockHUD) { _, newValue in
+                    if newValue {
+                        NotchWindowController.shared.setupNotchWindow()
+                    } else {
+                        if !enableNotchShelf && !enableHUDReplacement && !showMediaPlayer && !enableBatteryHUD {
+                            NotchWindowController.shared.closeWindow()
+                        }
+                    }
+                }
             } header: {
-                Text("System HUDs")
-            } footer: {
-                Text("Tap to toggle. System HUD requires Accessibility. Focus Mode requires Full Disk Access to detect Focus state changes.")
+                Text("System")
             }
             
-            // MARK: Clipboard (merged from separate tab)
-            clipboardSettings
+            // MARK: Peripherals
+            Section {
+                // AirPods & Headphones
+                HStack(spacing: 12) {
+                    AirPodsHUDIcon()
+                    
+                    Toggle(isOn: $enableAirPodsHUD) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("AirPods & Headphones")
+                            Text("Show when connected with battery and 3D animation")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .onChange(of: enableAirPodsHUD) { _, newValue in
+                    if newValue {
+                        NotchWindowController.shared.setupNotchWindow()
+                        AirPodsManager.shared.startMonitoring()
+                    } else {
+                        AirPodsManager.shared.stopMonitoring()
+                        if !enableNotchShelf && !enableHUDReplacement && !showMediaPlayer && !enableBatteryHUD && !enableCapsLockHUD {
+                            NotchWindowController.shared.closeWindow()
+                        }
+                    }
+                }
+            } header: {
+                Text("Audio")
+            }
+            
+            // MARK: Screen State
+            Section {
+                // Lock Screen
+                HStack(spacing: 12) {
+                    LockScreenHUDIcon()
+                    
+                    Toggle(isOn: $enableLockScreenHUD) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Lock Screen")
+                            Text("Show lock animation")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .onChange(of: enableLockScreenHUD) { _, newValue in
+                    if newValue {
+                        NotchWindowController.shared.setupNotchWindow()
+                    } else {
+                        if !enableNotchShelf && !enableHUDReplacement && !showMediaPlayer && !enableBatteryHUD && !enableCapsLockHUD && !enableAirPodsHUD {
+                            NotchWindowController.shared.closeWindow()
+                        }
+                    }
+                }
+                
+                // Focus Mode
+                HStack(spacing: 12) {
+                    FocusModeHUDIcon()
+                    
+                    Toggle(isOn: $enableDNDHUD) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Focus Mode")
+                            Text("Show when toggled")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .onChange(of: enableDNDHUD) { _, newValue in
+                    if newValue {
+                        NotchWindowController.shared.setupNotchWindow()
+                        if !DNDManager.shared.hasAccess {
+                            showDNDAccessAlert = true
+                        }
+                    } else {
+                        if !enableNotchShelf && !enableHUDReplacement && !showMediaPlayer && !enableBatteryHUD && !enableCapsLockHUD && !enableAirPodsHUD && !enableLockScreenHUD {
+                            NotchWindowController.shared.closeWindow()
+                        }
+                    }
+                }
+                .sheet(isPresented: $showDNDAccessAlert) {
+                    FullDiskAccessSheet(
+                        enableDNDHUD: $enableDNDHUD,
+                        isPresented: $showDNDAccessAlert
+                    )
+                }
+                
+                if !DNDManager.shared.hasAccess && enableDNDHUD {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                            .font(.system(size: 14))
+                        Text("Requires Full Disk Access")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.leading, 52)
+                }
+            } header: {
+                Text("Screen State")
+            }
         }
     }
     
@@ -1896,7 +2259,7 @@ struct BasketGestureInfoButton: View {
             if showPopover {
                 animateJiggle = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    withAnimation(.easeInOut(duration: 0.15).repeatForever(autoreverses: true)) {
+                    withAnimation(DroppyAnimation.hoverQuick.repeatForever(autoreverses: true)) {
                         animateJiggle = true
                     }
                 }

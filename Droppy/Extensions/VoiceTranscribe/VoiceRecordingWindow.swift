@@ -293,7 +293,7 @@ struct VoiceRecordingOverlayView: View {
                         RoundedRectangle(cornerRadius: 6)
                             .fill(Color.blue)
                             .frame(width: geo.size.width * max(0.02, manager.transcriptionProgress))
-                            .animation(.easeOut(duration: 0.3), value: manager.transcriptionProgress)
+                            .animation(DroppyAnimation.viewChange, value: manager.transcriptionProgress)
                     }
                     .frame(height: 8)
                 }

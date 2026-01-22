@@ -16,10 +16,10 @@ enum DroppyAnimationLegacy {
     // MARK: - Standard Springs
     
     /// Default spring for most UI interactions (0.3s, 0.8 damping)
-    static let standard = Animation.spring(response: 0.3, dampingFraction: 0.8)
+    static let standard = DroppyAnimation.state
     
     /// Quick spring for snappy interactions (0.25s, 0.7 damping)
-    static let quick = Animation.spring(response: 0.25, dampingFraction: 0.7)
+    static let quick = DroppyAnimation.hoverBouncy
     
     /// Slow spring for dramatic transitions (0.4s, 0.75 damping)
     static let gentle = Animation.spring(response: 0.4, dampingFraction: 0.75)
@@ -36,13 +36,13 @@ enum DroppyAnimationLegacy {
     static let shelfTransition = Animation.spring(response: 0.35, dampingFraction: 0.75)
     
     /// HUD show/hide animation
-    static let hudTransition = Animation.spring(response: 0.4, dampingFraction: 0.8)
+    static let hudTransition = DroppyAnimation.transition
     
     /// Category pill selection animation
-    static let categorySelection = Animation.spring(response: 0.35, dampingFraction: 0.7)
+    static let categorySelection = DroppyAnimation.notchState
     
     /// Hover scale animation
-    static let hover = Animation.spring(response: 0.25, dampingFraction: 0.7)
+    static let hover = DroppyAnimation.hoverBouncy
     
     /// Icon pulse animation
     static let pulse = Animation.spring(response: 0.3, dampingFraction: 0.6)
@@ -50,10 +50,10 @@ enum DroppyAnimationLegacy {
     // MARK: - Eased Animations
     
     /// Smooth fade animation
-    static let fade = Animation.easeInOut(duration: 0.2)
+    static let fade = DroppyAnimation.hoverQuick
     
     /// Quick fade animation
-    static let quickFade = Animation.easeInOut(duration: 0.15)
+    static let quickFade = DroppyAnimation.hoverQuick
     
     /// Slow reveal animation
     static let slowReveal = Animation.easeInOut(duration: 0.35)

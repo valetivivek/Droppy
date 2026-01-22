@@ -136,9 +136,12 @@ final class FloatingBasketWindowController: NSObject {
         let deltaY = abs(currentFrame.origin.y - newFrame.origin.y)
         if deltaX < 1.0 && deltaY < 1.0 { return }
         
+        // PREMIUM: Use smooth spring animation for buttery follow behavior
+        // Faster response (0.25s) with slight bounce for alive feel
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.4 // Slower for "woosh"
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            context.duration = 0.25
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.175, 0.885, 0.32, 1.0)  // Spring-like curve
+            context.allowsImplicitAnimation = true
             panel.animator().setFrame(newFrame, display: true)
         }, completionHandler: nil)
         
@@ -224,24 +227,64 @@ final class FloatingBasketWindowController: NSObject {
         DroppyState.shared.isMouseHovering = false
         DroppyState.shared.isDropTargeted = false
         
-        // Validate basket items before showing (remove ghost files)
-        DroppyState.shared.validateBasketItems()
+        // Set visible FIRST to kick off view rendering
         DroppyState.shared.isBasketVisible = true
         
-        // Start invisible for fade-in animation
+        // Start invisible and scaled down for spring animation (matches shelf expandOpen)
         panel.alphaValue = 0
+        if let contentView = panel.contentView {
+            contentView.wantsLayer = true
+            contentView.layer?.transform = CATransform3DMakeScale(0.85, 0.85, 1.0) // Start smaller for more pop
+        }
         panel.orderFrontRegardless()
         panel.makeKey() // Make key window so keyboard shortcuts work
         
-        // Smooth fade-in animation
+        // PREMIUM: Spring animation with real overshoot for alive, playful feel
+        // Using CASpringAnimation for true spring physics
+        if let layer = panel.contentView?.layer {
+            // Fade in
+            let fadeAnim = CABasicAnimation(keyPath: "opacity")
+            fadeAnim.fromValue = 0
+            fadeAnim.toValue = 1
+            fadeAnim.duration = 0.2
+            fadeAnim.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            fadeAnim.fillMode = .forwards
+            fadeAnim.isRemovedOnCompletion = false
+            layer.add(fadeAnim, forKey: "fadeIn")
+            layer.opacity = 1
+            
+            // Scale with spring overshoot
+            let scaleAnim = CASpringAnimation(keyPath: "transform.scale")
+            scaleAnim.fromValue = 0.85
+            scaleAnim.toValue = 1.0
+            scaleAnim.mass = 1.0
+            scaleAnim.stiffness = 300  // Higher stiffness = snappier
+            scaleAnim.damping = 18     // Lower damping = more overshoot
+            scaleAnim.initialVelocity = 10
+            scaleAnim.duration = scaleAnim.settlingDuration
+            scaleAnim.fillMode = .forwards
+            scaleAnim.isRemovedOnCompletion = false
+            layer.add(scaleAnim, forKey: "scaleSpring")
+            layer.transform = CATransform3DIdentity
+        }
+        
+        // Fade window itself
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.25
+            context.duration = 0.2
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().alphaValue = 1.0
         }, completionHandler: nil)
         
         basketWindow = panel
         isShowingOrHiding = false
+        
+        // PREMIUM: Haptic feedback confirms jiggle gesture success
+        HapticFeedback.expand()
+        
+        // DEFERRED: Validate basket items AFTER animation starts (file system checks can lag)
+        DispatchQueue.main.async {
+            DroppyState.shared.validateBasketItems()
+        }
         
         // Start keyboard monitor for Quick Look preview
         startKeyboardMonitor()
@@ -336,13 +379,21 @@ final class FloatingBasketWindowController: NSObject {
         // Reset peek mode
         isInPeekMode = false
         
-        // Smooth fade-out animation
+        // PREMIUM: Critically damped spring matching shelf expandClose (response: 0.45, damping: 1.0)
+        // Smooth, no-wobble collapse animation
+        if let contentView = panel.contentView {
+            contentView.wantsLayer = true
+        }
+        let criticallyDampedCurve = CAMediaTimingFunction(controlPoints: 0.4, 0.0, 0.2, 1.0)  // Ease-out for damped feel
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.2
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            context.duration = 0.35  // Slightly shorter than open for snappy close
+            context.timingFunction = criticallyDampedCurve
+            context.allowsImplicitAnimation = true
             panel.animator().alphaValue = 0
+            panel.contentView?.layer?.transform = CATransform3DMakeScale(0.92, 0.92, 1.0)
         }, completionHandler: { [weak self] in
             panel.orderOut(nil)
+            panel.contentView?.layer?.transform = CATransform3DIdentity // Reset for next show
             self?.basketWindow = nil
             self?.isShowingOrHiding = false
         })

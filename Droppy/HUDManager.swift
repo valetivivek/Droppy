@@ -172,7 +172,7 @@ final class HUDManager {
     
     private func interruptAndShow(_ request: HUDRequest) {
         // Quick fade out, then show new
-        withAnimation(.easeOut(duration: 0.1)) {
+        withAnimation(DroppyAnimation.hoverQuick) {
             activeHUD = nil
         }
         

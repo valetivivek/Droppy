@@ -218,7 +218,7 @@ struct ElementCaptureInfoView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringRecord = h }
+                    withAnimation(DroppyAnimation.hoverQuick) { isHoveringRecord = h }
                 }
             }
         }
@@ -253,7 +253,7 @@ struct ElementCaptureInfoView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.easeInOut(duration: 0.15)) { isHoveringClose = h }
+                withAnimation(DroppyAnimation.hoverQuick) { isHoveringClose = h }
             }
             
             Spacer()
@@ -278,7 +278,7 @@ struct ElementCaptureInfoView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.easeInOut(duration: 0.15)) { isHoveringReset = h }
+                withAnimation(DroppyAnimation.hoverQuick) { isHoveringReset = h }
             }
             .help("Reset Shortcut")
             

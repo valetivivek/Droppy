@@ -39,18 +39,18 @@ struct RenameWindowView: View {
                         )
                 )
                 
-                // Buttons
-                HStack(spacing: 12) {
-                    // Cancel button - styled like extension popup buttons
+                // Buttons - matching DroppyAlertView style exactly (secondary left, spacer, primary right)
+                HStack(spacing: 8) {
+                    // Cancel button - secondary style (left side)
                     Button {
                         onCancel()
                     } label: {
                         Text("Cancel")
-                            .fontWeight(.medium)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(isHoveringCancel ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto)
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(isHoveringCancel ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto)
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -65,16 +65,18 @@ struct RenameWindowView: View {
                     }
                     .keyboardShortcut(.escape, modifiers: [])
                     
-                    // Save button - blue accent button
+                    Spacer()
+                    
+                    // Save button - primary accent style (right side)
                     Button {
                         onRename(text)
                     } label: {
                         Text("Save")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(Color.accentColor.opacity(isHoveringSave ? 1.0 : 0.85))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.accentColor.opacity(isHoveringSave ? 1.0 : 0.85))
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -96,9 +98,9 @@ struct RenameWindowView: View {
         .frame(width: 300)
         .fixedSize(horizontal: false, vertical: true)
         .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(AdaptiveColors.subtleBorderAuto, lineWidth: 1)
         )
     }

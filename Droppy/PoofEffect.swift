@@ -106,7 +106,7 @@ struct PoofEffect: View {
         }
         
         // Fade out particles and center
-        withAnimation(.easeOut(duration: 0.3).delay(0.15)) {
+        withAnimation(DroppyAnimation.viewChange.delay(0.15)) {
             centerScale = 0.5
             centerOpacity = 0
             for i in particles.indices {
@@ -148,7 +148,7 @@ struct PoofModifier: ViewModifier {
             content
                 .scaleEffect(isPoofing ? 0.8 : 1.0)
                 .opacity(isPoofing ? 0.3 : 1.0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPoofing)
+                .animation(DroppyAnimation.hover, value: isPoofing)
             
             if isPoofing {
                 PoofEffect {

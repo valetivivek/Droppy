@@ -72,7 +72,7 @@ class TerminalNotchManager: ObservableObject {
     
     /// Toggle terminal visibility
     func toggle() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DroppyAnimation.state) {
             isVisible.toggle()
             if isVisible {
                 // CRITICAL: Also expand the shelf - terminal renders inside expanded shelf
@@ -106,14 +106,14 @@ class TerminalNotchManager: ObservableObject {
     
     /// Toggle between quick and expanded mode
     func toggleExpanded() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DroppyAnimation.state) {
             isExpanded.toggle()
         }
     }
     
     /// Clear terminal output (start fresh)
     func clearOutput() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DroppyAnimation.state) {
             lastOutput = ""
             commandText = ""
             hasExecutedCommand = false

@@ -288,6 +288,7 @@ struct VolumeHUDPreview: View {
 /// Media Player Preview - uses REAL NotchShape, AudioSpectrumView, and MarqueeText
 struct MediaPlayerPreview: View {
     @State private var isPlaying = true
+    @State private var animationTimer: Timer?
     
     // Match real notch dimensions
     private let hudWidth: CGFloat = 280
@@ -353,11 +354,15 @@ struct MediaPlayerPreview: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
         .onAppear {
-            Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
+            animationTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
                 withAnimation(DroppyAnimation.state) {
                     isPlaying.toggle()
                 }
             }
+        }
+        .onDisappear {
+            animationTimer?.invalidate()
+            animationTimer = nil
         }
     }
 }
@@ -469,6 +474,7 @@ private struct ClipboardMockItem: View {
 struct BatteryHUDPreview: View {
     @State private var isCharging = false
     @State private var batteryLevel: Int = 75
+    @State private var animationTimer: Timer?
     
     // Match real notch dimensions
     private let hudWidth: CGFloat = 280
@@ -542,7 +548,7 @@ struct BatteryHUDPreview: View {
         .padding(.vertical, 16)
         .onAppear {
             // Animate charging state and battery level
-            Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            animationTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
                 withAnimation(DroppyAnimation.transition) {
                     isCharging.toggle()
                     // Animate battery level when charging
@@ -554,12 +560,17 @@ struct BatteryHUDPreview: View {
                 }
             }
         }
+        .onDisappear {
+            animationTimer?.invalidate()
+            animationTimer = nil
+        }
     }
 }
 
 /// Caps Lock HUD Preview - animated ON/OFF state toggle
 struct CapsLockHUDPreview: View {
     @State private var isCapsLockOn = true
+    @State private var animationTimer: Timer?
     
     // Match real notch dimensions
     private let hudWidth: CGFloat = 280
@@ -621,11 +632,221 @@ struct CapsLockHUDPreview: View {
         .padding(.vertical, 16)
         .onAppear {
             // Animate ON/OFF state
-            Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            animationTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
                 withAnimation(DroppyAnimation.transition) {
                     isCapsLockOn.toggle()
                 }
             }
+        }
+        .onDisappear {
+            animationTimer?.invalidate()
+            animationTimer = nil
+        }
+    }
+}
+
+/// AirPods HUD Preview - shows stylized AirPods with battery indicator
+struct AirPodsHUDPreview: View {
+    @State private var rotation: Double = 0
+    @State private var animationTimer: Timer?
+    
+    // Match real notch dimensions
+    private let hudWidth: CGFloat = 280
+    private let notchWidth: CGFloat = 180
+    private let notchHeight: CGFloat = 32
+    
+    private var wingWidth: CGFloat { (hudWidth - notchWidth) / 2 }
+    
+    var body: some View {
+        ZStack {
+            // Notch background
+            NotchShape(bottomRadius: 16)
+                .fill(Color.black)
+                .frame(width: hudWidth, height: notchHeight)
+                .overlay(
+                    NotchShape(bottomRadius: 16)
+                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                )
+            
+            // Wings: AirPods icon (left) | Camera Gap | Battery (right)
+            HStack(spacing: 0) {
+                // Left wing - AirPods icon with subtle rotation
+                HStack {
+                    Spacer(minLength: 0)
+                    Image(systemName: "airpodspro")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.white)
+                        .rotation3DEffect(.degrees(rotation), axis: (x: 0, y: 1, z: 0))
+                    Spacer(minLength: 0)
+                }
+                .frame(width: wingWidth)
+                
+                // Camera notch gap
+                Spacer().frame(width: notchWidth)
+                
+                // Right wing - Battery percentage
+                HStack {
+                    Spacer(minLength: 0)
+                    Text("85%")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.green)
+                    Spacer(minLength: 0)
+                }
+                .frame(width: wingWidth)
+            }
+            .frame(width: hudWidth, height: notchHeight)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .onAppear {
+            // Subtle rotation animation
+            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                rotation = 15
+            }
+        }
+        .onDisappear {
+            animationTimer?.invalidate()
+        }
+    }
+}
+
+/// Lock Screen HUD Preview - shows lock icon animation
+struct LockScreenHUDPreview: View {
+    @State private var isLocked = true
+    @State private var animationTimer: Timer?
+    
+    // Match real notch dimensions
+    private let hudWidth: CGFloat = 280
+    private let notchWidth: CGFloat = 180
+    private let notchHeight: CGFloat = 32
+    
+    private var wingWidth: CGFloat { (hudWidth - notchWidth) / 2 }
+    
+    var body: some View {
+        ZStack {
+            // Notch background
+            NotchShape(bottomRadius: 16)
+                .fill(Color.black)
+                .frame(width: hudWidth, height: notchHeight)
+                .overlay(
+                    NotchShape(bottomRadius: 16)
+                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                )
+            
+            // Wings: Lock icon (left) | Camera Gap | Status (right)
+            HStack(spacing: 0) {
+                // Left wing - Lock icon
+                HStack {
+                    Spacer(minLength: 0)
+                    Image(systemName: isLocked ? "lock.fill" : "lock.open.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(isLocked ? .purple : .white)
+                        .contentTransition(.symbolEffect(.replace))
+                    Spacer(minLength: 0)
+                }
+                .frame(width: wingWidth)
+                
+                // Camera notch gap
+                Spacer().frame(width: notchWidth)
+                
+                // Right wing - Locked/Unlocked text
+                HStack {
+                    Spacer(minLength: 0)
+                    Text(isLocked ? "Locked" : "Unlocked")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(isLocked ? .purple : .white)
+                        .contentTransition(.interpolate)
+                    Spacer(minLength: 0)
+                }
+                .frame(width: wingWidth)
+            }
+            .frame(width: hudWidth, height: notchHeight)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .onAppear {
+            animationTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { _ in
+                withAnimation(DroppyAnimation.transition) {
+                    isLocked.toggle()
+                }
+            }
+        }
+        .onDisappear {
+            animationTimer?.invalidate()
+            animationTimer = nil
+        }
+    }
+}
+
+/// Focus Mode HUD Preview - shows moon icon toggle animation
+struct FocusModeHUDPreview: View {
+    @State private var isFocusOn = true
+    @State private var animationTimer: Timer?
+    
+    // Match real notch dimensions
+    private let hudWidth: CGFloat = 280
+    private let notchWidth: CGFloat = 180
+    private let notchHeight: CGFloat = 32
+    
+    private var wingWidth: CGFloat { (hudWidth - notchWidth) / 2 }
+    
+    private var accentColor: Color {
+        isFocusOn ? Color(red: 0.55, green: 0.35, blue: 0.95) : .white
+    }
+    
+    var body: some View {
+        ZStack {
+            // Notch background
+            NotchShape(bottomRadius: 16)
+                .fill(Color.black)
+                .frame(width: hudWidth, height: notchHeight)
+                .overlay(
+                    NotchShape(bottomRadius: 16)
+                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                )
+            
+            // Wings: Moon icon (left) | Camera Gap | ON/OFF (right)
+            HStack(spacing: 0) {
+                // Left wing - Moon icon
+                HStack {
+                    Spacer(minLength: 0)
+                    Image(systemName: isFocusOn ? "moon.fill" : "moon")
+                        .font(.system(size: 18))
+                        .foregroundStyle(accentColor)
+                        .contentTransition(.symbolEffect(.replace))
+                        .symbolEffect(.pulse, options: .repeating, isActive: isFocusOn)
+                    Spacer(minLength: 0)
+                }
+                .frame(width: wingWidth)
+                
+                // Camera notch gap
+                Spacer().frame(width: notchWidth)
+                
+                // Right wing - ON/OFF text
+                HStack {
+                    Spacer(minLength: 0)
+                    Text(isFocusOn ? "Focus On" : "Focus Off")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(accentColor)
+                        .contentTransition(.interpolate)
+                    Spacer(minLength: 0)
+                }
+                .frame(width: wingWidth)
+            }
+            .frame(width: hudWidth, height: notchHeight)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .onAppear {
+            animationTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { _ in
+                withAnimation(DroppyAnimation.transition) {
+                    isFocusOn.toggle()
+                }
+            }
+        }
+        .onDisappear {
+            animationTimer?.invalidate()
+            animationTimer = nil
         }
     }
 }
@@ -1146,6 +1367,173 @@ enum ExtensionCategory: String, CaseIterable, Identifiable {
         case .productivity: return .orange
         case .media: return .green
         }
+    }
+}
+
+// MARK: - Compact Animated HUD Icons (for Settings Rows)
+// 40x40 animated icons matching the official HUD styles
+
+/// Compact animated volume/brightness icon for settings rows - morphs between both
+struct VolumeHUDIcon: View {
+    @State private var showBrightness = false
+    
+    private var icon: String {
+        showBrightness ? "sun.max.fill" : "speaker.wave.3.fill"
+    }
+    
+    private var color: Color {
+        showBrightness ? .yellow : .white
+    }
+    
+    var body: some View {
+        Image(systemName: icon)
+            .font(.system(size: 20, weight: .medium))
+            .foregroundStyle(color)
+            .contentTransition(.symbolEffect(.replace.byLayer))
+            .frame(width: 40, height: 40)
+            .background(color.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .onAppear {
+                Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+                    withAnimation(DroppyAnimation.transition) {
+                        showBrightness.toggle()
+                    }
+                }
+            }
+    }
+}
+
+/// Compact animated battery icon for settings rows
+struct BatteryHUDIcon: View {
+    @State private var isCharging = true
+    
+    var body: some View {
+        Image(systemName: isCharging ? "battery.100.bolt" : "battery.75")
+            .font(.system(size: 22, weight: .medium))
+            .foregroundStyle(.green)
+            .symbolEffect(.pulse, options: .repeating, isActive: isCharging)
+            .frame(width: 40, height: 40)
+            .background(Color.green.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .onAppear {
+                Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+                    withAnimation { isCharging.toggle() }
+                }
+            }
+    }
+}
+
+/// Compact animated caps lock icon for settings rows
+struct CapsLockHUDIcon: View {
+    @State private var isOn = true
+    
+    var body: some View {
+        Image(systemName: isOn ? "capslock.fill" : "capslock")
+            .font(.system(size: 20, weight: .medium))
+            .foregroundStyle(isOn ? .green : .white.opacity(0.5))  // GREEN matches real HUD
+            .contentTransition(.symbolEffect(.replace))
+            .symbolEffect(.pulse, options: .repeating, isActive: isOn)
+            .frame(width: 40, height: 40)
+            .background(Color.green.opacity(isOn ? 0.1 : 0.05))  // GREEN matches real HUD
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .onAppear {
+                Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+                    withAnimation(DroppyAnimation.transition) { isOn.toggle() }
+                }
+            }
+    }
+}
+
+/// Premium 3D AirPods icon for settings rows
+struct AirPodsHUDIcon: View {
+    var body: some View {
+        ZStack {
+            // Subtle inner glow
+            Image(systemName: "airpodspro")
+                .font(.system(size: 22, weight: .regular))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.white, .white.opacity(0.7)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .shadow(color: .white.opacity(0.3), radius: 2, y: -1)  // Top highlight
+                .shadow(color: .black.opacity(0.4), radius: 3, y: 2)   // Bottom shadow for depth
+        }
+        .frame(width: 40, height: 40)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.white.opacity(0.1))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+/// Compact animated lock icon for settings rows
+struct LockScreenHUDIcon: View {
+    @State private var isLocked = true
+    
+    var body: some View {
+        Image(systemName: isLocked ? "lock.fill" : "lock.open.fill")
+            .font(.system(size: 20, weight: .medium))
+            .foregroundStyle(.white)  // WHITE matches real HUD
+            .contentTransition(.symbolEffect(.replace))
+            .frame(width: 40, height: 40)
+            .background(Color.white.opacity(0.1))  // WHITE matches real HUD
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .onAppear {
+                Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { _ in
+                    withAnimation(DroppyAnimation.transition) { isLocked.toggle() }
+                }
+            }
+    }
+}
+
+/// Compact animated focus mode icon for settings rows
+struct FocusModeHUDIcon: View {
+    @State private var isOn = true
+    
+    private var color: Color {
+        isOn ? Color(red: 0.55, green: 0.35, blue: 0.95) : .white.opacity(0.5)
+    }
+    
+    var body: some View {
+        Image(systemName: isOn ? "moon.fill" : "moon")
+            .font(.system(size: 20, weight: .medium))
+            .foregroundStyle(color)
+            .contentTransition(.symbolEffect(.replace))
+            .symbolEffect(.pulse, options: .repeating, isActive: isOn)
+            .frame(width: 40, height: 40)
+            .background(color.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .onAppear {
+                Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+                    withAnimation(DroppyAnimation.transition) { isOn.toggle() }
+                }
+            }
+    }
+}
+
+/// Compact animated media player icon for settings rows
+struct MediaPlayerHUDIcon: View {
+    @State private var isPlaying = true
+    
+    var body: some View {
+        ZStack {
+            // Album art gradient
+            RoundedRectangle(cornerRadius: 6)
+                .fill(LinearGradient(colors: [.purple, .pink], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: 26, height: 26)
+            
+            // Music note
+            Image(systemName: "music.note")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.9))
+        }
+        .frame(width: 40, height: 40)
+        .background(Color.purple.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
 

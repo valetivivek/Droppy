@@ -632,6 +632,7 @@ class ClipboardManager: ObservableObject {
         // Precisely mirroring ClipBook: The simulation happens immediately here;
         // the caller (WindowController) handles the 150ms "focus settling" delay.
         self.simulatePasteCommand(targetPID: targetPID)
+        HapticFeedback.copy()
     }
     
     private func simulatePasteCommand(targetPID: pid_t?) {
@@ -675,6 +676,7 @@ class ClipboardManager: ObservableObject {
                 // Force SwiftUI to detect the isFavorite change on rows
                 objectWillChange.send()
             }
+            HapticFeedback.toggle()
         }
     }
     
@@ -686,6 +688,7 @@ class ClipboardManager: ObservableObject {
                 // Force SwiftUI to detect the isFlagged change on rows
                 objectWillChange.send()
             }
+            HapticFeedback.toggle()
         }
     }
     
@@ -708,6 +711,7 @@ class ClipboardManager: ObservableObject {
             // Clean up image file if it exists
             deleteImageFile(for: history[index])
             history.remove(at: index)
+            HapticFeedback.delete()
             
             // If history is now empty, mark as explicitly cleared so it persists to disk
             if history.isEmpty {

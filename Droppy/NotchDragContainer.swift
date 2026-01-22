@@ -606,14 +606,20 @@ class NotchDragContainer: NSView {
                     withAnimation(DroppyAnimation.transition) {
                         DroppyState.shared.expandShelf(for: displayID)
                         DroppyState.shared.isDropTargeted = true
+                        DroppyState.shared.dropTargetDisplayID = displayID  // Track which screen
                     }
                 }
             }
         } else if overExpandedArea {
             // Highlight UI when over expanded drop zone
-            DispatchQueue.main.async {
-                withAnimation(DroppyAnimation.state) {
-                    DroppyState.shared.isDropTargeted = true
+            // Also track which screen for multi-monitor expand fix
+            if let notchWindow = self.window as? NotchWindow,
+               let displayID = notchWindow.notchScreen?.displayID {
+                DispatchQueue.main.async {
+                    withAnimation(DroppyAnimation.state) {
+                        DroppyState.shared.isDropTargeted = true
+                        DroppyState.shared.dropTargetDisplayID = displayID  // Track which screen
+                    }
                 }
             }
         }
@@ -658,6 +664,7 @@ class NotchDragContainer: NSView {
         DispatchQueue.main.async {
             withAnimation(DroppyAnimation.state) {
                 DroppyState.shared.isDropTargeted = false
+                DroppyState.shared.dropTargetDisplayID = nil
                 DroppyState.shared.isShelfAirDropZoneTargeted = false
             }
         }
@@ -668,6 +675,7 @@ class NotchDragContainer: NSView {
         DispatchQueue.main.async {
             withAnimation(DroppyAnimation.state) {
                 DroppyState.shared.isDropTargeted = false
+                DroppyState.shared.dropTargetDisplayID = nil
                 DroppyState.shared.isShelfAirDropZoneTargeted = false
             }
         }
@@ -687,10 +695,21 @@ class NotchDragContainer: NSView {
             return false // Reject - let other apps handle the drop
         }
         
+        // CRITICAL: Capture target display ID from THIS window's screen BEFORE clearing state
+        // This ensures items are added and shelf expands on the correct monitor
+        let targetDisplayID: CGDirectDisplayID? = {
+            if let notchWindow = self.window as? NotchWindow,
+               let displayID = notchWindow.notchScreen?.displayID {
+                return displayID
+            }
+            return nil
+        }()
+        
         // Remove highlight and AirDrop zone state
         DispatchQueue.main.async {
             withAnimation(DroppyAnimation.state) {
                 DroppyState.shared.isDropTargeted = false
+                DroppyState.shared.dropTargetDisplayID = nil
                 DroppyState.shared.isShelfAirDropZoneTargeted = false
             }
         }
@@ -723,6 +742,10 @@ class NotchDragContainer: NSView {
                 if !savedFiles.isEmpty {
                     withAnimation(DroppyAnimation.transition) {
                         DroppyState.shared.addItems(from: savedFiles)
+                        // Ensure shelf expands on the CORRECT display (where drop occurred)
+                        if let displayID = targetDisplayID {
+                            DroppyState.shared.expandShelf(for: displayID)
+                        }
                     }
                 } else {
                     print("📧 No emails exported, AppleScript may need user permission")
@@ -741,7 +764,7 @@ class NotchDragContainer: NSView {
             
             // Process file promises asynchronously
             for receiver in promiseReceivers {
-                receiver.receivePromisedFiles(atDestination: dropLocation, options: [:], operationQueue: filePromiseQueue) { fileURL, error in
+                receiver.receivePromisedFiles(atDestination: dropLocation, options: [:], operationQueue: filePromiseQueue) { [targetDisplayID] fileURL, error in
                     guard error == nil else {
                         print("📦 Error receiving promised file: \(error!)")
                         return
@@ -750,6 +773,10 @@ class NotchDragContainer: NSView {
                     DispatchQueue.main.async {
                         withAnimation(DroppyAnimation.transition) {
                             DroppyState.shared.addItems(from: [fileURL])
+                            // Ensure shelf expands on the CORRECT display (where drop occurred)
+                            if let displayID = targetDisplayID {
+                                DroppyState.shared.expandShelf(for: displayID)
+                            }
                         }
                     }
                 }
@@ -764,6 +791,10 @@ class NotchDragContainer: NSView {
             DispatchQueue.main.async {
                 withAnimation(DroppyAnimation.transition) {
                     DroppyState.shared.addItems(from: urls)
+                    // Ensure shelf expands on the CORRECT display (where drop occurred)
+                    if let displayID = targetDisplayID {
+                        DroppyState.shared.expandShelf(for: displayID)
+                    }
                 }
             }
             return true
@@ -787,6 +818,10 @@ class NotchDragContainer: NSView {
                 DispatchQueue.main.async {
                     withAnimation(DroppyAnimation.transition) {
                         DroppyState.shared.addItems(from: [fileURL])
+                        // Ensure shelf expands on the CORRECT display (where drop occurred)
+                        if let displayID = targetDisplayID {
+                            DroppyState.shared.expandShelf(for: displayID)
+                        }
                     }
                 }
                 return true

@@ -96,6 +96,11 @@ class AudioSpectrum: NSView {
         resetBars()
     }
     
+    override func removeFromSuperview() {
+        stopAnimating()
+        super.removeFromSuperview()
+    }
+    
     private func updateBars() {
         // Advance wave phase for organic motion (simulation mode only)
         wavePhase += 0.3

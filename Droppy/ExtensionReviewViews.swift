@@ -140,7 +140,7 @@ struct ExtensionReviewsSheet: View {
                                     }
                                 }
                                 .scaleEffect(hoveringRating == star ? 1.15 : 1.0)
-                                .animation(.spring(response: 0.2, dampingFraction: 0.6), value: hoveringRating)
+                                .animation(DroppyAnimation.stateEmphasis, value: hoveringRating)
                         }
                     }
                     

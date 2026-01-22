@@ -63,11 +63,16 @@ struct NotchHUDView: View {
                 let symmetricPadding = (notchHeight - iconSize) / 2
                 
                 HStack(spacing: 12) {
-                    // Left side: Icon only (no label for compact look)
+                    // Left side: Icon with BUTTERY SMOOTH SCALING
+                    // Icon scales from 0.85x (0%) to 1.15x (100%) for premium feel
+                    let iconScale = 0.85 + (value * 0.30)
+                    
                     Image(systemName: hudType.icon(for: value))
                         .font(.system(size: iconSize, weight: .semibold))
                         .foregroundStyle(isMuted ? .red : (hudType == .brightness ? .yellow : .white))
                         .contentTransition(.symbolEffect(.replace.byLayer))
+                        .scaleEffect(iconScale)
+                        .animation(.interpolatingSpring(stiffness: 300, damping: 20), value: value)
                         .frame(width: 24, height: iconSize, alignment: .leading)
                     
                     // Right side: Slider takes remaining width
@@ -90,10 +95,16 @@ struct NotchHUDView: View {
                 HStack(spacing: 0) {
                     // Left wing: Icon + Label
                     HStack(spacing: 10) {
+                        // Icon with BUTTERY SMOOTH SCALING
+                        // Icon scales from 0.85x (0%) to 1.15x (100%) for premium feel
+                        let iconScale = 0.85 + (value * 0.30)
+                        
                         Image(systemName: hudType.icon(for: value))
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(isMuted ? .red : (hudType == .brightness ? .yellow : .white))
                             .contentTransition(.symbolEffect(.replace.byLayer))
+                            .scaleEffect(iconScale)
+                            .animation(.interpolatingSpring(stiffness: 300, damping: 20), value: value)
                             .frame(width: 30, height: iconSize, alignment: .leading)  // Wider for speaker.wave icons
                         
                         Text(hudType == .brightness ? "Brightness" : "Volume")
@@ -127,7 +138,7 @@ struct NotchHUDView: View {
             }
         }
         // Only animate hudType changes, NOT value changes (value animation handled by slider)
-        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: hudType)
+        .animation(DroppyAnimation.notchState, value: hudType)
     }
 }
 
@@ -180,7 +191,7 @@ struct HUDOverlayView: View {
         .opacity(isVisible ? 1 : 0)
         .scaleEffect(isVisible ? 1 : 0.9)
         .offset(y: isVisible ? 0 : -10)
-        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isVisible)
+        .animation(DroppyAnimation.notchState, value: isVisible)
         .onChange(of: value) { _, newValue in
             withAnimation(.smooth(duration: 0.1)) {
                 animatedValue = newValue

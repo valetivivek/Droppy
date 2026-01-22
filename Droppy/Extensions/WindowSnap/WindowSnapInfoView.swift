@@ -211,7 +211,7 @@ struct WindowSnapInfoView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringDefaults = h }
+                    withAnimation(DroppyAnimation.hoverQuick) { isHoveringDefaults = h }
                 }
             }
             
@@ -284,7 +284,7 @@ struct WindowSnapInfoView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.easeInOut(duration: 0.15)) { isHoveringShortcut[action] = h }
+                withAnimation(DroppyAnimation.hoverQuick) { isHoveringShortcut[action] = h }
             }
         }
         .padding(.horizontal, 10)
@@ -318,7 +318,7 @@ struct WindowSnapInfoView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.easeInOut(duration: 0.15)) { isHoveringClose = h }
+                withAnimation(DroppyAnimation.hoverQuick) { isHoveringClose = h }
             }
             
             Spacer()
@@ -340,7 +340,7 @@ struct WindowSnapInfoView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.easeInOut(duration: 0.15)) { isHoveringReset = h }
+                withAnimation(DroppyAnimation.hoverQuick) { isHoveringReset = h }
             }
             .help("Reset Shortcuts")
             

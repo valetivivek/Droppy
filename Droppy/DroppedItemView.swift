@@ -191,7 +191,7 @@ struct DroppedItemView: View {
             try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
             thumbnail = await item.generateThumbnail(size: CGSize(width: 128, height: 128))
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+        .animation(DroppyAnimation.bouncy, value: isSelected)
     }
     
     // MARK: - Computed Properties

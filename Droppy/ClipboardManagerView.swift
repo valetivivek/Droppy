@@ -732,7 +732,7 @@ struct ClipboardManagerView: View {
                         .padding(.bottom, 20)
                         // Animation for list changes (favorites, add/remove)
                         // PERFORMANCE: ID-only Hashable makes this comparison fast
-                        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: sortedHistory)
+                        .animation(DroppyAnimation.listChange, value: sortedHistory)
                     }
                     .onAppear {
                         scrollProxy = proxy
@@ -1009,14 +1009,6 @@ struct ClipboardManagerView: View {
     
     var previewPane: some View {
         VStack(spacing: 0) {
-            // Draggable header area for window repositioning (top right)
-            HStack {
-                Spacer()
-            }
-            .frame(height: 40)
-            .background(WindowDragArea())
-            .contentShape(Rectangle())
-            
             if selectedItems.count > 1 {
                 // Multi-select stacked preview
                 MultiSelectPreviewView(
@@ -1044,12 +1036,11 @@ struct ClipboardManagerView: View {
                         .font(.system(size: 40))
                         .foregroundStyle(.secondary.opacity(0.5))
                     Text("Select an item to preview")
-                        .font(.system(size: 14, weight: .medium)) // Matched font weight
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
             }
         }
-
         .frame(minWidth: 504, maxWidth: .infinity, maxHeight: .infinity)
     }
 }
@@ -1572,7 +1563,7 @@ struct ClipboardPreviewView: View {
                         )
                     )
             )
-            .animation(.easeInOut(duration: 0.3), value: isEditing)
+            .animation(DroppyAnimation.viewChange, value: isEditing)
             .onChange(of: isEditing) { _, editing in
                 // Sync with shared state so Cmd+V shortcut is disabled during editing
                 manager.isEditingContent = editing
@@ -2061,7 +2052,7 @@ struct MultiSelectPreviewView: View {
                 }
             }
             .frame(height: 180)
-            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: items.count)
+            .animation(DroppyAnimation.transition, value: items.count)
             
             // Selection count badge
             HStack(spacing: 8) {
@@ -2348,7 +2339,7 @@ struct URLPreviewCard: View {
                     }
                 }
                 .opacity(isHovering ? 0.8 : 1.0)
-                .animation(.easeInOut(duration: 0.2), value: isHovering)
+                .animation(DroppyAnimation.hoverQuick, value: isHovering)
                 .help("Click to open link")
                 
                 // Raw URL at the bottom

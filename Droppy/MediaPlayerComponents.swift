@@ -38,33 +38,57 @@ struct InlineHUDView: View {
             .font(.system(size: 18, weight: .semibold))
             .foregroundStyle(type.accentColor)
             .frame(width: 32, alignment: .trailing) // Same width as text for symmetry
-            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: type.icon(for: value))
+            .animation(DroppyAnimation.notchState, value: type.icon(for: value))
             
-            // Slider (visual only) - matches HUDSlider style
+            // Slider (visual only) - matches HUDSlider premium style
             if type.showsSlider {
                 GeometryReader { geo in
                     let width = geo.size.width
                     let progress = max(0, min(1, value))
-                    let fillWidth = max(5, width * progress)
-                    let trackHeight: CGFloat = 5
+                    let fillWidth = max(4, width * progress)
+                    let trackHeight: CGFloat = 4
                     
                     ZStack(alignment: .leading) {
-                        // Track background
+                        // Track background (simple, no mask/blur)
                         Capsule()
-                            .fill(type.accentColor.opacity(0.2))
+                            .fill(Color.white.opacity(0.1))
                             .frame(height: trackHeight)
                         
-                        // Filled portion with glow
+                        // PREMIUM: Gradient fill with glow
                         if progress > 0 {
                             Capsule()
-                                .fill(type.accentColor)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            type.accentColor,
+                                            type.accentColor.opacity(0.85)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
                                 .frame(width: fillWidth, height: trackHeight)
-                                .shadow(color: type.accentColor.opacity(0.4), radius: 4)
+                                // Top highlight stroke
+                                .overlay(
+                                    Capsule()
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [.white.opacity(0.4), .clear],
+                                                startPoint: .top,
+                                                endPoint: .center
+                                            ),
+                                            lineWidth: 0.5
+                                        )
+                                )
+                                // PREMIUM BLOOM: Multi-layer glow
+                                .shadow(color: type.accentColor.opacity(0.3), radius: 1)
+                                .shadow(color: type.accentColor.opacity(0.15 + (progress * 0.15)), radius: 3)
+                                .shadow(color: type.accentColor.opacity(0.1 + (progress * 0.1)), radius: 5 + (progress * 3))
                         }
                     }
                     .frame(height: trackHeight)
                     .frame(maxHeight: .infinity, alignment: .center)
-                    .animation(.spring(response: 0.2, dampingFraction: 0.8), value: value)
+                    .animation(.interpolatingSpring(stiffness: 350, damping: 28), value: value)
                 }
                 .frame(height: 28)
             }
@@ -77,7 +101,7 @@ struct InlineHUDView: View {
                 .lineLimit(1)
                 .frame(width: 32, alignment: .leading) // Same width as icon for symmetry
                 .contentTransition(.numericText(value: value))
-                .animation(.spring(response: 0.25, dampingFraction: 0.8), value: value)
+                .animation(DroppyAnimation.notchState, value: value)
         }
         // Match width of center controls
         .frame(width: type.showsSlider ? 160 : 80)
@@ -175,19 +199,30 @@ struct SpotifyBadge: View {
     }
 }
 
-// MARK: - Media Control Button (plain, no background)
+// MARK: - Media Control Button (with premium nudge effects)
 
-/// Simple media control button without background (for rewind/play/forward)
+/// Media control button with premium press animations
+/// - nudgeDirection: .left for previous, .right for next, .none for play/pause (uses wiggle)
 struct MediaControlButton: View {
     let icon: String
     let size: CGFloat
-    var tapPadding: CGFloat = 16  // Extra padding around icon for tap target (default: 16, compact: 8)
+    var tapPadding: CGFloat = 16
+    var nudgeDirection: NudgeDirection = .none
     let action: () -> Void
     
     @State private var isHovering = false
+    @State private var pressOffset: CGFloat = 0
+    @State private var rotationAngle: Double = 0
+    
+    enum NudgeDirection {
+        case left, right, none
+    }
     
     var body: some View {
-        Button(action: action) {
+        Button {
+            triggerPressEffect()
+            action()
+        } label: {
             Image(systemName: icon)
                 .font(.system(size: size, weight: .bold))
                 .foregroundStyle(.white)
@@ -196,9 +231,47 @@ struct MediaControlButton: View {
                 .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(MediaButtonStyle(isHovering: isHovering))
+        .offset(x: pressOffset)
+        .rotationEffect(.degrees(rotationAngle))
         .onHover { hovering in
             withAnimation(DroppyAnimation.hover) {
                 isHovering = hovering
+            }
+        }
+    }
+    
+    /// Premium press effect - nudge for prev/next, wiggle for play/pause
+    private func triggerPressEffect() {
+        switch nudgeDirection {
+        case .left:
+            // Nudge left briefly
+            withAnimation(.spring(response: 0.16, dampingFraction: 0.72)) {
+                pressOffset = -6
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                withAnimation(.spring(response: 0.26, dampingFraction: 0.8)) {
+                    pressOffset = 0
+                }
+            }
+        case .right:
+            // Nudge right briefly
+            withAnimation(.spring(response: 0.16, dampingFraction: 0.72)) {
+                pressOffset = 6
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                withAnimation(.spring(response: 0.26, dampingFraction: 0.8)) {
+                    pressOffset = 0
+                }
+            }
+        case .none:
+            // Wiggle for play/pause
+            withAnimation(.spring(response: 0.18, dampingFraction: 0.52)) {
+                rotationAngle = 8
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.76)) {
+                    rotationAngle = 0
+                }
             }
         }
     }
@@ -211,8 +284,8 @@ struct MediaButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.92 : (isHovering ? 1.05 : 1.0))
-            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
-            .animation(.easeInOut(duration: 0.15), value: isHovering)
+            .animation(DroppyAnimation.hoverQuick, value: configuration.isPressed)
+            .animation(DroppyAnimation.hoverQuick, value: isHovering)
     }
 }
 
@@ -279,8 +352,8 @@ struct SpotifyButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.92 : (isHovering ? 1.05 : 1.0))
-            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
-            .animation(.easeInOut(duration: 0.15), value: isHovering)
+            .animation(DroppyAnimation.hoverQuick, value: configuration.isPressed)
+            .animation(DroppyAnimation.hoverQuick, value: isHovering)
     }
 }
 
@@ -346,7 +419,7 @@ struct MusicVisualizerBars: View {
     }
     
     private func startAnimation() {
-        withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
+        withAnimation(DroppyAnimation.viewChange.repeatForever(autoreverses: true)) {
             heights = [0.6, 1.0, 0.5]
         }
         

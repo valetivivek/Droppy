@@ -921,7 +921,7 @@ struct BasketItemView: View {
                         }
                         withAnimation(.spring(response: 0.3)) { shakeOffset = 0 }
                         try? await Task.sleep(nanoseconds: 1_500_000_000)
-                        withAnimation(.easeOut(duration: 0.3)) { isShakeAnimating = false }
+                        withAnimation(DroppyAnimation.viewChange) { isShakeAnimating = false }
                     }
                 }
             }
@@ -1154,7 +1154,7 @@ private struct BasketItemContent: View {
                             MagicProcessingOverlay()
                                 .frame(width: 60, height: 60)
                                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                .transition(.opacity.animation(.easeInOut(duration: 0.3)))
+                                .transition(.opacity.animation(DroppyAnimation.viewChange))
                         }
                     }
                 

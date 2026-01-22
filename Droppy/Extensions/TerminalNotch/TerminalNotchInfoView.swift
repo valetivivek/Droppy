@@ -284,7 +284,7 @@ struct TerminalNotchInfoView: View {
                     }
                     .buttonStyle(.plain)
                     .onHover { h in
-                        withAnimation(.easeInOut(duration: 0.15)) { isHoveringRecord = h }
+                        withAnimation(DroppyAnimation.hoverQuick) { isHoveringRecord = h }
                     }
                 }
                 
@@ -323,7 +323,7 @@ struct TerminalNotchInfoView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.easeInOut(duration: 0.15)) { isHoveringCancel = h }
+                withAnimation(DroppyAnimation.hoverQuick) { isHoveringCancel = h }
             }
             
             Spacer()
@@ -346,7 +346,7 @@ struct TerminalNotchInfoView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringReset = h }
+                    withAnimation(DroppyAnimation.hoverQuick) { isHoveringReset = h }
                 }
                 .help("Reset Shortcut")
             }
@@ -367,7 +367,7 @@ struct TerminalNotchInfoView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringAction = h }
+                    withAnimation(DroppyAnimation.hoverQuick) { isHoveringAction = h }
                 }
             }
         }
