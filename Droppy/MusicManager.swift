@@ -462,20 +462,29 @@ final class MusicManager: ObservableObject {
     
     /// Toggle play/pause
     func togglePlay() {
-        guard let sendCommand = MRMediaRemoteSendCommandPtr else { return }
+        guard let sendCommand = MRMediaRemoteSendCommandPtr else {
+            print("MusicManager: togglePlay failed - MediaRemote not loaded")
+            return
+        }
         sendCommand(MRCommand.togglePlayPause.rawValue, nil)
     }
     
     /// Skip to next track
     func nextTrack() {
-        guard let sendCommand = MRMediaRemoteSendCommandPtr else { return }
+        guard let sendCommand = MRMediaRemoteSendCommandPtr else {
+            print("MusicManager: nextTrack failed - MediaRemote not loaded")
+            return
+        }
         lastSkipDirection = .forward
         sendCommand(MRCommand.nextTrack.rawValue, nil)
     }
     
     /// Skip to previous track
     func previousTrack() {
-        guard let sendCommand = MRMediaRemoteSendCommandPtr else { return }
+        guard let sendCommand = MRMediaRemoteSendCommandPtr else {
+            print("MusicManager: previousTrack failed - MediaRemote not loaded")
+            return
+        }
         lastSkipDirection = .backward
         sendCommand(MRCommand.previousTrack.rawValue, nil)
     }
