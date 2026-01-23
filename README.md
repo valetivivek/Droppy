@@ -25,6 +25,10 @@
 </p>
 
 <p align="center">
+  <img src="https://i.postimg.cc/BnP07CdX/Screen-Recording2026-01-23at17-23-04-ezgif-com-video-to-gif-converter.gif" alt="Floating Basket" width="100%">
+</p>
+
+<p align="center">
   <a href="https://iordv.github.io/Droppy/"><strong>🌐 Website</strong></a> · 
   <a href="https://github.com/iordv/Droppy/releases/latest"><strong>⬇️ Download</strong></a> · 
   <a href="https://iordv.github.io/Droppy/extensions.html"><strong>🧩 Extensions</strong></a> · 
@@ -75,7 +79,7 @@ Never lose a copy again. Your **full clipboard history** with instant search, fa
 **Jiggle your mouse** to summon a floating basket anywhere on screen. Drop files in, push to shelf, convert formats, compress, extract text, remove backgrounds, share—all from a beautiful context menu. Enable drag-to-summon for instant access, and enjoy smooth **peek and hide** animations.
 
 <p align="center">
-  <img src="docs/assets/images/basket-demo.gif" alt="Floating Basket" width="100%">
+  <img src="https://i.postimg.cc/BnP07CdX/Screen-Recording2026-01-23at17-23-04-ezgif-com-video-to-gif-converter.gif" alt="Floating Basket" width="100%">
 </p>
 
 ---
