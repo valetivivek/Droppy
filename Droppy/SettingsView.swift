@@ -2055,148 +2055,41 @@ class ClickSelectingTextField: NSTextField {
 /// Info button that shows a popover explaining the swipe gesture for media/shelf switching
 struct SwipeGestureInfoButton: View {
     @State private var showPopover = false
-    @State private var animateSwipe = false
     
     var body: some View {
-        Button {
-            showPopover.toggle()
-            if showPopover {
-                // Start animation when popover opens
-                animateSwipe = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
-                        animateSwipe = true
-                    }
-                }
+        Image(systemName: "info.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+            .onTapGesture { showPopover.toggle() }
+            .onHover { hovering in
+                if hovering { showPopover = true }
             }
-        } label: {
-            Image(systemName: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            VStack(alignment: .center, spacing: 16) {
-                Text("Swipe Gesture")
-                    .font(.system(size: 15, weight: .semibold))
-                
-                // Animated swipe preview with Droppy design
-                HStack(spacing: 16) {
-                    // Media icon - gradient glass style
-                    VStack(spacing: 6) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color.pink.opacity(0.25), Color.pink.opacity(0.1)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color.pink.opacity(0.3), lineWidth: 1)
-                                )
-                                .shadow(color: .pink.opacity(0.2), radius: 8, y: 2)
-                            Image(systemName: "music.note")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [.pink, .pink.opacity(0.7)],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
-                        }
-                        .frame(width: 44, height: 44)
-                        
-                        Text("Media")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.secondary)
+            .popover(isPresented: $showPopover, arrowEdge: .leading) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "hand.draw.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.pink)
+                        Text("Swipe Gesture")
+                            .font(.headline)
                     }
                     
-                    // Animated arrows
-                    VStack(spacing: 4) {
-                        // Left arrows (swipe left for media)
-                        HStack(spacing: 1) {
-                            Image(systemName: "chevron.left")
-                            Image(systemName: "chevron.left")
-                        }
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.pink)
-                        .offset(x: animateSwipe ? -4 : 4)
-                        .opacity(animateSwipe ? 1 : 0.4)
-                        
-                        // Right arrows (swipe right for shelf)
-                        HStack(spacing: 1) {
-                            Image(systemName: "chevron.right")
-                            Image(systemName: "chevron.right")
-                        }
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.blue)
-                        .offset(x: animateSwipe ? 4 : -4)
-                        .opacity(animateSwipe ? 0.4 : 1)
-                    }
-                    .frame(width: 24)
+                    Text("Swipe left or right on the notch to switch between Media Controls and the File Shelf.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                     
-                    // Shelf icon - gradient glass style
-                    VStack(spacing: 6) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color.blue.opacity(0.25), Color.blue.opacity(0.1)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-                                )
-                                .shadow(color: .blue.opacity(0.2), radius: 8, y: 2)
-                            Image(systemName: "tray.and.arrow.down.fill")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [.blue, .blue.opacity(0.7)],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
-                        }
-                        .frame(width: 44, height: 44)
-                        
-                        Text("Shelf")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Swipe left → Media Controls", systemImage: "music.note")
+                        Label("Swipe right → File Shelf", systemImage: "tray.and.arrow.down.fill")
+                        Label("Quick toggle between modes", systemImage: "arrow.left.arrow.right")
                     }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 4)
-                
-                // Instructions with colored indicators
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(LinearGradient(colors: [.pink, .pink.opacity(0.6)], startPoint: .top, endPoint: .bottom))
-                            .frame(width: 6, height: 6)
-                        Text("Swipe left → Media")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(LinearGradient(colors: [.blue, .blue.opacity(0.6)], startPoint: .top, endPoint: .bottom))
-                            .frame(width: 6, height: 6)
-                        Text("Swipe right → Shelf")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                .padding()
+                .frame(width: 280)
             }
-            .padding(20)
-            .frame(width: 180)
-        }
     }
 }
 
@@ -2207,46 +2100,39 @@ struct NotchShelfInfoButton: View {
     @State private var showPopover = false
     
     var body: some View {
-        Button {
-            showPopover.toggle()
-        } label: {
-            Image(systemName: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            VStack(alignment: .center, spacing: 12) {
-                Text("Notch Shelf Tips")
-                    .font(.system(size: 15, weight: .semibold))
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "cursorarrow.click.2")
-                            .foregroundStyle(.red)
-                        Text("**Right-click** to hide the notch/island")
-                            .font(.system(size: 13))
-                    }
-                    
-                    HStack(spacing: 8) {
-                        Image(systemName: "cursorarrow.click.2")
-                            .foregroundStyle(.green)
-                        Text("**Right-click** the area again to show")
-                            .font(.system(size: 13))
-                    }
-                    
-                    HStack(spacing: 8) {
-                        Image(systemName: "menubar.arrow.up.rectangle")
-                            .foregroundStyle(.blue)
-                        Text("Or use the **menu bar icon**")
-                            .font(.system(size: 13))
-                    }
-                }
-                .foregroundStyle(.secondary)
+        Image(systemName: "info.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+            .onTapGesture { showPopover.toggle() }
+            .onHover { hovering in
+                if hovering { showPopover = true }
             }
-            .padding(16)
-            .frame(width: 280)
-        }
+            .popover(isPresented: $showPopover, arrowEdge: .leading) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "rectangle.topthird.inset.filled")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.blue)
+                        Text("Notch Shelf")
+                            .font(.headline)
+                    }
+                    
+                    Text("A file shelf that lives in your Mac's notch or as a Dynamic Island.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Right-click to hide the notch/island", systemImage: "cursorarrow.click.2")
+                        Label("Right-click the area again to show", systemImage: "eye")
+                        Label("Or use the menu bar icon", systemImage: "menubar.arrow.up.rectangle")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(width: 280)
+            }
     }
 }
 
@@ -2255,74 +2141,41 @@ struct NotchShelfInfoButton: View {
 /// Info button explaining the jiggle gesture to summon basket
 struct BasketGestureInfoButton: View {
     @State private var showPopover = false
-    @State private var animateJiggle = false
     
     var body: some View {
-        Button {
-            showPopover.toggle()
-            if showPopover {
-                animateJiggle = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    withAnimation(DroppyAnimation.hoverQuick.repeatForever(autoreverses: true)) {
-                        animateJiggle = true
-                    }
-                }
+        Image(systemName: "info.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+            .onTapGesture { showPopover.toggle() }
+            .onHover { hovering in
+                if hovering { showPopover = true }
             }
-        } label: {
-            Image(systemName: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            VStack(alignment: .center, spacing: 16) {
-                Text("Summon Basket")
-                    .font(.system(size: 15, weight: .semibold))
-                
-                // Jiggle animation preview
-                VStack(spacing: 8) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.purple.opacity(0.25), Color.purple.opacity(0.1)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(Color.purple.opacity(0.3), lineWidth: 1)
-                            )
-                            .shadow(color: .purple.opacity(0.2), radius: 8, y: 2)
-                        
-                        Image(systemName: "doc.fill")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(
-                                LinearGradient(colors: [.purple, .purple.opacity(0.7)], startPoint: .top, endPoint: .bottom)
-                            )
+            .popover(isPresented: $showPopover, arrowEdge: .leading) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "hand.draw.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.purple)
+                        Text("Summon Basket")
+                            .font(.headline)
                     }
-                    .frame(width: 50, height: 50)
-                    .rotationEffect(.degrees(animateJiggle ? 8 : -8))
                     
-                    Text("Jiggle while dragging")
-                        .font(.caption)
+                    Text("Shake files side-to-side while dragging to summon the floating basket.")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Works with any file you're dragging", systemImage: "doc.fill")
+                        Label("Basket appears after 2-3 quick shakes", systemImage: "arrow.left.arrow.right")
+                        Label("Drop files into the basket", systemImage: "tray.and.arrow.down")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 4)
-                
-                HStack(spacing: 8) {
-                    Image(systemName: "hand.draw.fill")
-                        .foregroundStyle(.purple)
-                        .font(.system(size: 11))
-                    Text("Shake files to summon basket")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                .padding()
+                .frame(width: 280)
             }
-            .padding(20)
-            .frame(width: 180)
-        }
     }
 }
 
@@ -2331,90 +2184,41 @@ struct BasketGestureInfoButton: View {
 /// Info button explaining auto-hide with peek behavior
 struct PeekModeInfoButton: View {
     @State private var showPopover = false
-    @State private var animatePeek = false
     
     var body: some View {
-        Button {
-            showPopover.toggle()
-            if showPopover {
-                animatePeek = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
-                        animatePeek = true
-                    }
-                }
+        Image(systemName: "info.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+            .onTapGesture { showPopover.toggle() }
+            .onHover { hovering in
+                if hovering { showPopover = true }
             }
-        } label: {
-            Image(systemName: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            VStack(alignment: .center, spacing: 16) {
-                Text("Peek Mode")
-                    .font(.system(size: 15, weight: .semibold))
-                
-                // Peek animation
-                HStack(spacing: 0) {
-                    // Screen representation
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.white.opacity(0.1))
-                            .frame(width: 80, height: 50)
-                        
-                        Text("Screen")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.secondary)
+            .popover(isPresented: $showPopover, arrowEdge: .leading) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "eye.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.purple)
+                        Text("Peek Mode")
+                            .font(.headline)
                     }
                     
-                    // Basket peeking from edge
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.purple.opacity(0.3), Color.purple.opacity(0.15)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .stroke(Color.purple.opacity(0.4), lineWidth: 1)
-                            )
-                        
-                        Image(systemName: "basket.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.purple)
+                    Text("Basket slides to the screen edge when idle and peeks out so you can hover to reveal it.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Slides to edge when not in use", systemImage: "arrow.right.to.line")
+                        Label("Hover the edge to reveal basket", systemImage: "cursorarrow.rays")
+                        Label("Stays visible while you interact", systemImage: "hand.point.up.left")
                     }
-                    .frame(width: 30, height: 40)
-                    .offset(x: animatePeek ? 0 : 20)
-                    .opacity(animatePeek ? 1 : 0.5)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 4)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(Color.purple)
-                            .frame(width: 5, height: 5)
-                        Text("Slides to edge when idle")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(Color.purple)
-                            .frame(width: 5, height: 5)
-                        Text("Hover edge to reveal")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                .padding()
+                .frame(width: 280)
             }
-            .padding(20)
-            .frame(width: 180)
-        }
     }
 }
 
@@ -2425,56 +2229,39 @@ struct InstantAppearInfoButton: View {
     @State private var showPopover = false
     
     var body: some View {
-        Button { showPopover.toggle() } label: {
-            Image(systemName: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            VStack(alignment: .center, spacing: 16) {
-                Text("Instant Appear")
-                    .font(.system(size: 15, weight: .semibold))
-                
-                HStack(spacing: 16) {
-                    // Drag icon
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(LinearGradient(colors: [Color.orange.opacity(0.25), Color.orange.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color.orange.opacity(0.3), lineWidth: 1))
-                            .shadow(color: .orange.opacity(0.2), radius: 6, y: 2)
-                        Image(systemName: "hand.point.up.left.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(LinearGradient(colors: [.orange, .orange.opacity(0.7)], startPoint: .top, endPoint: .bottom))
+        Image(systemName: "info.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+            .onTapGesture { showPopover.toggle() }
+            .onHover { hovering in
+                if hovering { showPopover = true }
+            }
+            .popover(isPresented: $showPopover, arrowEdge: .leading) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.orange)
+                        Text("Instant Appear")
+                            .font(.headline)
                     }
-                    .frame(width: 40, height: 40)
                     
-                    Image(systemName: "arrow.right")
+                    Text("Basket appears immediately when you start dragging a file.")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .font(.system(size: 12))
                     
-                    // Basket appears
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(LinearGradient(colors: [Color.purple.opacity(0.25), Color.purple.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color.purple.opacity(0.3), lineWidth: 1))
-                            .shadow(color: .purple.opacity(0.2), radius: 6, y: 2)
-                        Image(systemName: "basket.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(LinearGradient(colors: [.purple, .purple.opacity(0.7)], startPoint: .top, endPoint: .bottom))
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("No delay when dragging starts", systemImage: "hand.point.up.left.fill")
+                        Label("Basket is ready right away", systemImage: "basket.fill")
+                        Label("Great for quick file staging", systemImage: "bolt")
                     }
-                    .frame(width: 40, height: 40)
-                }
-                .padding(.vertical, 4)
-                
-                Text("Basket appears immediately\nwhen you start dragging")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                }
+                .padding()
+                .frame(width: 280)
             }
-            .padding(20)
-            .frame(width: 200)
-        }
     }
 }
 
@@ -2485,63 +2272,39 @@ struct AirDropZoneInfoButton: View {
     @State private var showPopover = false
     
     var body: some View {
-        Button { showPopover.toggle() } label: {
-            Image(systemName: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            VStack(alignment: .center, spacing: 16) {
-                Text("AirDrop Zone")
-                    .font(.system(size: 15, weight: .semibold))
-                
-                // Basket with AirDrop zone visualization
-                HStack(spacing: 2) {
-                    // Regular basket area
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.purple.opacity(0.15))
-                        VStack(spacing: 2) {
-                            Image(systemName: "doc.fill")
-                                .font(.system(size: 10))
-                            Image(systemName: "doc.fill")
-                                .font(.system(size: 10))
-                        }
-                        .foregroundStyle(.purple.opacity(0.6))
-                    }
-                    .frame(width: 50, height: 50)
-                    
-                    // AirDrop zone
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(LinearGradient(colors: [Color.cyan.opacity(0.25), Color.blue.opacity(0.15)], startPoint: .top, endPoint: .bottom))
-                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color.cyan.opacity(0.4), lineWidth: 1))
-                        
-                        Image(systemName: "airplayaudio")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(LinearGradient(colors: [.cyan, .blue], startPoint: .top, endPoint: .bottom))
-                    }
-                    .frame(width: 40, height: 50)
-                }
-                .padding(.vertical, 4)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.cyan).frame(width: 5, height: 5)
-                        Text("Drop on right side")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.cyan).frame(width: 5, height: 5)
-                        Text("Opens AirDrop picker")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
+        Image(systemName: "info.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+            .onTapGesture { showPopover.toggle() }
+            .onHover { hovering in
+                if hovering { showPopover = true }
             }
-            .padding(20)
-            .frame(width: 180)
-        }
+            .popover(isPresented: $showPopover, arrowEdge: .leading) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "airplayaudio")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.cyan)
+                        Text("AirDrop Zone")
+                            .font(.headline)
+                    }
+                    
+                    Text("Drop files on the right side of shelf/basket to instantly open the AirDrop picker.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Drop on the right edge", systemImage: "arrow.right.circle")
+                        Label("Opens system AirDrop picker", systemImage: "person.2.wave.2")
+                        Label("Select a nearby device to send", systemImage: "iphone.and.arrow.right.outward")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(width: 280)
+            }
     }
 }
 
@@ -2552,58 +2315,39 @@ struct AutoCleanInfoButton: View {
     @State private var showPopover = false
     
     var body: some View {
-        Button { showPopover.toggle() } label: {
-            Image(systemName: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            VStack(alignment: .center, spacing: 16) {
-                Text("Auto-Remove")
-                    .font(.system(size: 15, weight: .semibold))
-                
-                // Visual: item leaving shelf
-                HStack(spacing: 8) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.purple.opacity(0.15))
-                        Image(systemName: "doc.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.purple.opacity(0.6))
+        Image(systemName: "info.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+            .onTapGesture { showPopover.toggle() }
+            .onHover { hovering in
+                if hovering { showPopover = true }
+            }
+            .popover(isPresented: $showPopover, arrowEdge: .leading) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.green)
+                        Text("Auto-Remove")
+                            .font(.headline)
                     }
-                    .frame(width: 40, height: 40)
                     
-                    Image(systemName: "arrow.right")
+                    Text("Automatically removes items from shelf/basket after you drop them somewhere.")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.green.opacity(0.15))
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.green)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Clears item from shelf/basket", systemImage: "xmark.circle")
+                        Label("Original file is NOT deleted", systemImage: "doc.badge.checkmark")
+                        Label("Keeps your shelf tidy", systemImage: "sparkles")
                     }
-                    .frame(width: 40, height: 40)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 4)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.green).frame(width: 5, height: 5)
-                        Text("Clears item from shelf/basket")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.green).frame(width: 5, height: 5)
-                        Text("Original file is NOT deleted")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
+                .padding()
+                .frame(width: 280)
             }
-            .padding(20)
-            .frame(width: 220)
-        }
     }
 }
 
@@ -2614,65 +2358,39 @@ struct AlwaysCopyInfoButton: View {
     @State private var showPopover = false
     
     var body: some View {
-        Button { showPopover.toggle() } label: {
-            Image(systemName: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            VStack(alignment: .center, spacing: 16) {
-                Text("Protect Originals")
-                    .font(.system(size: 15, weight: .semibold))
-                
-                // Visual: file with shield
-                HStack(spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.blue.opacity(0.15))
-                        Image(systemName: "doc.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(.blue)
-                    }
-                    .frame(width: 40, height: 40)
-                    
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.green.opacity(0.15))
-                        Image(systemName: "shield.checkered")
-                            .font(.system(size: 16))
-                            .foregroundStyle(.green)
-                    }
-                    .frame(width: 40, height: 40)
-                }
-                .padding(.vertical, 4)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.green).frame(width: 5, height: 5)
-                        Text("Files are copied, never moved")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.green).frame(width: 5, height: 5)
-                        Text("Original stays at source location")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    
-                    Divider().padding(.vertical, 2)
-                    
-                    Text("When disabled:")
-                        .font(.caption).fontWeight(.medium)
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.orange).frame(width: 5, height: 5)
-                        Text("Same disk = may delete original")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
+        Image(systemName: "info.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+            .onTapGesture { showPopover.toggle() }
+            .onHover { hovering in
+                if hovering { showPopover = true }
             }
-            .padding(20)
-            .frame(width: 240)
-        }
+            .popover(isPresented: $showPopover, arrowEdge: .leading) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "shield.checkered")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.green)
+                        Text("Protect Originals")
+                            .font(.headline)
+                    }
+                    
+                    Text("When enabled, files are always copied instead of moved, keeping originals safe.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Files are copied, never moved", systemImage: "doc.on.doc")
+                        Label("Original stays at source location", systemImage: "lock.shield")
+                        Label("When disabled: same disk = may move", systemImage: "exclamationmark.triangle")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(width: 280)
+            }
     }
 }
 
@@ -3388,72 +3106,39 @@ struct PowerFoldersInfoButton: View {
     @State private var showPopover = false
     
     var body: some View {
-        Button { showPopover.toggle() } label: {
-            Image(systemName: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            VStack(alignment: .center, spacing: 16) {
-                Text("Power Folders")
-                    .font(.system(size: 15, weight: .semibold))
-                
-                // Folder visualization
-                HStack(spacing: 12) {
-                    // Regular folder
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.blue.opacity(0.15))
-                            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color.blue.opacity(0.3), lineWidth: 1))
-                        Image(systemName: "folder.fill")
-                            .font(.system(size: 18))
-                            .foregroundStyle(Color.blue)
+        Image(systemName: "info.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+            .onTapGesture { showPopover.toggle() }
+            .onHover { hovering in
+                if hovering { showPopover = true }
+            }
+            .popover(isPresented: $showPopover, arrowEdge: .leading) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "folder.fill.badge.plus")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.yellow)
+                        Text("Power Folders")
+                            .font(.headline)
                     }
-                    .frame(width: 45, height: 45)
                     
-                    Image(systemName: "arrow.right")
+                    Text("Drop folders onto Droppy to pin them. Pinned folders stay accessible and you can drop files directly into them.")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
-                    // Pinned folder
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.yellow.opacity(0.15))
-                            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color.yellow.opacity(0.5), lineWidth: 2))
-                        VStack(spacing: 2) {
-                            Image(systemName: "pin.fill")
-                                .font(.system(size: 8))
-                                .foregroundStyle(.yellow)
-                            Image(systemName: "folder.fill")
-                                .font(.system(size: 14))
-                                .foregroundStyle(Color.yellow)
-                        }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Pin folders to keep them accessible", systemImage: "pin.fill")
+                        Label("Drop files directly into pinned folders", systemImage: "arrow.right.doc.on.clipboard")
+                        Label("Hover to preview folder contents", systemImage: "eye")
                     }
-                    .frame(width: 45, height: 45)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 4)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.yellow).frame(width: 5, height: 5)
-                        Text("Pin folders to keep them")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.yellow).frame(width: 5, height: 5)
-                        Text("Drop files directly into them")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.yellow).frame(width: 5, height: 5)
-                        Text("Hover to preview contents")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
+                .padding()
+                .frame(width: 280)
             }
-            .padding(20)
-            .frame(width: 200)
-        }
     }
 }
 
@@ -3464,103 +3149,53 @@ struct ClipboardShortcutInfoButton: View {
     var shortcut: SavedShortcut?
     @State private var showPopover = false
     
-    /// Parse shortcut into individual key components for display
-    private var shortcutKeys: [String] {
-        guard let s = shortcut else {
-            // Default fallback
-            return ["⌘", "⇧", "Space"]
-        }
-        
-        var keys: [String] = []
+    /// Parse shortcut into display string
+    private var shortcutString: String {
+        guard let s = shortcut else { return "⌘⇧Space" }
+        var parts: [String] = []
         let flags = NSEvent.ModifierFlags(rawValue: s.modifiers)
-        
-        if flags.contains(.command) { keys.append("⌘") }
-        if flags.contains(.shift) { keys.append("⇧") }
-        if flags.contains(.option) { keys.append("⌥") }
-        if flags.contains(.control) { keys.append("⌃") }
-        
-        // Add the actual key
-        let keyString = KeyCodeHelper.string(for: UInt16(s.keyCode))
-        keys.append(keyString)
-        
-        return keys
+        if flags.contains(.command) { parts.append("⌘") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.control) { parts.append("⌃") }
+        parts.append(KeyCodeHelper.string(for: UInt16(s.keyCode)))
+        return parts.joined()
     }
     
     var body: some View {
-        Button { showPopover.toggle() } label: {
-            Image(systemName: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            VStack(alignment: .center, spacing: 16) {
-                Text("Clipboard Tips")
-                    .font(.system(size: 15, weight: .semibold))
-                
-                // Keyboard shortcut section - dynamic based on user's shortcut
-                VStack(spacing: 8) {
-                    HStack(spacing: 6) {
-                        ForEach(shortcutKeys, id: \.self) { key in
-                            KeyCapView(
-                                key: key,
-                                color: .cyan,
-                                isWide: key.count > 1
-                            )
-                        }
-                    }
-                    Text("Open clipboard")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                
-                Divider()
-                    .padding(.vertical, 2)
-                
-                // Double-tap rename section
-                VStack(spacing: 8) {
-                    HStack(spacing: 8) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(LinearGradient(colors: [Color.orange.opacity(0.25), Color.orange.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color.orange.opacity(0.3), lineWidth: 1))
-                            Image(systemName: "doc.text.fill")
-                                .font(.system(size: 14))
-                                .foregroundStyle(LinearGradient(colors: [.orange, .orange.opacity(0.7)], startPoint: .top, endPoint: .bottom))
-                        }
-                        .frame(width: 32, height: 32)
-                        
-                        VStack(spacing: 2) {
-                            Text("×2")
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.orange)
-                            Image(systemName: "hand.tap.fill")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.orange.opacity(0.7))
-                        }
-                        
-                        Image(systemName: "arrow.right")
-                            .foregroundStyle(.secondary)
-                            .font(.system(size: 10))
-                        
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(LinearGradient(colors: [Color.green.opacity(0.25), Color.green.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color.green.opacity(0.3), lineWidth: 1))
-                            Image(systemName: "pencil")
-                                .font(.system(size: 14))
-                                .foregroundStyle(LinearGradient(colors: [.green, .green.opacity(0.7)], startPoint: .top, endPoint: .bottom))
-                        }
-                        .frame(width: 32, height: 32)
-                    }
-                    Text("Double-tap to rename & save")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+        Image(systemName: "info.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+            .onTapGesture { showPopover.toggle() }
+            .onHover { hovering in
+                if hovering { showPopover = true }
             }
-            .padding(20)
-            .frame(width: 210)
-        }
+            .popover(isPresented: $showPopover, arrowEdge: .leading) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "doc.on.clipboard.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.cyan)
+                        Text("Clipboard Tips")
+                            .font(.headline)
+                    }
+                    
+                    Text("Press \(shortcutString) to quickly access your clipboard history.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Shortcut opens clipboard panel", systemImage: "keyboard")
+                        Label("Click to paste any item", systemImage: "doc.on.doc")
+                        Label("Double-tap text to rename & save", systemImage: "pencil")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(width: 280)
+            }
     }
 }
 
@@ -3595,79 +3230,39 @@ struct ExternalDisplayInfoButton: View {
     @State private var showPopover = false
     
     var body: some View {
-        Button { showPopover.toggle() } label: {
-            Image(systemName: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            VStack(alignment: .center, spacing: 16) {
-                Text("External Display")
-                    .font(.system(size: 15, weight: .semibold))
-                
-                // Monitor icons
-                HStack(spacing: 12) {
-                    // Laptop
-                    VStack(spacing: 4) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(Color.white.opacity(0.1))
-                                .frame(width: 30, height: 20)
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(Color.blue.opacity(0.3))
-                                .frame(width: 8, height: 3)
-                                .offset(y: -6)
-                        }
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.white.opacity(0.2))
-                            .frame(width: 36, height: 3)
-                        Text("Built-in")
-                            .font(.system(size: 8))
-                            .foregroundStyle(.secondary)
+        Image(systemName: "info.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+            .onTapGesture { showPopover.toggle() }
+            .onHover { hovering in
+                if hovering { showPopover = true }
+            }
+            .popover(isPresented: $showPopover, arrowEdge: .leading) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "display")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.green)
+                        Text("External Display")
+                            .font(.headline)
                     }
                     
-                    Image(systemName: "plus")
-                        .font(.system(size: 10))
+                    Text("Configure how Droppy appears on external monitors that don't have a notch.")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
-                    // External monitor
-                    VStack(spacing: 4) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                .fill(Color.white.opacity(0.1))
-                                .frame(width: 40, height: 26)
-                            Capsule()
-                                .fill(Color.green.opacity(0.4))
-                                .frame(width: 14, height: 5)
-                                .offset(y: -8)
-                        }
-                        Rectangle()
-                            .fill(Color.white.opacity(0.2))
-                            .frame(width: 4, height: 6)
-                        Text("External")
-                            .font(.system(size: 8))
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Choose Notch or Dynamic Island style", systemImage: "rectangle.topthird.inset.filled")
+                        Label("Or hide Droppy on external displays", systemImage: "eye.slash")
+                        Label("Works independently for each display", systemImage: "display.2")
                     }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 4)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.green).frame(width: 5, height: 5)
-                        Text("Choose Notch or Island style")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.green).frame(width: 5, height: 5)
-                        Text("Or hide completely")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
+                .padding()
+                .frame(width: 280)
             }
-            .padding(20)
-            .frame(width: 190)
-        }
     }
 }
 
@@ -3677,63 +3272,39 @@ struct QuickActionsInfoButton: View {
     @State private var showPopover = false
     
     var body: some View {
-        Button { showPopover.toggle() } label: {
-            Image(systemName: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            VStack(alignment: .center, spacing: 16) {
-                Text("Quick Actions")
-                    .font(.system(size: 15, weight: .semibold))
-                
-                // Visual demonstration
-                HStack(spacing: 12) {
-                    // Select All button
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.blue.opacity(0.15))
-                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color.blue.opacity(0.3), lineWidth: 1))
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(Color.blue)
+        Image(systemName: "info.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+            .onTapGesture { showPopover.toggle() }
+            .onHover { hovering in
+                if hovering { showPopover = true }
+            }
+            .popover(isPresented: $showPopover, arrowEdge: .leading) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "bolt.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.blue)
+                        Text("Quick Actions")
+                            .font(.headline)
                     }
-                    .frame(width: 36, height: 36)
                     
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 12))
+                    Text("Adds Select All and Add All buttons for faster batch operations.")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
-                    // Add All button
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.green.opacity(0.15))
-                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color.green.opacity(0.3), lineWidth: 1))
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(Color.green)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Select All selects all items at once", systemImage: "checkmark.circle.fill")
+                        Label("Add All copies items to Finder folder", systemImage: "plus.circle.fill")
+                        Label("Great for managing many files", systemImage: "doc.on.doc")
                     }
-                    .frame(width: 36, height: 36)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 4)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.blue).frame(width: 5, height: 5)
-                        Text("Select All selects all files")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.green).frame(width: 5, height: 5)
-                        Text("Add All copies to Finder folder")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
+                .padding()
+                .frame(width: 280)
             }
-            .padding(20)
-            .frame(width: 210)
-        }
     }
 }
 
