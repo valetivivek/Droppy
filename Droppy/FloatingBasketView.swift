@@ -679,24 +679,75 @@ struct FloatingBasketView: View {
     }
     
     private func moveToShelf() {
-        // Move selected items if any are selected, otherwise move all
-        let itemsToMove: [DroppedItem]
-        if state.selectedBasketItems.isEmpty {
-            itemsToMove = state.basketItems
+        // STACK PRESERVATION: Transfer entire stacks as stacks, not individual items
+        // This ensures that items grouped as a stack in the basket remain stacked on the shelf
+        
+        // Determine which stacks to move
+        var stacksToMove: [ItemStack] = []
+        var powerFoldersToMove: [DroppedItem] = []
+        
+        if state.selectedBasketItems.isEmpty && state.selectedBasketStacks.isEmpty {
+            // No selection - move ALL stacks and power folders
+            stacksToMove = state.basketStacks
+            powerFoldersToMove = state.basketPowerFolders
         } else {
-            itemsToMove = state.basketItems.filter { state.selectedBasketItems.contains($0.id) }
+            // Move selected stacks (entire stacks that are selected)
+            for stack in state.basketStacks {
+                if state.selectedBasketStacks.contains(stack.id) {
+                    // Entire stack is selected
+                    stacksToMove.append(stack)
+                } else {
+                    // Check if any items in this stack are individually selected
+                    let selectedItemsInStack = stack.items.filter { state.selectedBasketItems.contains($0.id) }
+                    if !selectedItemsInStack.isEmpty {
+                        // Create a new stack with just the selected items
+                        if selectedItemsInStack.count == stack.items.count {
+                            // All items selected - move the whole stack
+                            stacksToMove.append(stack)
+                        } else {
+                            // Only some items selected - create partial stack
+                            stacksToMove.append(ItemStack(items: selectedItemsInStack))
+                        }
+                    }
+                }
+            }
+            
+            // Move selected power folders
+            powerFoldersToMove = state.basketPowerFolders.filter { state.selectedBasketItems.contains($0.id) }
         }
         
-        // Remove moved items from basket and add to shelf
-        // Use transfer-safe removal to preserve files on disk
-        for item in itemsToMove {
-            state.addItem(item)
-            state.removeBasketItemForTransfer(item)
+        // Transfer power folders to shelf (distinct, never stacked)
+        for folder in powerFoldersToMove {
+            // Avoid duplicates
+            guard !state.shelfPowerFolders.contains(where: { $0.url == folder.url }) else { continue }
+            state.shelfPowerFolders.append(folder)
+            state.basketPowerFolders.removeAll { $0.id == folder.id }
         }
+        
+        // Transfer stacks to shelf as complete stacks
+        let existingShelfURLs = Set(state.shelfStacks.flatMap { $0.items.map { $0.url } })
+        
+        for stack in stacksToMove {
+            // Filter out any items that already exist on shelf
+            let newItems = stack.items.filter { !existingShelfURLs.contains($0.url) }
+            guard !newItems.isEmpty else { continue }
+            
+            // Create the new shelf stack preserving the stack structure
+            var newStack = ItemStack(items: newItems)
+            newStack.forceStackAppearance = stack.forceStackAppearance
+            state.shelfStacks.append(newStack)
+            
+            // Remove transferred items from basket
+            for item in newItems {
+                state.removeBasketItemForTransfer(item)
+            }
+        }
+        
         state.deselectAllBasket()
+        state.selectedBasketStacks.removeAll()
         
         // PREMIUM: Haptic confirms items moved to shelf
-        if !itemsToMove.isEmpty {
+        if !stacksToMove.isEmpty || !powerFoldersToMove.isEmpty {
             HapticFeedback.drop()
         }
         
@@ -706,7 +757,7 @@ struct FloatingBasketView: View {
         // 2. Use the screen where the BASKET WINDOW is located (most reliable)
         // 3. Use the screen where the mouse is currently located
         // 4. Fall back to main screen only as last resort
-        if !itemsToMove.isEmpty {
+        if !stacksToMove.isEmpty || !powerFoldersToMove.isEmpty {
             let targetDisplayID: CGDirectDisplayID
             
             if let currentExpandedDisplayID = state.expandedDisplayID {

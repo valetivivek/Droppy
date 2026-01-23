@@ -298,23 +298,38 @@ private func mediaKeyCallback(
         return Unmanaged.passUnretained(event)
     }
     
+    // CRASH FIX: NSEvent(cgEvent:) on background thread crashes when Caps Lock is involved!
+    // When Caps Lock is pressed, NSEvent init triggers TSM (Text Services Manager)
+    // Caps Lock handling which REQUIRES the main thread. This causes:
+    // _dispatch_assert_queue_fail in TISIsDesignatedRomanModeCapsLockSwitchAllowed
+    //
+    // Solution: Create NSEvent on main thread synchronously. Media key events are
+    // infrequent (user key presses), so the sync dispatch latency is acceptable.
+    
     // Only process system-defined events (raw value 14)
     guard type.rawValue == 14 else {
         return Unmanaged.passUnretained(event)
     }
     
-    // PERFORMANCE FIX: Extract NSEvent data inline WITHOUT main thread dispatch
-    // The TSM assertion only affects caps lock handling, which we don't use
-    // Media keys (volume/brightness) work fine off main thread
-    guard let nsEvent = NSEvent(cgEvent: event),
-          nsEvent.subtype.rawValue == 8 else { // NX_SUBTYPE_AUX_CONTROL_BUTTONS = 8
+    // Extract NSEvent data on main thread to avoid TSM Caps Lock crash
+    var nsEventData1: Int = 0
+    var nsEventSubtype: Int16 = 0
+    
+    DispatchQueue.main.sync {
+        if let nsEvent = NSEvent(cgEvent: event) {
+            nsEventData1 = nsEvent.data1
+            nsEventSubtype = nsEvent.subtype.rawValue
+        }
+    }
+    
+    // Check subtype - we only handle NX_SUBTYPE_AUX_CONTROL_BUTTONS (8)
+    guard nsEventSubtype == 8 else {
         return Unmanaged.passUnretained(event)
     }
     
-    // Extract key data
-    let data1 = nsEvent.data1
-    let keyCode = UInt32((data1 & 0xFFFF0000) >> 16)
-    let keyFlags = UInt32(data1 & 0x0000FFFF)
+    // Extract key data from data1
+    let keyCode = UInt32((nsEventData1 & 0xFFFF0000) >> 16)
+    let keyFlags = UInt32(nsEventData1 & 0x0000FFFF)
     let keyState = ((keyFlags & 0xFF00) >> 8)
     
     let keyDown = keyState == 0x0A || keyState == 0x08

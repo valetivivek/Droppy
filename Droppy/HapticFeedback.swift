@@ -19,6 +19,10 @@ enum HapticFeedback {
     
     /// Perform haptic feedback of the specified type
     func perform() {
+        // Check user preference (default: true)
+        let enabled = UserDefaults.standard.object(forKey: AppPreferenceKey.enableHapticFeedback) as? Bool ?? true
+        guard enabled else { return }
+        
         let performer = NSHapticFeedbackManager.defaultPerformer
         
         switch self {

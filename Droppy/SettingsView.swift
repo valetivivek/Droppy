@@ -23,6 +23,8 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKey.showOpenShelfIndicator) private var showOpenShelfIndicator = PreferenceDefault.showOpenShelfIndicator
     @AppStorage(AppPreferenceKey.hideNotchOnExternalDisplays) private var hideNotchOnExternalDisplays = PreferenceDefault.hideNotchOnExternalDisplays
     @AppStorage(AppPreferenceKey.hideNotchFromScreenshots) private var hideNotchFromScreenshots = PreferenceDefault.hideNotchFromScreenshots
+    @AppStorage(AppPreferenceKey.enableRightClickHide) private var enableRightClickHide = PreferenceDefault.enableRightClickHide
+    @AppStorage(AppPreferenceKey.enableHapticFeedback) private var enableHapticFeedback = PreferenceDefault.enableHapticFeedback
     @AppStorage(AppPreferenceKey.useDynamicIslandStyle) private var useDynamicIslandStyle = PreferenceDefault.useDynamicIslandStyle
     @AppStorage(AppPreferenceKey.useDynamicIslandTransparent) private var useDynamicIslandTransparent = PreferenceDefault.useDynamicIslandTransparent
     @AppStorage(AppPreferenceKey.externalDisplayUseDynamicIsland) private var externalDisplayUseDynamicIsland = PreferenceDefault.externalDisplayUseDynamicIsland
@@ -67,6 +69,9 @@ struct SettingsView: View {
     @State private var hoverAbout = false
     @State private var isCoffeeHovering = false
     @State private var isIntroHovering = false
+    @State private var isHardResetHovering = false
+    @State private var showHardResetConfirmation = false
+    @State private var hardResetIncludeClipboard = false
     @State private var scrollOffset: CGFloat = 0
     
     /// Extension to open from deep link (e.g., droppy://extension/ai-bg)
@@ -1382,6 +1387,24 @@ struct SettingsView: View {
                     // Apply the setting to the notch window
                     NotchWindowController.shared.updateScreenshotVisibility()
                 }
+                
+                Toggle(isOn: $enableRightClickHide) {
+                    VStack(alignment: .leading) {
+                        Text("Right-Click to Hide")
+                        Text("Show 'Hide Notch/Island' option in right-click menu")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                Toggle(isOn: $enableHapticFeedback) {
+                    VStack(alignment: .leading) {
+                        Text("Haptic Feedback")
+                        Text("Play haptic patterns when dropping files or performing actions")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             } header: {
                 Text("Accessibility")
             } footer: {
@@ -1440,125 +1463,143 @@ struct SettingsView: View {
             
             // MARK: About
             Section {
-            HStack(spacing: 14) {
-                // App Icon
-                if let appIcon = NSApp.applicationIconImage {
-                    Image(nsImage: appIcon)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 48, height: 48)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                HStack(spacing: 14) {
+                    // App Icon
+                    if let appIcon = NSApp.applicationIconImage {
+                        Image(nsImage: appIcon)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 48, height: 48)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Droppy")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                        Text("Version \(UpdateChecker.shared.currentVersion)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button {
+                        OnboardingWindowController.shared.show()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("Introduction")
+                                .fontWeight(.semibold)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.blue.opacity(isIntroHovering ? 1.0 : 0.8))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { hovering in
+                        withAnimation(DroppyAnimation.hover) {
+                            isIntroHovering = hovering
+                        }
+                    }
                 }
                 
-                VStack(alignment: .leading) {
-                    Text("Droppy")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text("Version \(UpdateChecker.shared.currentVersion)")
-                        .font(.subheadline)
+                LabeledContent("Developer", value: "Jordy Spruit")
+                
+                if let downloads = downloadCount {
+                    LabeledContent("Downloads", value: "\(downloads) Users")
+                }
+            } header: {
+                Text("About")
+            }
+            
+            // MARK: Support
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Hi, I'm Jordy — a solo developer building Droppy because I believe essential tools should be free.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    
+                    Text("I don't sell this app, but if you enjoy using it, a coffee would mean the world to me ❤️")
+                        .font(.callout)
                         .foregroundStyle(.secondary)
                 }
                 
-                Spacer()
-                
-                Button {
-                    OnboardingWindowController.shared.show()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text("Introduction")
-                            .fontWeight(.semibold)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Color.blue.opacity(isIntroHovering ? 1.0 : 0.8))
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-                .onHover { hovering in
-                    withAnimation(DroppyAnimation.hover) {
-                        isIntroHovering = hovering
+                Link(destination: URL(string: "https://buymeacoffee.com/droppy")!) {
+                    HStack {
+                        HStack(spacing: 8) {
+                            Image(systemName: "cup.and.saucer.fill")
+                                .font(.system(size: 14))
+                            Text("Buy me a coffee")
+                                .fontWeight(.medium)
+                        }
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
                     }
                 }
+            } header: {
+                Text("Support Development")
             }
-            .padding(.vertical, 8)
             
-            
-            LabeledContent("Developer", value: "Jordy Spruit")
-            
-            if let downloads = downloadCount {
-                LabeledContent {
-                    Text("\(downloads) Users")
-                } label: {
+            // MARK: Reset
+            Section {
+                Toggle(isOn: $hardResetIncludeClipboard) {
                     VStack(alignment: .leading) {
-                        Text("Downloads")
-                        Text("We do NOT store personal data. We ONLY track the total amount of downloads.")
+                        Text("Include Clipboard")
+                        Text("Also clear clipboard history when resetting")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
-            }
-            
-            Section {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .top, spacing: 14) {
-                        // Official BMC Logo (cached to prevent flashing)
-                        CachedAsyncImage(url: URL(string: "https://i.postimg.cc/MHxm3CKr/5c58570cfdd26f0001068f06-198x149-2x.avif")) { image in
-                             image.resizable()
-                                  .aspectRatio(contentMode: .fit)
-                        } placeholder: {
-                             Color.gray.opacity(0.3)
-                        }
-                        .frame(width: 44, height: 44) // Generic size container
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Support Development")
-                                .font(.headline)
-                            
-                            Text("Hi, I'm Jordy. I'm a solo developer building Droppy because I believe essential tools should be free.\n\nI don't sell this app, but if you enjoy using it, a coffee would mean the world to me. Thanks for your support! ❤️")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            
-                            Link(destination: URL(string: "https://buymeacoffee.com/droppy")!) {
-                                HStack(spacing: 8) {
-                                    Text("Buy me a coffee")
-                                        .fontWeight(.semibold)
-                                    Image(systemName: "arrow.up.right")
-                                        .font(.caption.weight(.semibold))
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                // BMC Yellow: #FFDD00
-                                .background(Color(red: 1.0, green: 0.867, blue: 0.0).opacity(isCoffeeHovering ? 1.0 : 0.9))
-                                .foregroundStyle(.black) // Black text for contrast on yellow
-                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .onHover { hovering in
-                                withAnimation(DroppyAnimation.hover) {
-                                    isCoffeeHovering = hovering
-                                }
-                            }
-                            .padding(.top, 4)
+                
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("Hard Reset")
+                        Text("Reset all Droppy settings to defaults")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(role: .destructive) {
+                        showHardResetConfirmation = true
+                    } label: {
+                        Text("Reset")
+                            .fontWeight(.semibold)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(isHardResetHovering ? 1.0 : 0.8))
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { hovering in
+                        withAnimation(DroppyAnimation.hover) {
+                            isHardResetHovering = hovering
                         }
                     }
                 }
-                .padding(.vertical, 8)
+            } header: {
+                Text("Troubleshooting")
+            } footer: {
+                Text("Use this if settings become stuck or broken after an update. Extensions will need to be reinstalled.")
             }
-        } header: {
-            Text("About")
+            .alert("Hard Reset Droppy?", isPresented: $showHardResetConfirmation) {
+                Button("Cancel", role: .cancel) {}
+                Button("Reset Everything", role: .destructive) {
+                    performHardReset()
+                }
+            } message: {
+                Text(hardResetIncludeClipboard
+                    ? "This will reset ALL settings and clear clipboard history. Droppy will restart."
+                    : "This will reset ALL settings (clipboard history will be preserved). Droppy will restart.")
+            }
         }
         .onAppear {
             Task {
@@ -1567,10 +1608,139 @@ struct SettingsView: View {
                 }
             }
         }
-        }
     }
     
     @State private var downloadCount: Int?
+    
+    // MARK: - Hard Reset
+    
+    /// Performs a complete reset of all Droppy settings
+    /// This is designed to be 100% reliable - clears EVERYTHING
+    private func performHardReset() {
+        print("[HardReset] Starting complete reset...")
+        
+        // Get the bundle identifier
+        guard let bundleID = Bundle.main.bundleIdentifier else {
+            print("[HardReset] ERROR: Failed to get bundle identifier")
+            return
+        }
+        
+        // STEP 1: Backup clipboard data if user wants to preserve it
+        var clipboardBackup: [String: Any] = [:]
+        var clipboardFileBackup: URL?
+        
+        if !hardResetIncludeClipboard {
+            // Backup clipboard history from UserDefaults
+            if let defaults = UserDefaults.standard.persistentDomain(forName: bundleID) {
+                // Common clipboard key patterns
+                let clipboardKeys = defaults.keys.filter { key in
+                    key.lowercased().contains("clipboard")
+                }
+                for key in clipboardKeys {
+                    if let value = defaults[key] {
+                        clipboardBackup[key] = value
+                    }
+                }
+            }
+            
+            // Backup clipboard persistence file if it exists
+            let paths = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            let clipboardFile = paths[0].appendingPathComponent("Droppy/clipboard.json")
+            if FileManager.default.fileExists(atPath: clipboardFile.path) {
+                let tempBackup = FileManager.default.temporaryDirectory.appendingPathComponent("clipboard_backup.json")
+                try? FileManager.default.copyItem(at: clipboardFile, to: tempBackup)
+                clipboardFileBackup = tempBackup
+            }
+            
+            print("[HardReset] Backed up clipboard data (\(clipboardBackup.count) keys)")
+        }
+        
+        // STEP 2: Clear ALL UserDefaults for this app
+        UserDefaults.standard.removePersistentDomain(forName: bundleID)
+        UserDefaults.standard.synchronize()
+        print("[HardReset] Cleared UserDefaults")
+        
+        // STEP 3: Clear NSStatusItem position cache (system-level)
+        // These are stored with prefix "NSStatusItem Preferred Position"
+        let statusItemKeys = [
+            "NSStatusItem Preferred Position DroppyMenuBarToggle",
+            "NSStatusItem Preferred Position DroppyMenuBarDivider",
+            "NSStatusItem Preferred Position DroppyStatusItem"
+        ]
+        for key in statusItemKeys {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+        UserDefaults.standard.synchronize()
+        print("[HardReset] Cleared status item positions")
+        
+        // STEP 4: Clear Application Support folder
+        let paths = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+        let appSupportDir = paths[0].appendingPathComponent("Droppy", isDirectory: true)
+        
+        if hardResetIncludeClipboard {
+            // Delete entire Droppy folder
+            try? FileManager.default.removeItem(at: appSupportDir)
+            print("[HardReset] Deleted entire Application Support/Droppy folder")
+        } else {
+            // Delete everything EXCEPT clipboard files
+            if let contents = try? FileManager.default.contentsOfDirectory(at: appSupportDir, includingPropertiesForKeys: nil) {
+                for item in contents {
+                    let filename = item.lastPathComponent.lowercased()
+                    // Keep clipboard-related files
+                    if !filename.contains("clipboard") {
+                        try? FileManager.default.removeItem(at: item)
+                    }
+                }
+            }
+            // Still delete images folder if clearing clipboard
+            let imagesDir = appSupportDir.appendingPathComponent("images", isDirectory: true)
+            if hardResetIncludeClipboard {
+                try? FileManager.default.removeItem(at: imagesDir)
+            }
+            print("[HardReset] Deleted Application Support contents (preserved clipboard)")
+        }
+        
+        // STEP 5: Restore clipboard if preserved
+        if !hardResetIncludeClipboard {
+            // Restore UserDefaults clipboard keys
+            for (key, value) in clipboardBackup {
+                UserDefaults.standard.set(value, forKey: key)
+            }
+            UserDefaults.standard.synchronize()
+            
+            // Restore clipboard file if backed up
+            if let backupURL = clipboardFileBackup {
+                let clipboardFile = appSupportDir.appendingPathComponent("clipboard.json")
+                try? FileManager.default.createDirectory(at: appSupportDir, withIntermediateDirectories: true)
+                try? FileManager.default.moveItem(at: backupURL, to: clipboardFile)
+            }
+            
+            print("[HardReset] Restored clipboard data")
+        }
+        
+        // STEP 6: Clear Caches
+        if let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {
+            let droppyCaches = cachesDir.appendingPathComponent(bundleID, isDirectory: true)
+            try? FileManager.default.removeItem(at: droppyCaches)
+            print("[HardReset] Cleared caches")
+        }
+        
+        print("[HardReset] ✅ Reset complete - restarting app...")
+        
+        // STEP 7: Restart app
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            // Relaunch the app using the bundle path
+            let url = URL(fileURLWithPath: Bundle.main.resourcePath!)
+            let appPath = url.deletingLastPathComponent().deletingLastPathComponent().absoluteString
+            let task = Process()
+            task.launchPath = "/usr/bin/open"
+            task.arguments = [appPath]
+            task.launch()
+            
+            // Quit current instance
+            NSApp.terminate(nil)
+        }
+    }
     
     // MARK: - Clipboard
     @AppStorage(AppPreferenceKey.enableClipboard) private var enableClipboard = PreferenceDefault.enableClipboard
@@ -2097,6 +2267,7 @@ struct SwipeGestureInfoButton: View {
 
 /// Info button explaining right-click to hide and show
 struct NotchShelfInfoButton: View {
+    @AppStorage(AppPreferenceKey.enableRightClickHide) private var enableRightClickHide = PreferenceDefault.enableRightClickHide
     @State private var showPopover = false
     
     var body: some View {
@@ -2123,8 +2294,10 @@ struct NotchShelfInfoButton: View {
                         .foregroundStyle(.secondary)
                     
                     VStack(alignment: .leading, spacing: 6) {
-                        Label("Right-click to hide the notch/island", systemImage: "cursorarrow.click.2")
-                        Label("Right-click the area again to show", systemImage: "eye")
+                        if enableRightClickHide {
+                            Label("Right-click to hide the notch/island", systemImage: "cursorarrow.click.2")
+                            Label("Right-click the area again to show", systemImage: "eye")
+                        }
                         Label("Or use the menu bar icon", systemImage: "menubar.arrow.up.rectangle")
                     }
                     .font(.caption)
@@ -2133,6 +2306,7 @@ struct NotchShelfInfoButton: View {
                 .padding()
                 .frame(width: 280)
             }
+
     }
 }
 
@@ -2339,7 +2513,7 @@ struct AutoCleanInfoButton: View {
                     
                     VStack(alignment: .leading, spacing: 6) {
                         Label("Clears item from shelf/basket", systemImage: "xmark.circle")
-                        Label("Original file is NOT deleted", systemImage: "doc.badge.checkmark")
+                        Label("Original file is NOT deleted", systemImage: "doc.text")
                         Label("Keeps your shelf tidy", systemImage: "sparkles")
                     }
                     .font(.caption)

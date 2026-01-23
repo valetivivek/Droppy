@@ -187,9 +187,8 @@ struct DroppedItemView: View {
         }
         .draggable(item)
         .task {
-            // Load thumbnail with slight delay for staggered effect
-            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
-            thumbnail = await item.generateThumbnail(size: CGSize(width: 128, height: 128))
+            // Load thumbnail from cache (no delay - cache handles throttling)
+            thumbnail = await ThumbnailCache.shared.loadThumbnailAsync(for: item, size: CGSize(width: 128, height: 128))
         }
         .animation(DroppyAnimation.bouncy, value: isSelected)
     }

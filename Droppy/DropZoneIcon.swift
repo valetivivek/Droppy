@@ -40,8 +40,8 @@ struct DropZoneIcon: View {
                 .symbolRenderingMode(.hierarchical)
             
         case .airDrop:
-            // Clean AirDrop-style wireless icon
-            Image(systemName: "dot.radiowaves.left.and.right")
+            // Real AirDrop-style icon (matches settings tooltip)
+            Image(systemName: "airplayaudio")
                 .font(.system(size: iconSize, weight: .medium))
                 .foregroundStyle(airDropGradient)
                 .symbolRenderingMode(.hierarchical)

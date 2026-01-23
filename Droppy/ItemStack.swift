@@ -89,17 +89,21 @@ struct ItemStack: Identifiable, Hashable {
 
 extension ItemStack {
     /// Animation for stack expansion (items fanning out)
-    static let expandAnimation: Animation = .spring(response: 0.45, dampingFraction: 0.8)
+    /// Faster for large stacks to prevent lag
+    static let expandAnimation: Animation = .spring(response: 0.35, dampingFraction: 0.85)
     
     /// Animation for stack collapse
-    static let collapseAnimation: Animation = .spring(response: 0.3, dampingFraction: 0.95)
+    static let collapseAnimation: Animation = .spring(response: 0.25, dampingFraction: 0.95)
     
     /// Animation for hover peek (quick response)
     static let peekAnimation: Animation = .spring(response: 0.25, dampingFraction: 0.7)
     
     /// Stagger delay between items during expansion
+    /// CAPPED at 10 items to prevent lag with large stacks (40+ items)
     static func staggerDelay(for index: Int) -> Double {
-        Double(index) * 0.035 // 35ms between each item
+        // Cap at 10 items (350ms max total stagger)
+        let cappedIndex = min(index, 10)
+        return Double(cappedIndex) * 0.025 // 25ms between each (was 35ms)
     }
 }
 
@@ -109,27 +113,34 @@ extension AnyTransition {
     /// Transition for stack appearing/disappearing (symmetric bounce in/out)
     static var stackDrop: AnyTransition {
         .asymmetric(
-            insertion: .scale(scale: 0.6)
+            insertion: .scale(scale: 0.7)
                 .combined(with: .opacity)
-                .animation(.spring(response: 0.4, dampingFraction: 0.8)),
-            removal: .scale(scale: 0.6)
+                .animation(.spring(response: 0.3, dampingFraction: 0.85)),
+            removal: .scale(scale: 0.7)
                 .combined(with: .opacity)
-                .combined(with: .offset(y: 10))
-                .animation(.spring(response: 0.3, dampingFraction: 0.9))
+                .animation(.spring(response: 0.2, dampingFraction: 0.9))
         )
     }
     
     /// Transition for items expanding from stack
+    /// Optimized: no offset transitions to prevent layout jump during expansion
     static func stackExpand(index: Int) -> AnyTransition {
-        .asymmetric(
-            insertion: .scale(scale: 0.7)
-                .combined(with: .offset(y: -15))
+        // For large stacks (>10 items), use simple fade - no stagger
+        let isLargeStack = index > 10
+        
+        if isLargeStack {
+            // Simple fade for items beyond first 10 - no stagger, minimal animation
+            return .opacity.animation(.easeOut(duration: 0.15))
+        }
+        
+        // Use only scale + opacity (NO offset) to prevent layout jump
+        return .asymmetric(
+            insertion: .scale(scale: 0.85)
                 .combined(with: .opacity)
-                .animation(ItemStack.expandAnimation.delay(ItemStack.staggerDelay(for: index))),
-            removal: .scale(scale: 0.7)
-                .combined(with: .offset(y: 10))
+                .animation(.easeOut(duration: 0.2).delay(ItemStack.staggerDelay(for: index))),
+            removal: .scale(scale: 0.85)
                 .combined(with: .opacity)
-                .animation(.spring(response: 0.25, dampingFraction: 0.9))
+                .animation(.easeOut(duration: 0.15))
         )
     }
 }

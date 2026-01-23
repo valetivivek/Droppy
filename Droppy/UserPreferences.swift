@@ -30,6 +30,7 @@ enum AppPreferenceKey {
     static let enableProgressiveBlur = "enableProgressiveBlur"
     static let autoHideOnFullscreen = "autoHideOnFullscreen"
     static let enableParallaxEffect = "enableParallaxEffect"
+    static let enableRightClickHide = "enableRightClickHide"
     
     // MARK: - Media Player
     static let showMediaPlayer = "showMediaPlayer"
@@ -76,6 +77,7 @@ enum AppPreferenceKey {
     static let showOpenShelfIndicator = "showOpenShelfIndicator"
     static let showDropIndicator = "showDropIndicator"  // Legacy
     static let enableIdleFace = "enableIdleFace"
+    static let enableHapticFeedback = "enableHapticFeedback"
     
     // MARK: - System
     static let showInMenuBar = "showInMenuBar"
@@ -126,6 +128,8 @@ enum PreferenceDefault {
     static let enableProgressiveBlur = true  // iOS-style progressive blur around notch
     static let autoHideOnFullscreen = true   // Hide notch in fullscreen apps/games
     static let enableParallaxEffect = true   // 3D parallax tilt on hover (album art, etc.)
+    static let enableRightClickHide = false  // Right-click to quickly hide notch/island
+    static let enableHapticFeedback = true   // Haptic feedback for trackpad (on by default)
     
     // MARK: - Media Player
     static let showMediaPlayer = true

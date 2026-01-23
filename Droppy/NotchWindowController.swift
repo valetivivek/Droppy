@@ -568,6 +568,10 @@ final class NotchWindowController: NSObject, ObservableObject {
             
             // Check if right-click is in the notch zone
             if clickZone.contains(mouseLocation) {
+                // Only hide if the preference is enabled (default: false)
+                let enableRightClickHide = UserDefaults.standard.bool(forKey: AppPreferenceKey.enableRightClickHide)
+                guard enableRightClickHide else { return }
+                
                 // Right-click on notch - temporarily hide it
                 DispatchQueue.main.async {
                     self.setTemporarilyHidden(true)
@@ -613,6 +617,10 @@ final class NotchWindowController: NSObject, ObservableObject {
                 )
                 
                 if clickZone.contains(mouseLocation) {
+                    // Only hide if the preference is enabled (default: false)
+                    let enableRightClickHide = UserDefaults.standard.bool(forKey: AppPreferenceKey.enableRightClickHide)
+                    guard enableRightClickHide else { return event }
+                    
                     // Right-click on notch - temporarily hide it
                     DispatchQueue.main.async {
                         self.setTemporarilyHidden(true)

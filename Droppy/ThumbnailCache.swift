@@ -186,6 +186,52 @@ final class ThumbnailCache {
         return item.icon
     }
     
+    // MARK: - Batch Preloading (Performance Optimization)
+    
+    /// Maximum concurrent QuickLook thumbnail generations
+    /// Too high overwhelms the system, too low is slow
+    private static let maxConcurrentThumbnails = 6
+    
+    /// Preload thumbnails for multiple items concurrently with throttling
+    /// Uses TaskGroup with concurrency limit to prevent system overload
+    /// - Parameters:
+    ///   - items: Array of items to preload thumbnails for
+    ///   - size: Thumbnail size (default 120x120)
+    ///   - onThumbnailLoaded: Optional callback for each loaded thumbnail (on MainActor)
+    func preloadThumbnails(
+        for items: [DroppedItem],
+        size: CGSize = CGSize(width: 120, height: 120),
+        onThumbnailLoaded: ((UUID, NSImage) -> Void)? = nil
+    ) async {
+        // Filter to only items that need loading
+        let itemsNeedingLoad = items.filter { cachedThumbnail(for: $0) == nil }
+        
+        guard !itemsNeedingLoad.isEmpty else { return }
+        
+        // Use TaskGroup with concurrency control via chunking
+        let chunks = itemsNeedingLoad.chunked(into: Self.maxConcurrentThumbnails)
+        
+        for chunk in chunks {
+            await withTaskGroup(of: (UUID, NSImage?).self) { group in
+                for item in chunk {
+                    group.addTask {
+                        let thumbnail = await self.loadThumbnailAsync(for: item, size: size)
+                        return (item.id, thumbnail)
+                    }
+                }
+                
+                // Process results as they complete
+                for await (id, thumbnail) in group {
+                    if let thumb = thumbnail, let callback = onThumbnailLoaded {
+                        await MainActor.run {
+                            callback(id, thumb)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     /// Get system icon for a file path (cached, very fast)
     func cachedIcon(forPath path: String) -> NSImage {
         let cacheKey = path as NSString
@@ -251,5 +297,18 @@ final class ThumbnailCache {
         cache.removeAllObjects()
         fileCache.removeAllObjects()
         iconCache.removeAllObjects()
+    }
+}
+
+// MARK: - Array Chunking Extension
+
+extension Array {
+    /// Splits array into chunks of specified size
+    /// Used for batching concurrent operations
+    func chunked(into size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0..<Swift.min($0 + size, count)])
+        }
     }
 }

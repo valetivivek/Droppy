@@ -23,7 +23,7 @@ struct ExpandedStackView: View {
     private let itemWidth: CGFloat = 70
     
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
             // Header with item count and collapse button
             expandedHeader
             
@@ -40,6 +40,7 @@ struct ExpandedStackView: View {
                 )
         )
         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+        .clipped() // Clip content during transitions to prevent overflow
         .compositingGroup() // Unity Standard for smooth animation
     }
     
@@ -219,13 +220,12 @@ struct ExpandedStackItemView: View {
             }
         }
         .task {
-            // Load thumbnail asynchronously
+            // Load thumbnail asynchronously - NO animation to prevent lag with many items
             if let cached = ThumbnailCache.shared.cachedThumbnail(for: item) {
                 thumbnail = cached
-            } else if let asyncThumb = await item.generateThumbnail() {
-                withAnimation(DroppyAnimation.hover) {
-                    thumbnail = asyncThumb
-                }
+            } else if let asyncThumb = await ThumbnailCache.shared.loadThumbnailAsync(for: item) {
+                // Direct state update without animation for performance
+                thumbnail = asyncThumb
             }
         }
     }

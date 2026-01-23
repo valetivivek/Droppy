@@ -197,6 +197,9 @@ struct MediaPlayerView: View {
     @ObservedObject private var capsLockManager = CapsLockManager.shared
     @ObservedObject private var dndManager = DNDManager.shared
     
+    // MARK: - Preferences
+    @AppStorage(AppPreferenceKey.enableRightClickHide) private var enableRightClickHide = PreferenceDefault.enableRightClickHide
+    
     // MARK: - Universal Inline HUD State
     // Handles all HUD types: volume, brightness, battery, caps lock, etc.
     @State private var inlineHUDType: InlineHUDType? = nil
@@ -370,14 +373,16 @@ struct MediaPlayerView: View {
                 }
             }
         }
-        // Right-click context menu to hide the notch/island (same as notch background)
+        // Right-click context menu - conditionally show hide option
         .contextMenu {
-            Button {
-                NotchWindowController.shared.setTemporarilyHidden(true)
-            } label: {
-                Label("Hide \(NotchWindowController.shared.displayModeLabel)", systemImage: "eye.slash")
+            if enableRightClickHide {
+                Button {
+                    NotchWindowController.shared.setTemporarilyHidden(true)
+                } label: {
+                    Label("Hide \(NotchWindowController.shared.displayModeLabel)", systemImage: "eye.slash")
+                }
+                Divider()
             }
-            Divider()
             Button {
                 SettingsWindowController.shared.showSettings()
             } label: {

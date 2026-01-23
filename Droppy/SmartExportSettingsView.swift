@@ -295,16 +295,40 @@ struct SmartExportSettingsRow: View {
     
     var body: some View {
         HStack(spacing: 8) {
-            // Info button with popover tooltip
-            Button { showPopover.toggle() } label: {
-                Image(systemName: "info.circle")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-                smartExportPopover
-            }
+            // Info button with popover tooltip (hover-to-show pattern)
+            Image(systemName: "info.circle")
+                .font(.system(size: 16))
+                .foregroundStyle(.secondary)
+                .frame(width: 20, height: 20)
+                .onTapGesture { showPopover.toggle() }
+                .onHover { hovering in
+                    showPopover = hovering
+                }
+                .popover(isPresented: $showPopover, arrowEdge: .leading) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.down.doc.fill")
+                                .font(.system(size: 24))
+                                .foregroundStyle(.blue)
+                            Text("Smart Export")
+                                .font(.headline)
+                        }
+                        
+                        Text("Automatically save processed files to designated folders.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Auto-save compressed files", systemImage: "arrow.down.doc")
+                            Label("Auto-save converted files", systemImage: "arrow.triangle.2.circlepath")
+                            Label("Choose destination per type", systemImage: "folder.badge.gearshape")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding()
+                    .frame(width: 280)
+                }
             
             if smartExportEnabled {
                 // Enabled State: Label + Configure Button (No Toggle)

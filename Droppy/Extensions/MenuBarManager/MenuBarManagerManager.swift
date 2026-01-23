@@ -69,6 +69,14 @@ final class MenuBarManager: ObservableObject {
     func enable() {
         guard !isEnabled else { return }
         
+        // FIX: Clear any stale removed state when explicitly enabling
+        // This fixes the singleton resurrection bug where init guard failed
+        // but user later tries to enable via Extensions UI
+        if ExtensionType.menuBarManager.isRemoved {
+            print("[MenuBarManager] Clearing stale removed state")
+            ExtensionType.menuBarManager.setRemoved(false)
+        }
+        
         isEnabled = true
         UserDefaults.standard.set(true, forKey: enabledKey)
         
@@ -137,6 +145,9 @@ final class MenuBarManager: ObservableObject {
             button.target = self
             button.action = #selector(toggleClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            print("[MenuBarManager] Toggle button configured with click action")
+        } else {
+            print("[MenuBarManager] ⚠️ WARNING: Toggle button is nil - clicks will not work!")
         }
         
         // Create the divider (expands to hide items)
@@ -148,6 +159,9 @@ final class MenuBarManager: ObservableObject {
             // Make divider nearly invisible - just a thin separator
             button.title = ""
             button.image = nil
+            print("[MenuBarManager] Divider configured")
+        } else {
+            print("[MenuBarManager] ⚠️ WARNING: Divider button is nil - expansion may not work!")
         }
         
         updateToggleIcon()
@@ -275,6 +289,26 @@ final class MenuBarManager: ObservableObject {
     
     @objc private func disableFromMenu() {
         disable()
+    }
+    
+    // MARK: - Diagnostics
+    
+    /// Print diagnostic information for troubleshooting
+    /// Call this from console or debug menu to diagnose issues
+    func printDiagnostics() {
+        print("[MenuBarManager] === DIAGNOSTICS ===")
+        print("  isRemoved: \(ExtensionType.menuBarManager.isRemoved)")
+        print("  isEnabled: \(isEnabled)")
+        print("  isExpanded: \(isExpanded)")
+        print("  toggleItem exists: \(toggleItem != nil)")
+        print("  toggleItem.button exists: \(toggleItem?.button != nil)")
+        print("  toggleItem.button.target set: \(toggleItem?.button?.target != nil)")
+        print("  toggleItem.button.action set: \(toggleItem?.button?.action != nil)")
+        print("  dividerItem exists: \(dividerItem != nil)")
+        print("  dividerItem.length: \(dividerItem?.length ?? -1)")
+        print("  UserDefaults enabledKey: \(UserDefaults.standard.bool(forKey: enabledKey))")
+        print("  UserDefaults expandedKey: \(UserDefaults.standard.object(forKey: expandedKey) ?? "nil")")
+        print("[MenuBarManager] === END DIAGNOSTICS ===")
     }
 }
 

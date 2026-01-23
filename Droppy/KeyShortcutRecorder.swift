@@ -102,10 +102,13 @@ struct KeyShortcutRecorder: View {
     func startRecording() {
         isRecording = true
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            // Ignore just modifier keys pressed alone
+            // Ignore modifier keys pressed alone (including Caps Lock)
+            // 54-55: Right/Left Command, 56: Left Shift, 57: Caps Lock
+            // 58: Left Option, 59: Left Control, 60: Right Shift
+            // 61: Right Option, 62: Right Control
             if event.keyCode == 54 || event.keyCode == 55 || event.keyCode == 56 || 
-               event.keyCode == 58 || event.keyCode == 59 || event.keyCode == 60 || 
-               event.keyCode == 61 || event.keyCode == 62 {
+               event.keyCode == 57 || event.keyCode == 58 || event.keyCode == 59 || 
+               event.keyCode == 60 || event.keyCode == 61 || event.keyCode == 62 {
                 return nil
             }
             
@@ -183,6 +186,7 @@ struct KeyCodeHelper {
         case 50: return "`"
         case 51: return "Delete"
         case 53: return "Esc"
+        case 57: return "⇪" // Caps Lock
         // Arrow keys
         case 123: return "←"
         case 124: return "→"

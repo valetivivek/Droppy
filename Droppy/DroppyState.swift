@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Observation
+import AppKit
 
 /// Main application state for the Droppy shelf
 @Observable
@@ -193,6 +194,46 @@ final class DroppyState {
         }
     }
     
+    /// Triggers auto-expansion of the shelf on the most appropriate screen
+    /// Called when items are added (from tracked folders, clipboard, etc.)
+    func triggerAutoExpand() {
+        // Run on main thread to ensure UI/Animation safety
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Check user preference (default: true)
+            let autoExpand = (UserDefaults.standard.object(forKey: AppPreferenceKey.autoExpandShelf) as? Bool) ?? true
+            guard autoExpand else { return }
+            
+            // Priority for expansion:
+            // 1. Existing expanded shelf (don't switch screens unexpectedly)
+            // 2. Screen with mouse cursor (user is likely looking here)
+            // 3. Main screen (fallback)
+            
+            var targetDisplayID: CGDirectDisplayID?
+            
+            if let current = self.expandedDisplayID {
+                targetDisplayID = current
+            } else {
+                // Find screen containing mouse
+                let mouseLocation = NSEvent.mouseLocation
+                // Note: NSEvent.mouseLocation is in global coordinates? No, it's screen coordinates.
+                // We just need to find which screen frame contains it.
+                if let screen = NSScreen.screens.first(where: { NSMouseInRect(mouseLocation, $0.frame, false) }) {
+                    targetDisplayID = screen.displayID
+                } else {
+                    targetDisplayID = NSScreen.main?.displayID
+                }
+            }
+            
+            if let displayID = targetDisplayID {
+                withAnimation(DroppyAnimation.interactive) {
+                    self.expandShelf(for: displayID)
+                }
+            }
+        }
+    }
+    
     /// Whether the floating basket is currently visible
     var isBasketVisible: Bool = false
     
@@ -328,6 +369,7 @@ final class DroppyState {
             guard !allExistingURLs.contains(item.url) else { return }
             shelfStacks.append(ItemStack(item: item))
         }
+        triggerAutoExpand()
         HapticFeedback.drop()
     }
     
@@ -341,15 +383,19 @@ final class DroppyState {
             
             // Check if item exists anywhere else - if so, remove it first
             for i in shelfStacks.indices {
-                if i != stackIndex {
+                if shelfStacks[i].id != stackId {
                     shelfStacks[i].items.removeAll { $0.url == item.url }
                 }
             }
             // Remove empty stacks
             shelfStacks.removeAll { $0.isEmpty }
             
+            // Re-find index after modifications (removeAll may have changed indices)
+            guard let newStackIndex = shelfStacks.firstIndex(where: { $0.id == stackId }) else { return }
+            
             // Add to the target stack
-            shelfStacks[stackIndex].items.append(item)
+            shelfStacks[newStackIndex].items.append(item)
+            triggerAutoExpand()
             return
         }
         
@@ -360,15 +406,18 @@ final class DroppyState {
             
             // Check if item exists anywhere else in basket - if so, remove it first
             for i in basketStacks.indices {
-                if i != stackIndex {
+                if basketStacks[i].id != stackId {
                     basketStacks[i].items.removeAll { $0.url == item.url }
                 }
             }
             // Remove empty stacks
             basketStacks.removeAll { $0.isEmpty }
             
+            // Re-find index after modifications (removeAll may have changed indices)
+            guard let newStackIndex = basketStacks.firstIndex(where: { $0.id == stackId }) else { return }
+            
             // Add to the target stack
-            basketStacks[stackIndex].items.append(item)
+            basketStacks[newStackIndex].items.append(item)
         }
     }
     
@@ -410,10 +459,12 @@ final class DroppyState {
             var stack = ItemStack(items: regularItems)
             stack.forceStackAppearance = forceStackAppearance
             shelfStacks.append(stack)
+            triggerAutoExpand()
             HapticFeedback.drop()
         }
         
         if !powerFolders.isEmpty {
+            triggerAutoExpand()
             HapticFeedback.drop()
         }
     }

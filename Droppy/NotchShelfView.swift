@@ -43,6 +43,7 @@ struct NotchShelfView: View {
     @AppStorage(AppPreferenceKey.useDynamicIslandTransparent) private var useDynamicIslandTransparent = PreferenceDefault.useDynamicIslandTransparent
     @AppStorage(AppPreferenceKey.enableAutoClean) private var enableAutoClean = PreferenceDefault.enableAutoClean
     @AppStorage(AppPreferenceKey.enableShelfAirDropZone) private var enableShelfAirDropZone = PreferenceDefault.enableShelfAirDropZone
+    @AppStorage(AppPreferenceKey.enableRightClickHide) private var enableRightClickHide = PreferenceDefault.enableRightClickHide
     
     // HUD State - Use @ObservedObject for singletons (they manage their own lifecycle)
     @ObservedObject private var volumeManager = VolumeManager.shared
@@ -611,8 +612,10 @@ struct NotchShelfView: View {
                 // NOTE: Auto-expand removed - drop handlers now explicitly expand the correct display
                 // This prevents multiple screens from racing to expand when items are added
                 
-                // Auto-collapse when shelf becomes empty
-                if newCount == 0 && state.isExpanded {
+                // Auto-collapse when shelf becomes TRULY empty
+                // Check both slot count AND actual arrays to avoid false positives during item moves
+                let isTrulyEmpty = state.shelfStacks.isEmpty && state.shelfPowerFolders.isEmpty
+                if newCount == 0 && state.isExpanded && isTrulyEmpty {
                     withAnimation(DroppyAnimation.expandClose) {
                         state.expandedDisplayID = nil
                     }
@@ -1401,12 +1404,14 @@ struct NotchShelfView: View {
                 Divider()
             }
             
-            Button {
-                NotchWindowController.shared.setTemporarilyHidden(true)
-            } label: {
-                Label("Hide \(isDynamicIslandMode ? "Dynamic Island" : "Notch")", systemImage: "eye.slash")
+            if enableRightClickHide {
+                Button {
+                    NotchWindowController.shared.setTemporarilyHidden(true)
+                } label: {
+                    Label("Hide \(isDynamicIslandMode ? "Dynamic Island" : "Notch")", systemImage: "eye.slash")
+                }
+                Divider()
             }
-            Divider()
             Button {
                 SettingsWindowController.shared.showSettings()
             } label: {

@@ -309,21 +309,17 @@ struct StackedItemView: View {
     // MARK: - Thumbnail Loading
     
     private func loadThumbnails() async {
-        // Load thumbnails for first 4 items asynchronously
+        // Load thumbnails for first 4 items using batch concurrent loading
         let itemsToLoad = Array(stack.items.prefix(4))
         
-        for item in itemsToLoad {
-            if let cached = ThumbnailCache.shared.cachedThumbnail(for: item) {
-                await MainActor.run {
-                    thumbnails[item.id] = cached
-                }
-            } else if let asyncThumb = await item.generateThumbnail() {
-                await MainActor.run {
-                    withAnimation(DroppyAnimation.hover) {
-                        thumbnails[item.id] = asyncThumb
-                    }
-                }
-            }
+        // Use batch preloading with callback to update state without animation
+        // This prevents QuickLook overload and eliminates animation lag
+        await ThumbnailCache.shared.preloadThumbnails(
+            for: itemsToLoad,
+            size: CGSize(width: 120, height: 120)
+        ) { [self] id, thumb in
+            // Direct state update - NO animation to prevent lag with many items
+            thumbnails[id] = thumb
         }
     }
 }
