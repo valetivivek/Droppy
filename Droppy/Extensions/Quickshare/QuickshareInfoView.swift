@@ -88,17 +88,22 @@ struct QuickshareInfoView: View {
     
     private var headerSection: some View {
         VStack(spacing: 12) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(Color.cyan.opacity(0.15))
-                    .frame(width: 64, height: 64)
-                
-                Image(systemName: "drop.fill")
-                    .font(.system(size: 30))
-                    .foregroundStyle(.cyan)
-                    .shadow(color: .cyan.opacity(0.4), radius: 4, y: 0)
+            // Icon from website
+            CachedAsyncImage(url: QuickshareExtension.iconURL) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                ZStack {
+                    Circle()
+                        .fill(Color.cyan.opacity(0.15))
+                    Image(systemName: "drop.fill")
+                        .font(.system(size: 30))
+                        .foregroundStyle(.cyan)
+                }
             }
+            .frame(width: 64, height: 64)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .shadow(color: Color.cyan.opacity(0.2), radius: 8, y: 4)
             
             HStack(alignment: .center, spacing: 10) {
