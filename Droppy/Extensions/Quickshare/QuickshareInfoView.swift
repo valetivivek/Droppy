@@ -229,16 +229,10 @@ struct QuickshareInfoView: View {
             } else {
                 // Unified List Card
                 VStack(spacing: 0) {
-                    ForEach(Array(manager.items.enumerated()), id: \.element.id) { index, item in
+                    ForEach(manager.items) { item in
                         itemRow(for: item)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
-                        
-                        if index < manager.items.count - 1 {
-                             Divider()
-                                .padding(.leading, 50)
-                                .overlay(Color.white.opacity(0.05))
-                        }
                     }
                 }
                 .padding(.vertical, 4)
