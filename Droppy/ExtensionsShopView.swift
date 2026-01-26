@@ -106,19 +106,20 @@ struct ExtensionsShopView: View {
                 }
             }
             
-            // Full-width hero: Window Snap
+            // Full-width hero: Quickshare (NEW)
             FeaturedExtensionCardWide(
-                title: "Window Snap",
-                subtitle: "Manage windows like a pro",
-                iconURL: "https://getdroppy.app/assets/icons/window-snap.jpg",
-                screenshotURL: "https://getdroppy.app/assets/images/window-snap-screenshot.png",
-                accentColor: .purple,
-                isInstalled: isWindowSnapInstalled,
-                features: ["Keyboard shortcuts", "Multi-monitor", "Edge snapping"]
+                title: "Droppy Quickshare",
+                subtitle: "Share files instantly",
+                iconURL: "https://getdroppy.app/assets/icons/quickshare.jpg",
+                screenshotURL: "https://getdroppy.app/assets/images/quickshare-screenshot.png",
+                accentColor: .cyan,
+                isInstalled: true,  // Core extension, always installed
+                features: ["Instant upload", "Auto-copy link", "Track expiry"],
+                isNew: true
             ) {
-                WindowSnapInfoView(
-                    installCount: extensionCounts["windowSnap"],
-                    rating: extensionRatings["windowSnap"]
+                QuickshareInfoView(
+                    installCount: extensionCounts["quickshare"],
+                    rating: extensionRatings["quickshare"]
                 )
             }
             
@@ -614,6 +615,7 @@ struct FeaturedExtensionCardWide<DetailView: View>: View {
     let accentColor: Color
     let isInstalled: Bool
     let features: [String]
+    var isNew: Bool = false
     let detailView: () -> DetailView
     
     @State private var showSheet = false
@@ -660,10 +662,24 @@ struct FeaturedExtensionCardWide<DetailView: View>: View {
                 // Content overlay
                 HStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 10) {
-                        // Title
-                        Text(title)
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundStyle(.white)
+                        // Title with optional NEW badge
+                        HStack(spacing: 8) {
+                            Text(title)
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(.white)
+                            
+                            if isNew {
+                                Text("NEW")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        Capsule()
+                                            .fill(accentColor)
+                                    )
+                            }
+                        }
                         
                         // Subtitle
                         Text(subtitle)
