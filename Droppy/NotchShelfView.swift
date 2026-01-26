@@ -526,7 +526,7 @@ struct NotchShelfView: View {
                             }) {
                                 Image(systemName: "arrow.up.forward.app")
                             }
-                            .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: isDynamicIslandMode, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
+                            .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseDynamicIslandTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
                             .help("Open in Terminal.app")
                             .transition(.scale(scale: 0.8).combined(with: .opacity))
                             
@@ -536,7 +536,7 @@ struct NotchShelfView: View {
                                 }) {
                                     Image(systemName: "arrow.counterclockwise")
                                 }
-                                .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: isDynamicIslandMode, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
+                                .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseDynamicIslandTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
                                 .help("Clear terminal output")
                                 .transition(.scale(scale: 0.8).combined(with: .opacity))
                             }
@@ -549,7 +549,7 @@ struct NotchShelfView: View {
                         }) {
                             Image(systemName: terminalManager.isVisible ? "xmark" : "terminal")
                         }
-                        .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: isDynamicIslandMode, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
+                        .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseDynamicIslandTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
                         .transition(.scale(scale: 0.8).combined(with: .opacity))
                     }
                     
@@ -563,7 +563,7 @@ struct NotchShelfView: View {
                         }) {
                             Image(systemName: "xmark")
                         }
-                        .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: isDynamicIslandMode, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
+                        .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseDynamicIslandTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
                     }
                 }
                 // Position exactly below the expanded content using SSOT gap
