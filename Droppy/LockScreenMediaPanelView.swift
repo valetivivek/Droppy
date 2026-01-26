@@ -54,10 +54,10 @@ struct LockScreenMediaPanelView: View {
                     
                     Spacer()
                     
-                    // Visualizer (4 bars like iPhone)
+                    // Visualizer (5 bars)
                     AudioSpectrumView(
                         isPlaying: musicManager.isPlaying,
-                        barCount: 4,
+                        barCount: 5,
                         barWidth: 3,
                         spacing: 2,
                         height: 20,
