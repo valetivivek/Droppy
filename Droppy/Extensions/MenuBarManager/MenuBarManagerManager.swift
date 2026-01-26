@@ -212,9 +212,15 @@ final class MenuBarManager: ObservableObject {
                 button.image = image
             }
         } else {
-            // Items hidden (collapsed) - show hollow circle with thicker stroke
-            if let image = NSImage(systemSymbolName: "circle", accessibilityDescription: "Show menu bar icons")?
+            // Items hidden (collapsed) - show hollow circle
+            // Using "circlebadge" which has a thicker, more visible stroke than "circle"
+            if let image = NSImage(systemSymbolName: "circlebadge", accessibilityDescription: "Show menu bar icons")?
                 .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 11, weight: .bold)) {
+                image.isTemplate = true
+                button.image = image
+            } else if let image = NSImage(systemSymbolName: "circle", accessibilityDescription: "Show menu bar icons")?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 14, weight: .heavy)) {
+                // Fallback to larger, heavier circle
                 image.isTemplate = true
                 button.image = image
             }
