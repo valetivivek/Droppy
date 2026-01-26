@@ -96,53 +96,38 @@ struct MenuBarItem: Identifiable, Equatable, Hashable {
             return []
         }
         
-        // Get the menu bar height to filter by Y position
-        guard let screen = NSScreen.main else {
-            print("[MenuBarItem] No main screen")
-            return []
-        }
-        let menuBarMaxY: CGFloat = 30 // Menu bar items are in top ~30 pixels
-        
-        // Multiple window levels that menu bar items can be at
-        let statusWindowLevel = Int(CGWindowLevelForKey(.statusWindow))
-        let mainMenuLevel = Int(CGWindowLevelForKey(.mainMenuWindow))
-        let popUpMenuLevel = Int(CGWindowLevelForKey(.popUpMenuWindow))
-        
-        print("[MenuBarItem] Scanning \(windowInfoList.count) windows for menu bar items")
-        print("[MenuBarItem] Status level: \(statusWindowLevel), MainMenu level: \(mainMenuLevel)")
+        print("[MenuBarItem] Scanning \(windowInfoList.count) total windows")
         
         var items: [MenuBarItem] = []
-        var debugItems: [(String, Int, CGRect)] = []
         
         for windowInfo in windowInfoList {
-            guard let layer = windowInfo[kCGWindowLayer as String] as? Int,
-                  let boundsDict = windowInfo[kCGWindowBounds as String] as? [String: CGFloat],
+            guard let boundsDict = windowInfo[kCGWindowBounds as String] as? [String: CGFloat],
                   let y = boundsDict["Y"],
                   let height = boundsDict["Height"],
-                  let width = boundsDict["Width"] else {
+                  let width = boundsDict["Width"],
+                  let x = boundsDict["X"] else {
                 continue
             }
             
             let ownerName = windowInfo[kCGWindowOwnerName as String] as? String ?? "Unknown"
+            let layer = windowInfo[kCGWindowLayer as String] as? Int ?? -1
             
-            // Track windows near the menu bar for debugging
-            if y < 50 && height < 50 && height > 0 && width > 0 {
-                debugItems.append((ownerName, layer, CGRect(
-                    x: boundsDict["X"] ?? 0,
-                    y: y,
-                    width: width,
-                    height: height
-                )))
+            // Menu bar items are:
+            // 1. At Y=0 (top of screen in Quartz coordinates)
+            // 2. Have height ~24 pixels (menu bar height)
+            // 3. Have positive width
+            let isAtTop = y >= 0 && y < 5  // Menu bar is at Y=0
+            let isMenuBarHeight = height >= 20 && height <= 30
+            let hasWidth = width > 5
+            
+            guard isAtTop && isMenuBarHeight && hasWidth else {
+                continue
             }
             
-            // Menu bar items should be:
-            // 1. Near the top of the screen (Y < menuBarMaxY)
-            // 2. At status window level OR main menu level
-            // 3. Have a reasonable size (height < 30, width > 0)
-            let isMenuBarHeight = y < menuBarMaxY && height > 0 && height < 40
-            let isMenuBarLevel = layer == statusWindowLevel || layer == mainMenuLevel || layer == 25 // 25 is common menu bar layer
-            
-            guard isMenuBarHeight && isMenuBarLevel else {
+            // Skip known system windows
+            if ownerName == "Window Server" || 
+               ownerName == "Dock" ||
+               ownerName == "Droppy" {
                 continue
             }
             
@@ -150,24 +135,10 @@ struct MenuBarItem: Identifiable, Equatable, Hashable {
                 continue
             }
             
-            // Skip Window Server
-            if item.ownerName == "Window Server" {
-                continue
-            }
-            
-            // Skip Droppy's own items
-            if item.ownerName == "Droppy" {
-                continue
-            }
-            
+            print("[MenuBarItem] Found: \(ownerName) at x=\(Int(x)) (layer \(layer))")
             items.append(item)
         }
         
-        // Debug output
-        print("[MenuBarItem] Found windows near menu bar:")
-        for (name, layer, frame) in debugItems {
-            print("  - \(name) (layer: \(layer)) frame: \(frame)")
-        }
         print("[MenuBarItem] Returning \(items.count) menu bar items")
         
         // Sort by X position (right to left in menu bar)
