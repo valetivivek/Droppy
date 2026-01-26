@@ -53,18 +53,19 @@ struct LockScreenMediaPanelView: View {
                             .lineLimit(1)
                     }
                     
-                    Spacer()
+                    Spacer(minLength: 8)
                     
-                    // Visualizer (5 bars) - at exact right edge (aligned with timestamp)
+                    // Visualizer (5 bars) - at right edge, uses album art color
                     AudioSpectrumView(
                         isPlaying: musicManager.isPlaying,
                         barCount: 5,
                         barWidth: 3,
                         spacing: 2,
                         height: 20,
-                        color: .white
+                        color: musicManager.visualizerColor
                     )
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(height: albumArtSize)
                 
                 // Row 2: Progress bar with timestamps
