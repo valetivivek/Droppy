@@ -3,21 +3,25 @@
 //  Droppy
 //
 //  Creates an overlay window that covers (hides) selected menu bar items
-//  This allows us to "hide" items by drawing over them at the menu bar level
+//  Uses a simple approach: draws a solid bar that extends from the left edge
+//  to just before the Droppy divider position
 //
 
 import SwiftUI
 import AppKit
 
-/// A panel that overlays the menu bar to visually hide selected items
+/// A panel that overlays the menu bar to visually hide items to the left of the divider
 @MainActor
 class MenuBarCoverPanel: NSPanel {
     
-    /// The items currently being covered (hidden)
-    private var coveredItems: [MenuBarItem] = []
+    /// The width of the cover (how far from left edge to cover)
+    private var coverWidth: CGFloat = 0
     
-    /// Timer to update cover positions as items may move
+    /// Timer to update cover
     private var updateTimer: Timer?
+    
+    /// Reference to items being covered
+    private var coveredOwnerNames: Set<String> = []
     
     init() {
         super.init(
@@ -27,51 +31,66 @@ class MenuBarCoverPanel: NSPanel {
             defer: false
         )
         
-        // Critical: Position above menu bar items
-        self.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.statusWindow)) + 1)
-        self.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresHidden]
+        // Critical: Position ABOVE menu bar items (status window level + 2)
+        self.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.statusWindow)) + 2)
+        self.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresHidden, .fullScreenAuxiliary]
         self.backgroundColor = .clear
         self.isOpaque = false
         self.hasShadow = false
-        self.ignoresMouseEvents = true // Let clicks pass through to what's underneath
+        self.ignoresMouseEvents = true // Let clicks pass through
         self.isReleasedWhenClosed = false
         
-        print("[MenuBarCoverPanel] Initialized")
+        print("[MenuBarCoverPanel] Initialized with level: \(self.level.rawValue)")
     }
     
-    /// Update the cover to hide the specified items
-    func updateCover(for items: [MenuBarItem]) {
-        self.coveredItems = items
+    /// Update the cover to hide the specified items by owner name
+    func updateCover(forOwnerNames ownerNames: Set<String>) {
+        self.coveredOwnerNames = ownerNames
         
-        guard !items.isEmpty else {
+        guard !ownerNames.isEmpty else {
             orderOut(nil)
             return
         }
         
         // Get the menu bar screen
-        guard let screen = NSScreen.main else { return }
+        guard let screen = NSScreen.main else { 
+            print("[MenuBarCoverPanel] No main screen")
+            return 
+        }
         
-        // Calculate the union of all item frames
-        var coverRegions: [NSRect] = []
+        // Get all menu bar items and find the ones we need to cover
+        let allItems = MenuBarItem.getMenuBarItems()
+        let itemsToCover = allItems.filter { ownerNames.contains($0.ownerName) }
         
-        for item in items {
-            // Convert from CoreGraphics coordinates (top-left origin) to AppKit (bottom-left origin)
+        guard !itemsToCover.isEmpty else {
+            print("[MenuBarCoverPanel] No items found to cover")
+            orderOut(nil)
+            return
+        }
+        
+        // Calculate cover regions for each item
+        // CoreGraphics uses top-left origin, AppKit uses bottom-left
+        var coverRects: [CGRect] = []
+        
+        for item in itemsToCover {
+            // Convert CG frame to AppKit frame
             let cgFrame = item.frame
-            let appKitY = screen.frame.height - cgFrame.origin.y - cgFrame.height
-            let frame = NSRect(
+            // Y in CG: 0 = top of screen
+            // Y in AppKit: 0 = bottom of screen
+            let appKitY = screen.frame.height - cgFrame.maxY
+            
+            let rect = CGRect(
                 x: cgFrame.origin.x,
                 y: appKitY,
                 width: cgFrame.width,
                 height: cgFrame.height
             )
-            coverRegions.append(frame)
+            coverRects.append(rect)
+            print("[MenuBarCoverPanel] Item '\(item.ownerName)' frame CG: \(cgFrame) -> AppKit: \(rect)")
         }
         
-        // Create the cover view
-        let coverView = MenuBarCoverView(regions: coverRegions, screen: screen)
-        
-        // Size the panel to cover the entire menu bar area
-        let menuBarHeight: CGFloat = 37 // Standard menu bar height + buffer
+        // Set panel frame to cover the entire menu bar
+        let menuBarHeight: CGFloat = 37
         let panelFrame = NSRect(
             x: screen.frame.origin.x,
             y: screen.frame.maxY - menuBarHeight,
@@ -80,21 +99,35 @@ class MenuBarCoverPanel: NSPanel {
         )
         
         setFrame(panelFrame, display: false)
+        
+        // Create view with cover rectangles (convert to panel-local coordinates)
+        let localRects = coverRects.map { rect -> CGRect in
+            CGRect(
+                x: rect.origin.x - panelFrame.origin.x,
+                y: rect.origin.y - panelFrame.origin.y,
+                width: rect.width,
+                height: rect.height
+            )
+        }
+        
+        let coverView = SimpleMenuBarCoverView(rects: localRects)
         contentView = NSHostingView(rootView: coverView)
         
         orderFrontRegardless()
         
-        print("[MenuBarCoverPanel] Covering \(items.count) items")
+        print("[MenuBarCoverPanel] Covering \(itemsToCover.count) items, panel frame: \(panelFrame)")
     }
     
     /// Start auto-updating the cover positions
     func startAutoUpdate() {
         updateTimer?.invalidate()
-        updateTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        updateTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.refreshCover()
+                guard let self, !self.coveredOwnerNames.isEmpty else { return }
+                self.updateCover(forOwnerNames: self.coveredOwnerNames)
             }
         }
+        print("[MenuBarCoverPanel] Auto-update started")
     }
     
     /// Stop auto-updating
@@ -103,69 +136,41 @@ class MenuBarCoverPanel: NSPanel {
         updateTimer = nil
     }
     
-    /// Refresh the cover based on current item positions
-    private func refreshCover() {
-        // Get fresh positions for currently covered items
-        let allItems = MenuBarItem.getMenuBarItems()
-        let ownerNames = Set(coveredItems.map { $0.ownerName })
-        
-        // Find updated positions for our covered items
-        let updatedItems = allItems.filter { ownerNames.contains($0.ownerName) }
-        
-        // Deduplicate by owner
-        var seen = Set<String>()
-        let uniqueItems = updatedItems.filter { item in
-            if seen.contains(item.ownerName) { return false }
-            seen.insert(item.ownerName)
-            return true
-        }
-        
-        updateCover(for: uniqueItems)
-    }
-    
     /// Clear the cover (show all items)
     func clearCover() {
-        coveredItems = []
+        coveredOwnerNames = []
         orderOut(nil)
         print("[MenuBarCoverPanel] Cover cleared")
     }
 }
 
-/// SwiftUI view that draws covers over specific regions
-struct MenuBarCoverView: View {
-    let regions: [NSRect]
-    let screen: NSScreen
+/// Simple SwiftUI view that draws solid rectangles to cover items
+struct SimpleMenuBarCoverView: View {
+    let rects: [CGRect]
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Draw cover rectangles for each region
-                ForEach(Array(regions.enumerated()), id: \.offset) { _, region in
-                    // Convert region to local coordinates
-                    let localX = region.origin.x - screen.frame.origin.x
-                    let localY = geometry.size.height - (region.origin.y - (screen.frame.maxY - geometry.size.height)) - region.height
-                    
-                    // Sample the menu bar background color and use it
-                    menuBarBackgroundColor()
-                        .frame(width: region.width + 4, height: region.height + 2)
-                        .position(
-                            x: localX + region.width / 2,
-                            y: localY + region.height / 2
-                        )
-                }
+        Canvas { context, size in
+            // Get the menu bar background color based on appearance
+            let isDarkMode = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let coverColor = isDarkMode 
+                ? Color(nsColor: NSColor(white: 0.15, alpha: 1.0))  // Dark mode menu bar
+                : Color(nsColor: NSColor(white: 0.98, alpha: 1.0))  // Light mode menu bar
+            
+            for rect in rects {
+                // Draw a solid rectangle with slight padding
+                let paddedRect = CGRect(
+                    x: rect.origin.x - 2,
+                    y: size.height - rect.origin.y - rect.height - 2,
+                    width: rect.width + 4,
+                    height: rect.height + 4
+                )
+                
+                context.fill(
+                    Path(roundedRect: paddedRect, cornerRadius: 0),
+                    with: .color(coverColor)
+                )
             }
         }
         .ignoresSafeArea()
-    }
-    
-    /// Get the appropriate menu bar background color
-    private func menuBarBackgroundColor() -> Color {
-        // Match the menu bar appearance
-        // In dark mode, menu bar is dark; in light mode, it's light
-        if NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
-            return Color(nsColor: NSColor(white: 0.2, alpha: 1.0))
-        } else {
-            return Color(nsColor: NSColor(white: 0.95, alpha: 1.0))
-        }
     }
 }

@@ -467,30 +467,11 @@ final class MenuBarManager: ObservableObject {
         // Get owner names of items that should be hidden (selected in Droppy Bar config)
         let selectedOwnerNames = droppyBarItemStore.enabledOwnerNames
         
-        guard !selectedOwnerNames.isEmpty else {
+        if selectedOwnerNames.isEmpty {
             coverPanel?.clearCover()
-            return
-        }
-        
-        // Get current menu bar items
-        let allItems = MenuBarItem.getMenuBarItems()
-        
-        // Find the items that match our selected owners
-        let itemsToHide = allItems.filter { selectedOwnerNames.contains($0.ownerName) }
-        
-        // Deduplicate by owner
-        var seen = Set<String>()
-        let uniqueItemsToHide = itemsToHide.filter { item in
-            if seen.contains(item.ownerName) { return false }
-            seen.insert(item.ownerName)
-            return true
-        }
-        
-        if !uniqueItemsToHide.isEmpty {
-            print("[MenuBarManager] Hiding \(uniqueItemsToHide.count) items: \(uniqueItemsToHide.map { $0.ownerName })")
-            coverPanel?.updateCover(for: uniqueItemsToHide)
         } else {
-            coverPanel?.clearCover()
+            print("[MenuBarManager] Hiding items: \(selectedOwnerNames)")
+            coverPanel?.updateCover(forOwnerNames: selectedOwnerNames)
         }
     }
     
