@@ -722,10 +722,22 @@ struct BasketItemView: View {
         // Move to Shelf (only when shelf is enabled)
         if enableNotchShelf {
             Button {
-                state.addItem(item)
-                state.removeBasketItemForTransfer(item)  // Transfer-safe: don't delete file
+                // Handle multi-selection: move all selected items if this item is selected
+                let itemsToMove = state.selectedBasketItems.contains(item.id) 
+                    ? state.basketItems.filter { state.selectedBasketItems.contains($0.id) }
+                    : [item]
+                
+                for moveItem in itemsToMove {
+                    state.addItem(moveItem)
+                    state.removeBasketItemForTransfer(moveItem)  // Transfer-safe: don't delete file
+                }
+                state.deselectAllBasket()
             } label: {
-                Label("Move to Shelf", systemImage: "arrow.up.to.line")
+                if state.selectedBasketItems.count > 1 && state.selectedBasketItems.contains(item.id) {
+                    Label("Move to Shelf (\(state.selectedBasketItems.count))", systemImage: "arrow.up.to.line")
+                } else {
+                    Label("Move to Shelf", systemImage: "arrow.up.to.line")
+                }
             }
         }
         
