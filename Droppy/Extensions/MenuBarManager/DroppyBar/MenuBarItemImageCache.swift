@@ -42,7 +42,11 @@ final class MenuBarItemImageCache: ObservableObject {
     
     private func startPeriodicUpdates() {
         // Update every 3 seconds like Ice does
-        updateTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+        updateTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] timer in
+            guard self != nil else {
+                timer.invalidate()
+                return
+            }
             Task { @MainActor [weak self] in
                 await self?.updateCache()
             }
@@ -89,6 +93,7 @@ final class MenuBarItemImageCache: ObservableObject {
     }
     
     /// Capture a single menu bar item's image
+    @available(macOS, deprecated: 14.0, message: "CGWindowListCreateImage is deprecated, ScreenCaptureKit to be used in future")
     private func captureItemImage(item: MenuBarItem, backingScaleFactor: CGFloat) -> CGImage? {
         // Use CGWindowListCreateImage with the specific window ID
         let windowID = item.windowID

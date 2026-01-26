@@ -142,8 +142,12 @@ final class MenuBarItemClicker {
     private func scheduleReturn() {
         returnTimer?.invalidate()
         
-        returnTimer = Timer.scheduledTimer(withTimeInterval: returnInterval, repeats: false) { [weak self] _ in
-            Task { @MainActor in
+        returnTimer = Timer.scheduledTimer(withTimeInterval: returnInterval, repeats: false) { [weak self] timer in
+            guard let self else {
+                timer.invalidate()
+                return
+            }
+            Task { @MainActor [weak self] in
                 self?.returnTempShownItems()
             }
         }
