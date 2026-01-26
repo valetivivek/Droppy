@@ -123,6 +123,7 @@ struct DroppyBarContentView: View {
     let closePanel: () -> Void
     
     @State private var items: [MenuBarItem] = []
+    @State private var showingConfiguration = false
     
     private var contentHeight: CGFloat {
         imageCache.menuBarHeight ?? 24
@@ -134,7 +135,7 @@ struct DroppyBarContentView: View {
                 if !CGPreflightScreenCaptureAccess() {
                     permissionNeededView
                 } else {
-                    emptyStateView
+                    configurePromptView
                 }
             } else {
                 ForEach(items) { item in
@@ -145,6 +146,9 @@ struct DroppyBarContentView: View {
                     )
                 }
             }
+            
+            // Configure button
+            configureButton
         }
         .frame(height: contentHeight)
         .padding(.horizontal, 7)
@@ -161,6 +165,12 @@ struct DroppyBarContentView: View {
         .onAppear {
             loadItems()
         }
+        .sheet(isPresented: $showingConfiguration) {
+            DroppyBarConfigView(onDismiss: {
+                showingConfiguration = false
+                loadItems()
+            })
+        }
     }
     
     private var permissionNeededView: some View {
@@ -174,24 +184,44 @@ struct DroppyBarContentView: View {
         .padding(.horizontal, 12)
     }
     
-    private var emptyStateView: some View {
-        Text("No menu bar items found")
+    private var configurePromptView: some View {
+        Text("Click + to add icons")
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 8)
+    }
+    
+    private var configureButton: some View {
+        Button {
+            showingConfiguration = true
+        } label: {
+            Image(systemName: "plus.circle")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 4)
+        .help("Configure Droppy Bar icons")
     }
     
     private func loadItems() {
-        // Get menu bar items - filter out system items
-        items = MenuBarItem.getMenuBarItems(onScreenOnly: false, activeSpaceOnly: true)
-            .filter { item in
-                // Skip system/utility items
-                item.ownerName != "Control Center" &&
-                item.ownerName != "Spotlight" &&
-                item.ownerName != "Dock" &&
-                item.ownerName != "SystemUIServer"
+        // Get all menu bar items
+        let allItems = MenuBarItem.getMenuBarItems(onScreenOnly: false, activeSpaceOnly: true)
+        
+        // Get configured bundle IDs from store
+        let configuredBundleIds = MenuBarManager.shared.getDroppyBarItemStore().enabledBundleIds
+        
+        // Filter to only show configured items
+        if configuredBundleIds.isEmpty {
+            items = []
+        } else {
+            items = allItems.filter { item in
+                guard let bundleId = item.owningApplication?.bundleIdentifier else { return false }
+                return configuredBundleIds.contains(bundleId)
             }
-        print("[DroppyBar] Loaded \(items.count) items")
+        }
+        
+        print("[DroppyBar] Showing \(items.count) configured items")
     }
 }
 

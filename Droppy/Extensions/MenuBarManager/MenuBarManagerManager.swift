@@ -101,6 +101,11 @@ final class MenuBarManager: ObservableObject {
     
     // MARK: - Public API
     
+    /// Get the Droppy Bar item store for configuration
+    func getDroppyBarItemStore() -> DroppyBarItemStore {
+        droppyBarItemStore
+    }
+    
     /// Enable the menu bar manager
     func enable() {
         guard !isEnabled else { return }
