@@ -2,8 +2,8 @@
 //  MenuBarItem.swift
 //  Droppy
 //
-//  Model for menu bar items using Ice's approach with private APIs.
-//  Uses CGSGetProcessMenuBarWindowList to get ALL menu bar items.
+//  Model for menu bar items using Ice's approach.
+//  Menu bar items are windows at kCGStatusWindowLevel (layer 25).
 //
 
 import Cocoa
@@ -22,7 +22,7 @@ struct MenuBarItem: Identifiable, Equatable, Hashable {
     /// The owning application's PID
     let ownerPID: pid_t
     
-    /// The frame of the item in screen coordinates (from CGSGetScreenRectForWindow)
+    /// The frame of the item in screen coordinates
     let frame: CGRect
     
     /// The owning application's bundle identifier
@@ -63,8 +63,11 @@ struct MenuBarItem: Identifiable, Equatable, Hashable {
             }
         }
         
-        // Default: use owner name or title
-        return ownerName.isEmpty ? (title ?? "Unknown") : ownerName
+        // Default: prefer title if available, otherwise use owner name
+        if let title = title, !title.isEmpty {
+            return title
+        }
+        return ownerName.isEmpty ? "Unknown" : ownerName
     }
     
     /// The owning application
@@ -74,34 +77,55 @@ struct MenuBarItem: Identifiable, Equatable, Hashable {
     
     // MARK: - Static Methods
     
-    /// Gets all menu bar items using CGSGetProcessMenuBarWindowList
-    /// This is the CORRECT way to get all menu bar items including system items
+    /// Gets all menu bar items by finding windows at kCGStatusWindowLevel
+    /// This is the key insight from Ice: menu bar items are at layer 25
     static func getMenuBarItems(onScreenOnly: Bool = true, activeSpaceOnly: Bool = true) -> [MenuBarItem] {
-        // Step 1: Get all menu bar window IDs via private API
-        let menuBarWindowIDs = WindowServer.getMenuBarWindowList()
+        // kCGStatusWindowLevel is 25 - this is where menu bar items live
+        let statusWindowLevel = Int(CGWindowLevelForKey(.statusWindow))
         
-        print("[MenuBarItem] CGSGetProcessMenuBarWindowList returned \(menuBarWindowIDs.count) windows")
+        print("[MenuBarItem] Looking for windows at layer \(statusWindowLevel) (kCGStatusWindowLevel)")
         
-        // Step 2: For each window ID, get frame and info
-        var items: [MenuBarItem] = []
+        // Get all windows
+        var options: CGWindowListOption = [.optionAll]
+        if onScreenOnly {
+            options = [.optionOnScreenOnly]
+        }
         
-        // Get window info for all windows to match with our menu bar window IDs
-        guard let allWindowInfo = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] else {
+        guard let allWindowInfo = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
             print("[MenuBarItem] CGWindowListCopyWindowInfo failed")
             return []
         }
         
-        // Create a lookup dictionary by window ID
-        var windowInfoByID: [CGWindowID: [String: Any]] = [:]
-        for info in allWindowInfo {
-            if let windowID = info[kCGWindowNumber as String] as? CGWindowID {
-                windowInfoByID[windowID] = info
-            }
-        }
+        print("[MenuBarItem] Scanning \(allWindowInfo.count) windows")
         
-        for windowID in menuBarWindowIDs {
-            // Get accurate frame from private API
-            guard let frame = WindowServer.getWindowFrame(windowID: windowID) else {
+        var items: [MenuBarItem] = []
+        
+        for info in allWindowInfo {
+            // Get layer - CRITICAL filter
+            guard let layer = info[kCGWindowLayer as String] as? Int else {
+                continue
+            }
+            
+            // Only include windows at status window level (layer 25)
+            guard layer == statusWindowLevel else {
+                continue
+            }
+            
+            guard let windowID = info[kCGWindowNumber as String] as? CGWindowID else {
+                continue
+            }
+            
+            // Get accurate frame from private API (more reliable than bounds dict)
+            let frame: CGRect
+            if let privateFrame = WindowServer.getWindowFrame(windowID: windowID) {
+                frame = privateFrame
+            } else if let boundsDict = info[kCGWindowBounds as String] as? [String: CGFloat],
+                      let x = boundsDict["X"],
+                      let y = boundsDict["Y"],
+                      let width = boundsDict["Width"],
+                      let height = boundsDict["Height"] {
+                frame = CGRect(x: x, y: y, width: width, height: height)
+            } else {
                 continue
             }
             
@@ -110,23 +134,12 @@ struct MenuBarItem: Identifiable, Equatable, Hashable {
                 continue
             }
             
-            // Get window info for this ID
-            guard let info = windowInfoByID[windowID] else {
-                continue
-            }
-            
             let ownerName = info[kCGWindowOwnerName as String] as? String ?? "Unknown"
             let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t ?? 0
             let title = info[kCGWindowName as String] as? String
-            let isOnScreen = info[kCGWindowIsOnscreen as String] as? Bool ?? false
             
-            // Skip our own items
-            if ownerName == "Droppy" {
-                continue
-            }
-            
-            // Apply onScreenOnly filter
-            if onScreenOnly && !isOnScreen {
+            // Skip our own items and Window Server
+            if ownerName == "Droppy" || ownerName == "Window Server" {
                 continue
             }
             
@@ -142,7 +155,7 @@ struct MenuBarItem: Identifiable, Equatable, Hashable {
                 bundleIdentifier: bundleID
             )
             
-            print("[MenuBarItem] Found: \(item.displayName) at x=\(Int(frame.minX)) w=\(Int(frame.width))")
+            print("[MenuBarItem] Found: '\(item.displayName)' owner=\(ownerName) at x=\(Int(frame.minX)) w=\(Int(frame.width)) layer=\(layer)")
             items.append(item)
         }
         
