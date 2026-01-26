@@ -2,8 +2,8 @@
 //  MenuBarItem.swift
 //  Droppy
 //
-//  Model for menu bar items, modeled after Ice's implementation.
-//  Provides access to window info, frame, and owner details.
+//  Model for menu bar items using Ice's approach with private APIs.
+//  Uses CGSGetProcessMenuBarWindowList to get ALL menu bar items.
 //
 
 import Cocoa
@@ -22,14 +22,11 @@ struct MenuBarItem: Identifiable, Equatable, Hashable {
     /// The owning application's PID
     let ownerPID: pid_t
     
-    /// The frame of the item in screen coordinates
+    /// The frame of the item in screen coordinates (from CGSGetScreenRectForWindow)
     let frame: CGRect
     
-    /// Whether the item is currently on screen
-    let isOnScreen: Bool
-    
-    /// The window layer
-    let layer: Int
+    /// The owning application's bundle identifier
+    let bundleIdentifier: String?
     
     // MARK: - Identifiable
     
@@ -37,9 +34,37 @@ struct MenuBarItem: Identifiable, Equatable, Hashable {
     
     // MARK: - Computed Properties
     
-    /// Display name for the item (owner name or title)
+    /// Display name for the item - follows Ice's naming logic
     var displayName: String {
-        title ?? ownerName
+        // Handle Control Center special titles like Ice does
+        if bundleIdentifier == "com.apple.controlcenter" {
+            switch title {
+            case "AccessibilityShortcuts": return "Accessibility Shortcuts"
+            case "BentoBox": return "Control Centre"
+            case "FocusModes": return "Focus"
+            case "KeyboardBrightness": return "Keyboard Brightness"
+            case "MusicRecognition": return "Music Recognition"
+            case "NowPlaying": return "Now Playing"
+            case "ScreenMirroring": return "Screen Mirroring"
+            case "StageManager": return "Stage Manager"
+            case "UserSwitcher": return "Fast User Switching"
+            case "WiFi": return "Wi-Fi"
+            default: return title ?? ownerName
+            }
+        }
+        
+        // Handle SystemUIServer special titles
+        if bundleIdentifier == "com.apple.systemuiserver" {
+            switch title {
+            case "TimeMachine.TMMenuExtraHost", "TimeMachineMenuExtra.TMMenuExtraHost":
+                return "Time Machine"
+            default:
+                break
+            }
+        }
+        
+        // Default: use owner name or title
+        return ownerName.isEmpty ? (title ?? "Unknown") : ownerName
     }
     
     /// The owning application
@@ -47,112 +72,77 @@ struct MenuBarItem: Identifiable, Equatable, Hashable {
         NSRunningApplication(processIdentifier: ownerPID)
     }
     
-    // MARK: - Initialization
-    
-    /// Creates a MenuBarItem from a window info dictionary
-    init?(windowInfo: [String: Any]) {
-        guard
-            let windowID = windowInfo[kCGWindowNumber as String] as? CGWindowID,
-            let ownerName = windowInfo[kCGWindowOwnerName as String] as? String,
-            let ownerPID = windowInfo[kCGWindowOwnerPID as String] as? pid_t,
-            let boundsDict = windowInfo[kCGWindowBounds as String] as? [String: CGFloat],
-            let x = boundsDict["X"],
-            let y = boundsDict["Y"],
-            let width = boundsDict["Width"],
-            let height = boundsDict["Height"]
-        else {
-            return nil
-        }
-        
-        self.windowID = windowID
-        self.title = windowInfo[kCGWindowName as String] as? String
-        self.ownerName = ownerName
-        self.ownerPID = ownerPID
-        self.frame = CGRect(x: x, y: y, width: width, height: height)
-        self.isOnScreen = (windowInfo[kCGWindowIsOnscreen as String] as? Bool) ?? false
-        self.layer = (windowInfo[kCGWindowLayer as String] as? Int) ?? 0
-    }
-    
-    /// Creates a MenuBarItem by looking up a window ID
-    init?(windowID: CGWindowID) {
-        guard let windowInfoList = CGWindowListCopyWindowInfo([.optionIncludingWindow], windowID) as? [[String: Any]],
-              let windowInfo = windowInfoList.first else {
-            return nil
-        }
-        self.init(windowInfo: windowInfo)
-    }
-    
     // MARK: - Static Methods
     
-    /// Gets all menu bar items
-    /// - Parameters:
-    ///   - onScreenOnly: If true, only returns items currently visible
-    ///   - activeSpaceOnly: If true, only returns items in the active space
-    /// - Returns: Array of MenuBarItem sorted by X position (right to left)
+    /// Gets all menu bar items using CGSGetProcessMenuBarWindowList
+    /// This is the CORRECT way to get all menu bar items including system items
     static func getMenuBarItems(onScreenOnly: Bool = true, activeSpaceOnly: Bool = true) -> [MenuBarItem] {
-        var options: CGWindowListOption = []
-        if onScreenOnly {
-            options.insert(.optionOnScreenOnly)
-        }
+        // Step 1: Get all menu bar window IDs via private API
+        let menuBarWindowIDs = WindowServer.getMenuBarWindowList()
         
-        guard let windowInfoList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
-            print("[MenuBarItem] CGWindowListCopyWindowInfo returned nil")
+        print("[MenuBarItem] CGSGetProcessMenuBarWindowList returned \(menuBarWindowIDs.count) windows")
+        
+        // Step 2: For each window ID, get frame and info
+        var items: [MenuBarItem] = []
+        
+        // Get window info for all windows to match with our menu bar window IDs
+        guard let allWindowInfo = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] else {
+            print("[MenuBarItem] CGWindowListCopyWindowInfo failed")
             return []
         }
         
-        print("[MenuBarItem] Scanning \(windowInfoList.count) total windows")
+        // Create a lookup dictionary by window ID
+        var windowInfoByID: [CGWindowID: [String: Any]] = [:]
+        for info in allWindowInfo {
+            if let windowID = info[kCGWindowNumber as String] as? CGWindowID {
+                windowInfoByID[windowID] = info
+            }
+        }
         
-        var items: [MenuBarItem] = []
-        
-        for windowInfo in windowInfoList {
-            guard let boundsDict = windowInfo[kCGWindowBounds as String] as? [String: CGFloat],
-                  let y = boundsDict["Y"],
-                  let height = boundsDict["Height"],
-                  let width = boundsDict["Width"],
-                  let x = boundsDict["X"] else {
+        for windowID in menuBarWindowIDs {
+            // Get accurate frame from private API
+            guard let frame = WindowServer.getWindowFrame(windowID: windowID) else {
                 continue
             }
             
-            let ownerName = windowInfo[kCGWindowOwnerName as String] as? String ?? "Unknown"
-            let layer = windowInfo[kCGWindowLayer as String] as? Int ?? -1
-            
-            // Menu bar items are at layer 25 (kCGStatusWindowLevel)
-            // This is the most reliable way to identify them
-            let isMenuBarLayer = layer == 25
-            
-            // Also allow layer 0 items that are in the menu bar area (for some third-party apps)
-            let isAtMenuBarTop = y >= 0 && y <= 30
-            let isReasonableSize = width > 5 && width < 200 && height > 10 && height < 50
-            
-            // Accept if it's at status window layer OR if it looks like a menu bar item
-            let isLikelyMenuBarItem = isMenuBarLayer || (layer == 0 && isAtMenuBarTop && isReasonableSize)
-            
-            guard isLikelyMenuBarItem else {
+            // Skip tiny/invalid windows
+            if frame.width < 5 || frame.height < 5 {
                 continue
             }
             
-            // Skip only our own items and the window server
-            if ownerName == "Window Server" || 
-               ownerName == "Droppy" ||
-               ownerName == "Wallpaper" {
+            // Get window info for this ID
+            guard let info = windowInfoByID[windowID] else {
                 continue
             }
             
-            // Skip items with invalid dimensions (0x0 or 1x1)
-            if width <= 1 || height <= 1 {
+            let ownerName = info[kCGWindowOwnerName as String] as? String ?? "Unknown"
+            let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t ?? 0
+            let title = info[kCGWindowName as String] as? String
+            let isOnScreen = info[kCGWindowIsOnscreen as String] as? Bool ?? false
+            
+            // Skip our own items
+            if ownerName == "Droppy" {
                 continue
             }
             
-            // Skip full screen windows
-            if let screenWidth = NSScreen.main?.frame.width, width >= screenWidth {
+            // Apply onScreenOnly filter
+            if onScreenOnly && !isOnScreen {
                 continue
             }
             
-            guard let item = MenuBarItem(windowInfo: windowInfo) else {
-                continue
-            }
+            // Get bundle identifier from running application
+            let bundleID = NSRunningApplication(processIdentifier: ownerPID)?.bundleIdentifier
             
-            print("[MenuBarItem] Found: \(ownerName) at x=\(Int(x)) y=\(Int(y)) w=\(Int(width)) h=\(Int(height)) layer=\(layer)")
+            let item = MenuBarItem(
+                windowID: windowID,
+                title: title,
+                ownerName: ownerName,
+                ownerPID: ownerPID,
+                frame: frame,
+                bundleIdentifier: bundleID
+            )
+            
+            print("[MenuBarItem] Found: \(item.displayName) at x=\(Int(frame.minX)) w=\(Int(frame.width))")
             items.append(item)
         }
         
@@ -162,21 +152,9 @@ struct MenuBarItem: Identifiable, Equatable, Hashable {
         return items.sorted { $0.frame.minX > $1.frame.minX }
     }
     
-    /// Gets menu bar items for a specific section (hidden vs visible)
-    /// - Parameter hidden: If true, returns hidden items; if false, returns visible items
-    /// - Returns: Array of MenuBarItem
-    static func getHiddenMenuBarItems() -> [MenuBarItem] {
-        // Get all items including offscreen
-        return getMenuBarItems(onScreenOnly: false, activeSpaceOnly: true)
-            .filter { !$0.isOnScreen }
-    }
-    
     /// Gets the current frame of a menu bar item by window ID
     static func getCurrentFrame(for windowID: CGWindowID) -> CGRect? {
-        guard let item = MenuBarItem(windowID: windowID) else {
-            return nil
-        }
-        return item.frame
+        WindowServer.getWindowFrame(windowID: windowID)
     }
 }
 

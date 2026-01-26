@@ -91,6 +91,17 @@ func CGSGetScreenRectForWindow(
     _ outRect: inout CGRect
 ) -> CGError
 
+// MARK: - Menu Bar Window List (KEY for detecting all menu bar items)
+
+@_silgen_name("CGSGetProcessMenuBarWindowList")
+func CGSGetProcessMenuBarWindowList(
+    _ cid: CGSConnectionID,
+    _ targetCID: CGSConnectionID,
+    _ count: Int32,
+    _ list: UnsafeMutablePointer<CGWindowID>,
+    _ outCount: inout Int32
+) -> CGError
+
 // MARK: - Helper Wrapper
 
 enum WindowServer {
@@ -113,5 +124,31 @@ enum WindowServer {
         var rect = CGRect.zero
         guard CGSGetScreenRectForWindow(CGSMainConnectionID(), windowID, &rect) == .success else { return nil }
         return rect
+    }
+    
+    /// Get all menu bar item window IDs using CGSGetProcessMenuBarWindowList
+    /// This is the KEY function that returns ALL menu bar items including system items
+    static func getMenuBarWindowList() -> [CGWindowID] {
+        var count: Int32 = 0
+        guard CGSGetWindowCount(CGSMainConnectionID(), 0, &count) == .success else { return [] }
+        
+        var list = [CGWindowID](repeating: 0, count: Int(count))
+        var outCount: Int32 = 0
+        
+        let result = CGSGetProcessMenuBarWindowList(
+            CGSMainConnectionID(),
+            0,  // 0 = all processes
+            count,
+            &list,
+            &outCount
+        )
+        
+        guard result == .success else {
+            print("[WindowServer] CGSGetProcessMenuBarWindowList failed")
+            return []
+        }
+        
+        print("[WindowServer] Found \(outCount) menu bar windows")
+        return Array(list.prefix(Int(outCount)))
     }
 }
