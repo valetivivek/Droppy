@@ -24,24 +24,21 @@ final class MenuBarManager: ObservableObject {
     /// Whether hidden icons are currently expanded (visible)
     @Published private(set) var isExpanded = true
     
-
-    
-    /// Whether the Droppy Bar is enabled (shows when expanding menu bar icons)
-    @Published var droppyBarEnabled: Bool = false {
+    /// Whether hover-to-reveal is enabled (on by default)
+    @Published var hoverToRevealEnabled: Bool = true {
         didSet {
-            UserDefaults.standard.set(droppyBarEnabled, forKey: droppyBarEnabledKey)
-            // Bar visibility is now controlled by isExpanded, not separate toggle
-            if droppyBarEnabled && isExpanded {
-                showDroppyBar()
+            UserDefaults.standard.set(hoverToRevealEnabled, forKey: hoverToRevealKey)
+            if hoverToRevealEnabled {
+                startHoverMonitoring()
             } else {
-                hideDroppyBar()
+                stopHoverMonitoring()
             }
         }
     }
     
     // MARK: - Status Items
     
-    /// The visible toggle button - always shows dot, click to toggle
+    /// The visible toggle button - always shows chevron, click to toggle
     private var toggleItem: NSStatusItem?
     
     /// The invisible divider that expands to push items off-screen
@@ -51,28 +48,35 @@ final class MenuBarManager: ObservableObject {
     private let toggleAutosaveName = "DroppyMenuBarToggle"
     private let dividerAutosaveName = "DroppyMenuBarDivider"
     
-    // MARK: - Droppy Bar
+    // MARK: - Hover Monitoring
     
-    /// The floating Droppy Bar panel
-    private var droppyBarPanel: DroppyBarPanel?
+    /// Global mouse move monitor for hover detection
+    private var mouseMonitor: Any?
     
-    /// Item store for Droppy Bar
-    private let droppyBarItemStore = DroppyBarItemStore()
+    /// Whether we are currently in a hover-expanded state (temporary expansion)
+    private var isHoverExpanded = false
     
-    /// Cover panel that hides selected menu bar items
-    private var coverPanel: MenuBarCoverPanel?
+    /// Timer to delay collapse for stability (debounce)
+    private var collapseTimer: Timer?
     
-    /// Combine cancellables for subscriptions
-    private var cancellables = Set<AnyCancellable>()
+    /// Delay before collapsing after mouse leaves (seconds)
+    private let collapseDelay: TimeInterval = 0.3
     
-
+    /// Threshold X position - mouse must be to the right of this to trigger hover reveal
+    /// This is the right side of the screen where menu bar icons live
+    private var hoverThresholdX: CGFloat {
+        guard let screen = NSScreen.main else { return 800 }
+        // Trigger when mouse is in the right 50% of screen (where menu bar icons typically are)
+        return screen.frame.width * 0.5
+    }
+    
     // MARK: - Constants
     
     /// Standard length for toggle (shows chevron)
     private let toggleLength: CGFloat = NSStatusItem.variableLength
     
-    /// Standard length for divider (shows icon)
-    private let dividerStandardLength: CGFloat = NSStatusItem.variableLength
+    /// Standard length for divider (thin, almost invisible)
+    private let dividerStandardLength: CGFloat = 1
     
     /// Expanded length to push items off-screen
     private let dividerExpandedLength: CGFloat = 10_000
@@ -81,8 +85,7 @@ final class MenuBarManager: ObservableObject {
     
     private let enabledKey = "menuBarManagerEnabled"
     private let expandedKey = "menuBarManagerExpanded"
-
-    private let droppyBarEnabledKey = "droppyBarEnabled"
+    private let hoverToRevealKey = "menuBarManagerHoverToReveal"
     
     // MARK: - Initialization
     
@@ -90,27 +93,19 @@ final class MenuBarManager: ObservableObject {
         // Only start if extension is not removed
         guard !ExtensionType.menuBarManager.isRemoved else { return }
         
-
-        
-        // Load Droppy Bar preference (don't trigger didSet during init)
-        let savedDroppyBarEnabled = UserDefaults.standard.bool(forKey: droppyBarEnabledKey)
+        // Load hover preference (default to true)
+        if UserDefaults.standard.object(forKey: hoverToRevealKey) != nil {
+            hoverToRevealEnabled = UserDefaults.standard.bool(forKey: hoverToRevealKey)
+        } else {
+            hoverToRevealEnabled = true
+        }
         
         if UserDefaults.standard.bool(forKey: enabledKey) {
             enable()
         }
-        
-        // Show Droppy Bar after setup if it was enabled
-        if savedDroppyBarEnabled {
-            droppyBarEnabled = true
-        }
     }
     
     // MARK: - Public API
-    
-    /// Get the Droppy Bar item store for configuration
-    func getDroppyBarItemStore() -> DroppyBarItemStore {
-        droppyBarItemStore
-    }
     
     /// Enable the menu bar manager
     func enable() {
@@ -130,12 +125,6 @@ final class MenuBarManager: ObservableObject {
         // Create both status items
         createStatusItems()
         
-        // Create cover panel for hiding selected items
-        setupCoverPanel()
-        
-        // Subscribe to item store changes to auto-hide selected items
-        setupItemStoreSubscription()
-        
         // Restore previous expansion state, or default to expanded (showing all icons)
         if UserDefaults.standard.object(forKey: expandedKey) != nil {
             isExpanded = UserDefaults.standard.bool(forKey: expandedKey)
@@ -144,10 +133,12 @@ final class MenuBarManager: ObservableObject {
         }
         applyExpansionState()
         
-        // Apply cover for any already-selected items
-        updateCoverForSelectedItems()
+        // Start hover monitoring if enabled
+        if hoverToRevealEnabled {
+            startHoverMonitoring()
+        }
         
-        print("[MenuBarManager] Enabled, expanded: \(isExpanded)")
+        print("[MenuBarManager] Enabled, expanded: \(isExpanded), hoverToReveal: \(hoverToRevealEnabled)")
     }
     
     /// Disable the menu bar manager
@@ -157,11 +148,8 @@ final class MenuBarManager: ObservableObject {
         isEnabled = false
         UserDefaults.standard.set(false, forKey: enabledKey)
         
-        // Clean up cover panel
-        coverPanel?.stopAutoUpdate()
-        coverPanel?.clearCover()
-        coverPanel = nil
-        cancellables.removeAll()
+        // Stop hover monitoring
+        stopHoverMonitoring()
         
         // Show all items before removing
         if !isExpanded {
@@ -178,18 +166,9 @@ final class MenuBarManager: ObservableObject {
     /// Toggle between expanded and collapsed states
     func toggleExpanded() {
         isExpanded.toggle()
-
+        isHoverExpanded = false // User manually toggled, clear hover state
         UserDefaults.standard.set(isExpanded, forKey: expandedKey)
         applyExpansionState()
-        
-        // Also toggle Droppy Bar if enabled
-        if droppyBarEnabled {
-            if isExpanded {
-                showDroppyBar()
-            } else {
-                hideDroppyBar()
-            }
-        }
         
         // Notify to refresh Droppy menu
         NotificationCenter.default.post(name: .menuBarManagerStateChanged, object: nil)
@@ -197,38 +176,111 @@ final class MenuBarManager: ObservableObject {
         print("[MenuBarManager] Toggled: \(isExpanded ? "expanded" : "collapsed")")
     }
     
-    /// Set the expansion state directly (used by Droppy Bar click handler)
-    func setExpanded(_ expanded: Bool) {
-        guard expanded != isExpanded else { return }
-        
-        isExpanded = expanded
-
-        UserDefaults.standard.set(isExpanded, forKey: expandedKey)
-        applyExpansionState()
-        
-        // Also toggle Droppy Bar if enabled
-        if droppyBarEnabled {
-            if isExpanded {
-                showDroppyBar()
-            } else {
-                hideDroppyBar()
-            }
-        }
-        
-        NotificationCenter.default.post(name: .menuBarManagerStateChanged, object: nil)
-        print("[MenuBarManager] Set expanded: \(isExpanded)")
-    }
-    
     /// Clean up all resources
     func cleanup() {
+        stopHoverMonitoring()
         disable()
         UserDefaults.standard.removeObject(forKey: enabledKey)
         UserDefaults.standard.removeObject(forKey: expandedKey)
+        UserDefaults.standard.removeObject(forKey: hoverToRevealKey)
         
         print("[MenuBarManager] Cleanup complete")
     }
     
-
+    // MARK: - Hover Monitoring
+    
+    private func startHoverMonitoring() {
+        guard mouseMonitor == nil, isEnabled else { return }
+        
+        mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+            Task { @MainActor in
+                self?.handleMouseMove(event)
+            }
+        }
+        
+        print("[MenuBarManager] Hover monitoring started")
+    }
+    
+    private func stopHoverMonitoring() {
+        if let monitor = mouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseMonitor = nil
+            print("[MenuBarManager] Hover monitoring stopped")
+        }
+        
+        // Cancel any pending collapse
+        collapseTimer?.invalidate()
+        collapseTimer = nil
+        
+        // Restore to user's saved state if we were hover-expanded
+        if isHoverExpanded {
+            isHoverExpanded = false
+            let savedState = UserDefaults.standard.bool(forKey: expandedKey)
+            if isExpanded != savedState {
+                isExpanded = savedState
+                applyExpansionState()
+            }
+        }
+    }
+    
+    private func handleMouseMove(_ event: NSEvent) {
+        guard isEnabled, hoverToRevealEnabled else { return }
+        guard let screen = NSScreen.main else { return }
+        
+        let mouseLocation = NSEvent.mouseLocation
+        
+        // Check if mouse is in menu bar area (top 24px of screen)
+        let menuBarHeight: CGFloat = 24
+        let isInMenuBar = mouseLocation.y >= (screen.frame.maxY - menuBarHeight)
+        
+        // Check if mouse is in the right portion of the screen (where icons are)
+        let isInIconArea = mouseLocation.x >= hoverThresholdX
+        
+        if isInMenuBar && isInIconArea {
+            // Cancel any pending collapse
+            collapseTimer?.invalidate()
+            collapseTimer = nil
+            
+            // Mouse is in the menu bar on the right side - expand if collapsed
+            if !isExpanded && !isHoverExpanded {
+                isHoverExpanded = true
+                isExpanded = true
+                applyExpansionState()
+                print("[MenuBarManager] Hover expand triggered")
+            }
+        } else {
+            // Mouse left the menu bar area - schedule collapse with delay for stability
+            if isHoverExpanded && isExpanded && collapseTimer == nil {
+                collapseTimer = Timer.scheduledTimer(withTimeInterval: collapseDelay, repeats: false) { [weak self] _ in
+                    Task { @MainActor [weak self] in
+                        guard let self else { return }
+                        
+                        // Get fresh screen reference inside MainActor context
+                        guard let currentScreen = NSScreen.main else {
+                            self.collapseTimer = nil
+                            return
+                        }
+                        
+                        // Double-check mouse is still outside before collapsing
+                        let menuBarHeight: CGFloat = 24
+                        let currentLocation = NSEvent.mouseLocation
+                        let stillInMenuBar = currentLocation.y >= (currentScreen.frame.maxY - menuBarHeight)
+                        let stillInIconArea = currentLocation.x >= self.hoverThresholdX
+                        
+                        if !stillInMenuBar || !stillInIconArea {
+                            self.isHoverExpanded = false
+                            let savedState = UserDefaults.standard.bool(forKey: self.expandedKey)
+                            self.isExpanded = savedState
+                            self.applyExpansionState()
+                            print("[MenuBarManager] Hover collapse triggered (after delay)")
+                        }
+                        self.collapseTimer = nil
+                    }
+                }
+            }
+        }
+    }
+    
     // MARK: - Status Items Creation
     
     private func createStatusItems() {
@@ -240,31 +292,21 @@ final class MenuBarManager: ObservableObject {
             button.target = self
             button.action = #selector(toggleClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-            print("[MenuBarManager] Toggle button configured - Preferred Position: 0")
-            // Try to force position 0
-            StatusItemDefaults.setPreferredPosition(0, for: toggleAutosaveName)
+            print("[MenuBarManager] Toggle button configured with click action")
         } else {
             print("[MenuBarManager] ⚠️ WARNING: Toggle button is nil - clicks will not work!")
         }
         
         // Create the divider (expands to hide items)
-        // This should be positioned to the LEFT of the toggle (Position 1)
+        // This should be positioned to the LEFT of the toggle
         dividerItem = NSStatusBar.system.statusItem(withLength: dividerStandardLength)
         dividerItem?.autosaveName = dividerAutosaveName
         
         if let button = dividerItem?.button {
-            // Make divider visible so users know where to drag items
-            // Using a distinct "separator" style icon
-            let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .light)
-            button.image = NSImage(systemSymbolName: "line.3.horizontal.decrease.circle", accessibilityDescription: "Hiding Divider")?
-                .withSymbolConfiguration(config)
-            button.imagePosition = .imageOnly
-            
-            // Add a tooltip to explain what this is
-            button.toolTip = "Drag items to the LEFT of this divider to hide them from the main bar."
-            
-            print("[MenuBarManager] Divider configured - Preferred Position: 1")
-            StatusItemDefaults.setPreferredPosition(1, for: dividerAutosaveName)
+            // Make divider nearly invisible - just a thin separator
+            button.title = ""
+            button.image = nil
+            print("[MenuBarManager] Divider configured")
         } else {
             print("[MenuBarManager] ⚠️ WARNING: Divider button is nil - expansion may not work!")
         }
@@ -297,37 +339,30 @@ final class MenuBarManager: ObservableObject {
     private func updateToggleIcon() {
         guard let button = toggleItem?.button else { return }
         
-        let config = NSImage.SymbolConfiguration(pointSize: 8, weight: .regular)
+        let config = NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)
         
         if isExpanded {
-            // Items shown - show filled dot
-            button.image = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: "Hide menu bar icons")?
+            // Items visible (expanded) - show chevron pointing right (icons expanded outward)
+            // Issue #83: User expects ">" when expanded
+            button.image = NSImage(systemSymbolName: "chevron.compact.right", accessibilityDescription: "Hide menu bar icons")?
                 .withSymbolConfiguration(config)
         } else {
-            // Items hidden - show empty dot
-            button.image = NSImage(systemSymbolName: "circle", accessibilityDescription: "Show menu bar icons")?
+            // Items hidden (collapsed) - show chevron pointing left (click to expand)
+            // Issue #83: User expects "<" when collapsed, indicating "click to expand"
+            button.image = NSImage(systemSymbolName: "chevron.compact.left", accessibilityDescription: "Show menu bar icons")?
                 .withSymbolConfiguration(config)
         }
     }
     
     private func applyExpansionState() {
-        guard let dividerItem = dividerItem, let button = dividerItem.button else { return }
-        
-        let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .light)
+        guard let dividerItem = dividerItem else { return }
         
         if isExpanded {
-            // Show hidden items - divider at standard length
+            // Show hidden items - divider at minimal length
             dividerItem.length = dividerStandardLength
-            // Show the "Hider" icon so users know where the boundary is
-            button.image = NSImage(systemSymbolName: "line.3.horizontal.decrease.circle", accessibilityDescription: "Hiding Divider")?
-                .withSymbolConfiguration(config)
-            button.isEnabled = true
         } else {
             // Hide items - expand divider to push items left off-screen
             dividerItem.length = dividerExpandedLength
-            // Clear icon so it's just empty space
-            button.image = nil
-            button.isEnabled = false
         }
         
         updateToggleIcon()
@@ -361,7 +396,18 @@ final class MenuBarManager: ObservableObject {
         
         menu.addItem(.separator())
         
-
+        // Hover to reveal toggle
+        let hoverItem = NSMenuItem(
+            title: "Hover to Reveal",
+            action: #selector(toggleHoverToReveal),
+            keyEquivalent: ""
+        )
+        hoverItem.target = self
+        hoverItem.state = hoverToRevealEnabled ? .on : .off
+        hoverItem.image = NSImage(systemSymbolName: "cursorarrow.motionlines", accessibilityDescription: nil)
+        menu.addItem(hoverItem)
+        
+        menu.addItem(.separator())
         
         let howToItem = NSMenuItem(
             title: "How to Use",
@@ -392,87 +438,21 @@ final class MenuBarManager: ObservableObject {
         toggleExpanded()
     }
     
-
+    @objc private func toggleHoverToReveal() {
+        hoverToRevealEnabled.toggle()
+    }
     
     @objc private func showHowTo() {
         // Show Droppy-style notification
         DroppyAlertController.shared.showSimple(
             style: .info,
             title: "How to Use Menu Bar Manager",
-            message: "1. Hold ⌘ (Command) and drag menu bar icons\n2. Move icons to the LEFT of the chevron to hide them\n3. Click the chevron to show/hide those icons\n\nIcons to the right of the chevron stay visible."
+            message: "1. Hold ⌘ (Command) and drag menu bar icons\n2. Move icons to the LEFT of the chevron to hide them\n3. Click the chevron to show/hide those icons\n\nIcons to the right of the chevron stay visible.\n\nTip: Hover over the right side of the menu bar to temporarily reveal hidden icons."
         )
     }
     
     @objc private func disableFromMenu() {
         disable()
-    }
-    
-    // MARK: - Droppy Bar Methods
-    
-    /// Show the Droppy Bar panel
-    private func showDroppyBar() {
-        if droppyBarPanel == nil {
-            droppyBarPanel = DroppyBarPanel()
-        }
-        
-        // Find the screen containing the mouse cursor
-        let mouseLocation = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first(where: { NSMouseInRect(mouseLocation, $0.frame, false) }) ?? NSScreen.main
-        
-        Task { @MainActor in
-            await droppyBarPanel?.show(on: screen)
-        }
-        print("[MenuBarManager] Droppy Bar shown")
-    }
-    
-    /// Hide the Droppy Bar panel
-    private func hideDroppyBar() {
-        droppyBarPanel?.orderOut(nil)
-        print("[MenuBarManager] Droppy Bar hidden")
-    }
-    
-    /// Toggle Droppy Bar visibility
-    func toggleDroppyBar() {
-        if droppyBarPanel?.isVisible == true {
-            hideDroppyBar()
-        } else {
-            showDroppyBar()
-        }
-    }
-    
-    // MARK: - Cover Panel (Hide Selected Items)
-    
-    /// Set up the cover panel
-    private func setupCoverPanel() {
-        coverPanel = MenuBarCoverPanel()
-        coverPanel?.startAutoUpdate()
-        print("[MenuBarManager] Cover panel created")
-    }
-    
-    /// Subscribe to item store changes to auto-hide selected items
-    private func setupItemStoreSubscription() {
-        droppyBarItemStore.$items
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.updateCoverForSelectedItems()
-            }
-            .store(in: &cancellables)
-        print("[MenuBarManager] Subscribed to item store changes")
-    }
-    
-    /// Update the cover panel to hide currently selected items
-    func updateCoverForSelectedItems() {
-        guard isEnabled else { return }
-        
-        // Get owner names of items that should be hidden (selected in Droppy Bar config)
-        let selectedOwnerNames = droppyBarItemStore.enabledOwnerNames
-        
-        if selectedOwnerNames.isEmpty {
-            coverPanel?.clearCover()
-        } else {
-            print("[MenuBarManager] Hiding items: \(selectedOwnerNames)")
-            coverPanel?.updateCover(forOwnerNames: selectedOwnerNames)
-        }
     }
     
     // MARK: - Diagnostics
@@ -484,14 +464,18 @@ final class MenuBarManager: ObservableObject {
         print("  isRemoved: \(ExtensionType.menuBarManager.isRemoved)")
         print("  isEnabled: \(isEnabled)")
         print("  isExpanded: \(isExpanded)")
+        print("  isHoverExpanded: \(isHoverExpanded)")
+        print("  hoverToRevealEnabled: \(hoverToRevealEnabled)")
         print("  toggleItem exists: \(toggleItem != nil)")
         print("  toggleItem.button exists: \(toggleItem?.button != nil)")
         print("  toggleItem.button.target set: \(toggleItem?.button?.target != nil)")
         print("  toggleItem.button.action set: \(toggleItem?.button?.action != nil)")
         print("  dividerItem exists: \(dividerItem != nil)")
         print("  dividerItem.length: \(dividerItem?.length ?? -1)")
+        print("  mouseMonitor exists: \(mouseMonitor != nil)")
         print("  UserDefaults enabledKey: \(UserDefaults.standard.bool(forKey: enabledKey))")
         print("  UserDefaults expandedKey: \(UserDefaults.standard.object(forKey: expandedKey) ?? "nil")")
+        print("  UserDefaults hoverToRevealKey: \(UserDefaults.standard.object(forKey: hoverToRevealKey) ?? "nil (default true)")")
         print("[MenuBarManager] === END DIAGNOSTICS ===")
     }
 }
