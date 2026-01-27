@@ -70,6 +70,16 @@ struct HUDLayoutCalculator {
         return (!hasPhysicalNotch || forceTest) && useDynamicIsland
     }
     
+    /// Whether this is an external display using notch visual style (curved corners)
+    /// External displays can choose DI style or Notch style - Notch style has curved corners that need padding
+    var isExternalWithNotchStyle: Bool {
+        guard let screen = screen else { return false }
+        if screen.isBuiltIn { return false }
+        // External display with notch style = user chose NOT to use DI style
+        let externalUseDI = (UserDefaults.standard.object(forKey: "externalDisplayUseDynamicIsland") as? Bool) ?? true
+        return !externalUseDI
+    }
+    
     /// Whether transparent Dynamic Island mode is enabled
     /// Uses the MAIN "Transparent Background" setting - one toggle controls all transparency
     var isTransparentDynamicIsland: Bool {
@@ -83,12 +93,15 @@ struct HUDLayoutCalculator {
     
     /// Symmetric padding for icon alignment
     /// In Dynamic Island: matches vertical padding for visual balance
-    /// In Notch mode: ensures icons align with outer edges, +10pt for curved wing corners
+    /// In Notch mode or External with notch style: +10pt for curved corners
     func symmetricPadding(for iconSize: CGFloat) -> CGFloat {
         let calculated = (notchHeight - iconSize) / 2
         let basePadding = max(calculated, 6) // Minimum 6px for visibility
-        // +10pt compensation for curved wing corners (topCornerRadius) in notch mode only
-        return isDynamicIslandMode ? basePadding : basePadding + 10
+        // +10pt compensation for curved corners in:
+        // 1. Built-in notch mode (physical notch with curved wing corners)
+        // 2. External with notch visual style (curved topCornerRadius)
+        let needsCurvedCornerPadding = !isDynamicIslandMode || isExternalWithNotchStyle
+        return needsCurvedCornerPadding ? basePadding + 10 : basePadding
     }
     
     // MARK: - Standard Sizes
