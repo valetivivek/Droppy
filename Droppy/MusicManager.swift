@@ -146,6 +146,20 @@ final class MusicManager: ObservableObject {
         SpotifyController.shared
     }
     
+    // MARK: - Apple Music Integration
+    
+    /// Whether the current media source is Apple Music (and Apple Music extension is enabled)
+    var isAppleMusicSource: Bool {
+        // If Apple Music extension is disabled, pretend it's not Apple Music
+        guard !ExtensionType.appleMusic.isRemoved else { return false }
+        return bundleIdentifier == AppleMusicController.appleMusicBundleId
+    }
+    
+    /// Apple Music controller for app-specific features (shuffle, repeat, love)
+    var appleMusicController: AppleMusicController {
+        AppleMusicController.shared
+    }
+    
     /// Temporarily suppress timing updates after Spotify commands to avoid stale data
     private var suppressTimingUpdatesUntil: Date = .distantPast
     
@@ -475,6 +489,10 @@ final class MusicManager: ObservableObject {
                 if isSpotifySource {
                     SpotifyController.shared.onTrackChange()
                 }
+                // Notify Apple Music controller of track change
+                if isAppleMusicSource {
+                    AppleMusicController.shared.onTrackChange()
+                }
             }
             songTitle = title
         }
@@ -534,6 +552,7 @@ final class MusicManager: ObservableObject {
         }
         if let bundle = payload.launchableBundleIdentifier {
             let wasSpotify = isSpotifySource
+            let wasAppleMusic = isAppleMusicSource
             let previousBundle = bundleIdentifier
             bundleIdentifier = bundle
             
@@ -548,10 +567,20 @@ final class MusicManager: ObservableObject {
                 SpotifyController.shared.refreshState()
             }
             
+            // Refresh Apple Music state when source changes to Apple Music
+            if isAppleMusicSource && !wasAppleMusic {
+                AppleMusicController.shared.refreshState()
+            }
+            
             // PERFORMANCE FIX: Stop Spotify's position sync timer when switching away
             // This prevents a "zombie timer" from running when another source is active
             if wasSpotify && !isSpotifySource {
                 SpotifyController.shared.stopPositionSyncTimer()
+            }
+            
+            // PERFORMANCE FIX: Stop Apple Music's position sync timer when switching away
+            if wasAppleMusic && !isAppleMusicSource {
+                AppleMusicController.shared.stopPositionSyncTimer()
             }
         }
         

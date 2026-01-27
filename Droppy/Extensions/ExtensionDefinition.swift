@@ -112,6 +112,7 @@ final class ExtensionRegistry {
         register(TermiNotchExtension.self)
         register(MenuBarManagerExtension.self)
         register(QuickshareExtension.self)
+        register(AppleMusicExtension.self)
     }
     
     /// Register an extension definition

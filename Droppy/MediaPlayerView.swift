@@ -590,11 +590,16 @@ struct MediaPlayerView: View {
                     .modifier(AlbumArtMatchedGeometry(namespace: albumArtNamespace, id: "albumArt"))
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     
-                    // Spotify badge (bottom-right corner) - fades in without sliding
-                    SpotifyBadge()
-                        .offset(x: 5, y: 5)
-                        .opacity(musicManager.isSpotifySource ? 1 : 0)
-                        .animation(DroppyAnimation.state, value: musicManager.isSpotifySource)
+                    // Source badge (bottom-right corner) - fades in without sliding
+                    ZStack {
+                        SpotifyBadge()
+                            .opacity(musicManager.isSpotifySource ? 1 : 0)
+                        AppleMusicBadge()
+                            .opacity(musicManager.isAppleMusicSource ? 1 : 0)
+                    }
+                    .offset(x: 5, y: 5)
+                    .animation(DroppyAnimation.state, value: musicManager.isSpotifySource)
+                    .animation(DroppyAnimation.state, value: musicManager.isAppleMusicSource)
                 }
                 // Subtle border highlight
                 .overlay(
@@ -793,13 +798,16 @@ struct MediaPlayerView: View {
     @ViewBuilder
     private var controlsRowCompact: some View {
         let isSpotify = musicManager.isSpotifySource
+        let isAppleMusic = musicManager.isAppleMusicSource
         let spotify = musicManager.spotifyController
+        let appleMusic = musicManager.appleMusicController
         let spotifyGreen = Color(red: 0.11, green: 0.73, blue: 0.33)
+        let appleMusicPink = Color(red: 0.98, green: 0.34, blue: 0.40)  // Apple Music accent
         
         ZStack {
             // Compact centered controls
             HStack(spacing: 20) {
-                // Shuffle (Spotify only)
+                // Shuffle (Spotify or Apple Music)
                 if isSpotify {
                     SpotifyControlButton(
                         icon: "shuffle",
@@ -808,6 +816,15 @@ struct MediaPlayerView: View {
                         size: 16
                     ) {
                         spotify.toggleShuffle()
+                    }
+                } else if isAppleMusic {
+                    SpotifyControlButton(
+                        icon: "shuffle",
+                        isActive: appleMusic.shuffleEnabled,
+                        accentColor: appleMusicPink,
+                        size: 16
+                    ) {
+                        appleMusic.toggleShuffle()
                     }
                 }
                 
@@ -831,7 +848,7 @@ struct MediaPlayerView: View {
                     musicManager.nextTrack()
                 }
                 
-                // Repeat (Spotify only)
+                // Repeat (Spotify or Apple Music)
                 if isSpotify {
                     SpotifyControlButton(
                         icon: spotify.repeatMode.iconName,
@@ -840,6 +857,27 @@ struct MediaPlayerView: View {
                         size: 16
                     ) {
                         spotify.cycleRepeatMode()
+                    }
+                } else if isAppleMusic {
+                    SpotifyControlButton(
+                        icon: appleMusic.repeatMode.iconName,
+                        isActive: appleMusic.repeatMode != .off,
+                        accentColor: appleMusicPink,
+                        size: 16
+                    ) {
+                        appleMusic.cycleRepeatMode()
+                    }
+                }
+                
+                // Love button (Apple Music only - Spotify requires OAuth)
+                if isAppleMusic {
+                    SpotifyControlButton(
+                        icon: appleMusic.isCurrentTrackLoved ? "heart.fill" : "heart",
+                        isActive: appleMusic.isCurrentTrackLoved,
+                        accentColor: appleMusicPink,
+                        size: 16
+                    ) {
+                        appleMusic.toggleLove()
                     }
                 }
             }
