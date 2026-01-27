@@ -382,6 +382,10 @@ struct ExtensionsShopView: View {
                 AnyView(ExtensionInfoView(
                     extensionType: .appleMusic,
                     onAction: {
+                        // Open Apple Music app (similar to Spotify pattern)
+                        if let url = URL(string: "music://") {
+                            NSWorkspace.shared.open(url)
+                        }
                         AppleMusicController.shared.refreshState()
                     },
                     installCount: extensionCounts["appleMusic"],
