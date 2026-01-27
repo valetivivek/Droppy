@@ -2049,7 +2049,7 @@ struct NotchShelfView: View {
 
 // MARK: - Custom Notch Shape
 /// U-shaped notch with elegant curved top corners (wings) extending outward
-/// Inspired by Atoll's implementation - creates visual transition to screen edges
+/// Creates visual transition to screen edges
 struct NotchShape: Shape {
     var topCornerRadius: CGFloat
     var bottomRadius: CGFloat

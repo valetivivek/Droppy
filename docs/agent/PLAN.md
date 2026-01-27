@@ -28,7 +28,7 @@ Fix auto-expand failure after unlock by recreating the "zombified" Notch Window 
 
 ## Test Strategy
 1.  **Unlock Fix**: Lock -> Unlock -> Wait 1s -> Verify Notch expands. (Passes if window is fresh).
-2.  **Lock Fix**: Lock again -> Verify Notch is visible on Lock Screen (Atoll style).
+2.  **Lock Fix**: Lock again -> Verify Notch is visible on Lock Screen.
 3.  **Cycle**: Repeat 3x.
 
 ## Rollback Plan
