@@ -1530,16 +1530,27 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     NotificationHUDIcon(isEnabled: isNotificationHUDInstalled && enableNotificationHUD)
                     
-                    // Only show toggle when extension is installed AND enabled
-                    // Otherwise show "Enable under Extensions" message
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Notify me!")
-                            .foregroundStyle(isNotificationHUDInstalled && enableNotificationHUD ? .primary : .secondary)
-                        Text(isNotificationHUDInstalled && enableNotificationHUD ? "Show notifications in the notch" : "Enable under Extensions")
-                            .font(.caption)
-                            .foregroundStyle(.secondary.opacity(isNotificationHUDInstalled && enableNotificationHUD ? 1 : 0.7))
+                    if isNotificationHUDInstalled {
+                        // Extension is enabled - show toggle
+                        Toggle(isOn: $enableNotificationHUD) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Notify me!")
+                                Text("Show notifications in the notch")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    } else {
+                        // Extension is not enabled - show message
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Notify me!")
+                                .foregroundStyle(.secondary)
+                            Text("Enable under Extensions")
+                                .font(.caption)
+                                .foregroundStyle(.secondary.opacity(0.7))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } header: {
                 Text("System")
