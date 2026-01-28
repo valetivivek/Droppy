@@ -323,7 +323,8 @@ struct MediaHUDView: View {
                 // NOTCH MODE: Two wings separated by the notch space
                 // Using Droppy pattern: 20px icons with symmetricPadding for outer-wing alignment
                 let iconSize: CGFloat = 20
-                let symmetricPadding = max((notchHeight - iconSize) / 2, 6)  // Min 6px for visibility
+                // +wingCornerCompensation for curved wing corners (topCornerRadius)
+                let symmetricPadding = max((notchHeight - iconSize) / 2, 6) + NotchLayoutConstants.wingCornerCompensation
                 
                 HStack(spacing: 0) {
                     // Left wing: Album art near left edge
@@ -454,10 +455,9 @@ private class MiniAudioVisualizerState: ObservableObject {
 // MARK: - Subtle Scrolling Text for Long File Names
 
 /// A text view that subtly scrolls horizontally to reveal long file names
-/// - Waits ~2 seconds after appearing before first scroll
-/// - Scrolls slowly to show full text, pauses, then scrolls back
-/// - Repeats the cycle every ~6 seconds
-/// - Only scrolls when text is actually truncated
+/// - Only scrolls when hovered (not in static state)
+/// - Very slow and subtle scroll speed for premium feel
+/// - Scrolls to show full text, pauses, then scrolls back
 /// - Uses fade edges for a premium look
 struct SubtleScrollingText: View {
     let text: String
@@ -470,15 +470,16 @@ struct SubtleScrollingText: View {
     @State private var textWidth: CGFloat = 0
     @State private var containerWidth: CGFloat = 0
     @State private var scrollOffset: CGFloat = 0
+    @State private var isHovering: Bool = false
     @State private var scrollPhase: ScrollPhase = .idle
     @State private var scrollTimer: Timer?
     
     private enum ScrollPhase {
-        case idle          // Waiting before first scroll
-        case scrollingEnd  // Scrolling to show end of text
-        case pausingEnd    // Paused at end
+        case idle           // Not scrolling (static)
+        case waitingToScroll // Hover started, waiting before scroll
+        case scrollingEnd   // Scrolling to show end of text
+        case pausingEnd     // Paused at end
         case scrollingStart // Scrolling back to start
-        case pausingStart  // Paused at start before next cycle
     }
     
     /// Whether text overflows the container (needs scrolling)
@@ -551,7 +552,6 @@ struct SubtleScrollingText: View {
             .clipped()
             .onAppear {
                 containerWidth = geo.size.width
-                startScrollCycle()
             }
             .onChange(of: geo.size) { _, newSize in
                 containerWidth = newSize.width
@@ -559,6 +559,14 @@ struct SubtleScrollingText: View {
             .onDisappear {
                 scrollTimer?.invalidate()
                 scrollTimer = nil
+            }
+            .onHover { hovering in
+                isHovering = hovering
+                if hovering && needsScroll {
+                    startHoverScroll()
+                } else {
+                    stopScrollAndReset()
+                }
             }
         }
         .frame(width: maxWidth, height: 14) // Single line height
@@ -569,63 +577,77 @@ struct SubtleScrollingText: View {
         scrollTimer = nil
         scrollOffset = 0
         scrollPhase = .idle
-        startScrollCycle()
     }
     
-    private func startScrollCycle() {
-        guard needsScroll else { return }
-        
+    private func stopScrollAndReset() {
+        scrollTimer?.invalidate()
+        scrollTimer = nil
         scrollPhase = .idle
-        scrollOffset = 0
+        // Gently scroll back to start
+        withAnimation(.easeOut(duration: 0.6)) {
+            scrollOffset = 0
+        }
+    }
+    
+    private func startHoverScroll() {
+        guard needsScroll && isHovering else { return }
         
-        // Wait 2.5 seconds before starting scroll
-        scrollTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: false) { _ in
+        scrollPhase = .waitingToScroll
+        
+        // Wait 0.8 seconds after hover before starting scroll
+        scrollTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: false) { _ in
+            guard isHovering else { return }
             advanceScrollPhase()
         }
     }
     
     private func advanceScrollPhase() {
+        guard isHovering else {
+            stopScrollAndReset()
+            return
+        }
+        
         switch scrollPhase {
-        case .idle:
-            // Start scrolling to end
+        case .idle, .waitingToScroll:
+            // Start scrolling to end - VERY SLOW (4 seconds for full scroll)
             scrollPhase = .scrollingEnd
-            withAnimation(.easeInOut(duration: 1.5)) {
+            withAnimation(.easeInOut(duration: 4.0)) {
                 scrollOffset = maxScrollOffset
             }
             // After scroll completes, pause at end
-            scrollTimer = Timer.scheduledTimer(withTimeInterval: 1.7, repeats: false) { _ in
+            scrollTimer = Timer.scheduledTimer(withTimeInterval: 4.2, repeats: false) { _ in
                 advanceScrollPhase()
             }
             
         case .scrollingEnd:
-            // Pause at end
+            // Pause at end for 2 seconds
             scrollPhase = .pausingEnd
-            scrollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { _ in
+            scrollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { _ in
                 advanceScrollPhase()
             }
             
         case .pausingEnd:
-            // Scroll back to start
+            // Scroll back to start - also slow (3 seconds)
             scrollPhase = .scrollingStart
-            withAnimation(.easeInOut(duration: 1.2)) {
+            withAnimation(.easeInOut(duration: 3.0)) {
                 scrollOffset = 0
             }
-            // After scroll completes, pause at start
-            scrollTimer = Timer.scheduledTimer(withTimeInterval: 1.4, repeats: false) { _ in
-                advanceScrollPhase()
+            // After scroll completes, restart cycle if still hovering
+            scrollTimer = Timer.scheduledTimer(withTimeInterval: 3.2, repeats: false) { _ in
+                if isHovering {
+                    scrollPhase = .waitingToScroll
+                    // Wait before next cycle
+                    scrollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { _ in
+                        advanceScrollPhase()
+                    }
+                } else {
+                    scrollPhase = .idle
+                }
             }
             
         case .scrollingStart:
-            // Pause at start before next cycle
-            scrollPhase = .pausingStart
-            scrollTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
-                advanceScrollPhase()
-            }
-            
-        case .pausingStart:
-            // Restart cycle
-            scrollPhase = .idle
-            advanceScrollPhase()
+            // Handled in pausingEnd case
+            break
         }
     }
 }

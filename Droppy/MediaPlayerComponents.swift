@@ -231,13 +231,13 @@ struct AudioVisualizerBars: View {
         AudioSpectrumView(
             isPlaying: isPlaying,
             barCount: 5,
-            barWidth: 3,
+            barWidth: 2,  // v21.69: Thinner bars (was 3pt)
             spacing: 2,
             height: 20,
             color: color,
             audioLevel: audioAnalyzer.audioLevel
         )
-        .frame(width: 5 * 3 + 4 * 2, height: 20) // 5 bars * 3px + 4 gaps * 2px
+        .frame(width: 5 * 2 + 4 * 2, height: 20) // 5 bars * 2px + 4 gaps * 2px = 18px
         .onAppear { audioAnalyzer.startObserving() }
         .onDisappear { audioAnalyzer.stopObserving() }
     }

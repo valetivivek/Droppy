@@ -1,51 +1,22 @@
-📢 Important
-- Version 10 is our biggest update yet - "The Community Update"!
-- Built with feedback from our Discord community
-
 ✨ New Features
-- Added Droppy Quickshare - upload files instantly to 0x0.st for quick sharing
-- Added Notify Me! extension - get notified for important file events
-- Added Apple Music integration - native playback controls
-- Added Lock Screen Now Playing Widget with beautiful glass effect
-- Added Lock/Unlock animations with premium visual feedback
-- Added subtle unlock sound for a satisfying experience
-- Added Window Snap support for external monitors with spatial cycling
-- Redesigned Media HUDs with premium gradient visualizer and rounded progress bars
-- Added gradient text effect for long media titles with smooth fade
-- Added premium blur transitions when switching between HUDs
-- Redesigned file items in Shelf and Basket with native macOS appearance
-- Redesigned folder items with folder peek interactions - view and open folders directly
-- Added interactive folder exploration right from the shelf
-- Redesigned Settings window with better separation and new sections
-- Added new About page with modern layout and 2x2 link grid
-- Added new HUDs settings page for better organization
-- Added premium curvature on notch/HUD top edges
-- Added ambient glow effect to media player using album art dominant colors
-- Added album art color extraction for timestamps and artist names
-- Added menu bar dot indicator replacing chevron
-- Added hover explanations for basket quick action buttons
-- Improved all animations for expanding, collapsing, and swiping between HUDs
-- Added premium blur effects throughout the UI
+- Added clipboard video playback - MP4, MOV, and other video files now play inline with full controls
+- Added rich document previews for Word, Excel, PowerPoint, and PDF files in clipboard with multi-page support
+- Added pinch-to-zoom for document previews (zoom 1x-5x with centered scaling)
+- Added double-tap to toggle zoom and pan when zoomed in
+- Added zoom controls overlay with zoom in/out buttons and percentage indicator
+- Added subtle horizontal scrolling for long file names in shelf and basket views
+
+🔧 Improvements  
+- Optimized Dynamic Island padding (reduced from 30pt to 20pt for tighter, more elegant appearance)
+- Increased Dynamic Island corner radius to 50pt for more pill-like, rounded aesthetic
+- Fixed shelf grid horizontal padding (20pt for Dynamic Island, 30pt for notch modes)
+- Fixed double clipping artifact on Dynamic Island expanded view
+- Unified transparency logic for floating buttons across all display modes
+- Improved consistency between Dynamic Island and external notch display modes
 
 🐛 Bug Fixes
-- Fixed Termi-Notch crashes and improved stability
-- Fixed Termi-Notch to persist directory changes across commands
-- Fixed tracked folder now opens in the last opened location for basket
-- Fixed Finder Configuration now opens correct System Settings page
-- Fixed quick action buttons are now visible and usable below basket
-- Fixed hover effects for basket quick actions with proper explanations
-- Fixed onboarding now respects transparency setting
-- Fixed window animations with smoother spring timing
-- Fixed menu bar manager icon visibility and drag positioning
-- Fixed menu bar item detection with improved filtering
-- Fixed AI Background Removal install loop on macOS Tahoe
-- Fixed clipboard text truncation to prevent row expansion
-- Fixed basket 'Move to Shelf' now moves all selected items
-- Fixed clipboard item renames now persist to disk
-- Fixed SkyLight hover detection after lock/unlock
-- Fixed lock screen media panel layout matching iPhone style
-- Fixed visualizer alignment and positioning
-- Fixed drag-and-drop on built-in screen after SkyLight delegation
-- Fixed Lock Screen HUD jumping with window recycling mechanism
-- Fixed notification HUD padding with symmetrical layout
-- Fixed preferences default values to prevent menu bar disappearing
+- Fixed volume/brightness HUD clipping at 100% on external notch style
+- Fixed icon clipping on external notch style with proper padding
+- Fixed battery/capslock/DND HUD widths for external displays
+- Fixed all HUD views to properly respect external display style preference
+- Fixed external display notch padding using correct Dynamic Island height

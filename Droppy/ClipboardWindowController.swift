@@ -261,19 +261,33 @@ class ClipboardWindowController: NSObject, NSWindowDelegate {
                 return event
             }
             
-            if event.window != window {
+            // Don't close if click is on a sheet or child window attached to our window
+            if let clickedWindow = event.window {
+                // Check if clicked window is our main window
+                if clickedWindow == window {
+                    return event
+                }
+                
+                // Check if clicked window is a sheet attached to our window
+                if clickedWindow.sheetParent == window {
+                    return event
+                }
+                
+                // Check if clicked window's parent is our window (child windows)
+                if clickedWindow.parent == window {
+                    return event
+                }
+                
+                // Check if the window is a sheet or presented from our app (generic check)
+                // This catches modal sheets that SwiftUI presents
+                if clickedWindow.level == .modalPanel || clickedWindow.isSheet {
+                    return event
+                }
+                
                 print("🖱️ Droppy: Local Click Outside (Window: \(String(describing: event.window))) -> Closing")
                 DispatchQueue.main.async {
                     self.close()
                 }
-            } else {
-                 // Click was inside the window, check coordinates just in case (e.g. slight border issues)
-                 let mouseLoc = NSEvent.mouseLocation
-                 if !window.frame.contains(mouseLoc) {
-                     // Can happen if event.window is set but coordinate is outside? Rare.
-                     print("🖱️ Droppy: Local Click reported inside but coords outside -> Closing")
-                     DispatchQueue.main.async { self.close() }
-                 }
             }
             return event
         }

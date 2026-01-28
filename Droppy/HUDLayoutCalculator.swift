@@ -97,11 +97,11 @@ struct HUDLayoutCalculator {
     func symmetricPadding(for iconSize: CGFloat) -> CGFloat {
         let calculated = (notchHeight - iconSize) / 2
         let basePadding = max(calculated, 6) // Minimum 6px for visibility
-        // +10pt compensation for curved corners in:
+        // +wingCornerCompensation for curved corners in:
         // 1. Built-in notch mode (physical notch with curved wing corners)
         // 2. External with notch visual style (curved topCornerRadius)
         let needsCurvedCornerPadding = !isDynamicIslandMode || isExternalWithNotchStyle
-        return needsCurvedCornerPadding ? basePadding + 10 : basePadding
+        return needsCurvedCornerPadding ? basePadding + NotchLayoutConstants.wingCornerCompensation : basePadding
     }
     
     // MARK: - Standard Sizes

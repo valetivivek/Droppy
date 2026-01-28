@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import LinkPresentation
 import Quartz
+import AVKit
 
 // MARK: - Quick Look Data Source for Clipboard Images
 class QuickLookDataSource: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelegate {
@@ -1044,6 +1045,7 @@ struct FlaggedGridItemView: View {
     @ObservedObject var manager: ClipboardManager
     
     @State private var isHovering = false
+    @State private var cachedThumbnail: NSImage? // Async-loaded thumbnail
     
     var body: some View {
         Button(action: onTap) {
@@ -1054,9 +1056,34 @@ struct FlaggedGridItemView: View {
                         .fill(Color.white.opacity(0.1))
                         .frame(width: 32, height: 32)
                     
-                    itemIcon
-                        .foregroundStyle(.white)
-                        .font(.system(size: 12))
+                    // Show cached thumbnail for images and files, icon for others
+                    if let thumbnail = cachedThumbnail {
+                        Image(nsImage: thumbnail)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 32, height: 32)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    } else {
+                        itemIcon
+                            .foregroundStyle(.white)
+                            .font(.system(size: 12))
+                    }
+                }
+                .task(id: item.id) {
+                    // Load thumbnail asynchronously for images and files
+                    guard cachedThumbnail == nil else { return }
+                    
+                    if item.type == .image {
+                        let thumbnail = ThumbnailCache.shared.thumbnail(for: item)
+                        await MainActor.run {
+                            cachedThumbnail = thumbnail
+                        }
+                    } else if item.type == .file, let path = item.content {
+                        let thumbnail = await ThumbnailCache.shared.loadFileThumbnailAsync(path: path, size: CGSize(width: 64, height: 64))
+                        await MainActor.run {
+                            cachedThumbnail = thumbnail ?? ThumbnailCache.shared.cachedIcon(forPath: path)
+                        }
+                    }
                 }
                 
                 // Title and time
@@ -1150,8 +1177,8 @@ struct ClipboardItemRow: View {
                     .fill(Color.white.opacity(0.1))
                     .frame(width: 32, height: 32)
                 
-                // Show cached thumbnail for images, icon for others
-                if item.type == .image, let thumbnail = cachedThumbnail {
+                // Show cached thumbnail for images and files, icon for others
+                if let thumbnail = cachedThumbnail {
                     Image(nsImage: thumbnail)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
@@ -1164,12 +1191,20 @@ struct ClipboardItemRow: View {
                 }
             }
             .task(id: item.id) {
-                // Load thumbnail asynchronously
-                if item.type == .image && cachedThumbnail == nil {
-                    // Run on background thread to avoid blocking UI
+                // Load thumbnail asynchronously for images and files
+                guard cachedThumbnail == nil else { return }
+                
+                if item.type == .image {
+                    // Image: load from clipboard image cache
                     let thumbnail = ThumbnailCache.shared.thumbnail(for: item)
                     await MainActor.run {
                         cachedThumbnail = thumbnail
+                    }
+                } else if item.type == .file, let path = item.content {
+                    // File: load QuickLook thumbnail for PDFs, docs, etc.
+                    let thumbnail = await ThumbnailCache.shared.loadFileThumbnailAsync(path: path, size: CGSize(width: 64, height: 64))
+                    await MainActor.run {
+                        cachedThumbnail = thumbnail ?? ThumbnailCache.shared.cachedIcon(forPath: path)
                     }
                 }
             }
@@ -1287,6 +1322,7 @@ struct ClipboardPreviewView: View {
     // Cached Preview Content
     @State private var cachedImage: NSImage?
     @State private var cachedAttributedText: AttributedString?
+    @State private var cachedFilePreview: NSImage? // QuickLook preview for file types
     @State private var isLoadingPreview = false
     
     // Link Preview State
@@ -1296,6 +1332,63 @@ struct ClipboardPreviewView: View {
     @State private var linkPreviewIcon: NSImage?
     @State private var isLoadingLinkPreview = false
     @State private var isDirectImageLink = false
+    
+    // Multi-Page Document State
+    @State private var documentPageCount: Int = 1
+    @State private var currentPageIndex: Int = 0
+    @State private var isLoadingPage = false
+    @State private var swipeOffset: CGFloat = 0
+    @State private var showZoomedPreview = false
+    
+    // Video Preview State
+    @State private var videoPlayer: AVPlayer?
+    @State private var isVideoFile: Bool = false
+    
+    // Video file extensions
+    private static let videoExtensions: Set<String> = ["mp4", "mov", "m4v", "avi", "mkv", "webm"]
+    
+    private func isVideoPath(_ path: String) -> Bool {
+        let ext = URL(fileURLWithPath: path).pathExtension.lowercased()
+        return Self.videoExtensions.contains(ext)
+    }
+    
+    // MARK: - Page Navigation
+    
+    private enum SwipeDirection {
+        case left, right
+    }
+    
+    private func navigateToPage(_ pageIndex: Int, path: String, direction: SwipeDirection) {
+        guard pageIndex >= 0 && pageIndex < documentPageCount else { return }
+        
+        // Animate out
+        let exitOffset: CGFloat = direction == .left ? -300 : 300
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+            swipeOffset = exitOffset
+        }
+        
+        // Load new page
+        isLoadingPage = true
+        Task {
+            let newPreview = await ThumbnailCache.shared.loadDocumentPage(path: path, pageIndex: pageIndex, size: CGSize(width: 400, height: 400))
+            
+            await MainActor.run {
+                currentPageIndex = pageIndex
+                
+                // Reset offset to opposite side for entrance
+                swipeOffset = direction == .left ? 300 : -300
+                
+                // Update preview
+                cachedFilePreview = newPreview
+                isLoadingPage = false
+                
+                // Animate in
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    swipeOffset = 0
+                }
+            }
+        }
+    }
     
     private func copyToClipboard() {
         NSPasteboard.general.clearContents()
@@ -1505,17 +1598,196 @@ struct ClipboardPreviewView: View {
                     
                 case .file:
                     if let path = item.content {
-                        VStack(spacing: 12) {
-                            Image(nsImage: ThumbnailCache.shared.cachedIcon(forPath: path))
-                                .resizable()
-                                .frame(width: 64, height: 64)
-                            Text(URL(fileURLWithPath: path).lastPathComponent)
-                                .font(.headline)
-                                .foregroundStyle(.white)
-                            Text(path)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
+                        VStack(spacing: 16) {
+                            // Check if this is a video file
+                            if isVideoFile, let player = videoPlayer {
+                                // Video Player View
+                                VideoPlayer(player: player)
+                                    .aspectRatio(16/9, contentMode: .fit)
+                                    .frame(maxHeight: 280)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                                    .onAppear {
+                                        player.play()
+                                    }
+                                    .onDisappear {
+                                        player.pause()
+                                    }
+                            } else {
+                                // Document preview with swipe gesture for multi-page
+                                ZStack {
+                                    if let preview = cachedFilePreview {
+                                        Image(nsImage: preview)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                            .frame(maxHeight: 280)
+                                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                            .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                                            .offset(x: swipeOffset)
+                                            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: swipeOffset)
+                                    } else if isLoadingPreview || isLoadingPage {
+                                        ProgressView()
+                                            .controlSize(.large)
+                                            .padding(40)
+                                    } else {
+                                        Image(nsImage: ThumbnailCache.shared.cachedIcon(forPath: path))
+                                            .resizable()
+                                            .frame(width: 80, height: 80)
+                                    }
+                                }
+                                .gesture(
+                                    DragGesture(minimumDistance: 30)
+                                        .onChanged { value in
+                                            // Only allow horizontal swipe if multi-page
+                                            guard documentPageCount > 1 else { return }
+                                            swipeOffset = value.translation.width * 0.4
+                                        }
+                                        .onEnded { value in
+                                            guard documentPageCount > 1 else { return }
+                                            let threshold: CGFloat = 50
+                                            
+                                            if value.translation.width < -threshold && currentPageIndex < documentPageCount - 1 {
+                                                // Swipe left - next page
+                                                navigateToPage(currentPageIndex + 1, path: path, direction: .left)
+                                            } else if value.translation.width > threshold && currentPageIndex > 0 {
+                                                // Swipe right - previous page
+                                                navigateToPage(currentPageIndex - 1, path: path, direction: .right)
+                                            } else {
+                                                // Snap back
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                    swipeOffset = 0
+                                                }
+                                            }
+                                        }
+                                )
+                                .onTapGesture(count: 2) {
+                                    // Double-click to zoom
+                                    showZoomedPreview = true
+                                }
+                                
+                                // Page Navigation (only show for multi-page docs)
+                                if documentPageCount > 1 {
+                                    HStack(spacing: 8) {
+                                        // Previous button
+                                        Button {
+                                            if currentPageIndex > 0 {
+                                                navigateToPage(currentPageIndex - 1, path: path, direction: .right)
+                                            }
+                                        } label: {
+                                            Image(systemName: "chevron.left")
+                                        }
+                                        .buttonStyle(DroppyCircleButtonStyle(size: 28))
+                                        .disabled(currentPageIndex == 0)
+                                        .opacity(currentPageIndex > 0 ? 1.0 : 0.4)
+                                        
+                                        // Page indicators (dots)
+                                        if documentPageCount <= 10 {
+                                            HStack(spacing: 6) {
+                                                ForEach(0..<documentPageCount, id: \.self) { index in
+                                                    Circle()
+                                                        .fill(index == currentPageIndex ? Color.white : Color.white.opacity(0.3))
+                                                        .frame(width: 6, height: 6)
+                                                        .scaleEffect(index == currentPageIndex ? 1.2 : 1.0)
+                                                        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: currentPageIndex)
+                                                        .onTapGesture {
+                                                            if index != currentPageIndex {
+                                                                let direction: SwipeDirection = index > currentPageIndex ? .left : .right
+                                                                navigateToPage(index, path: path, direction: direction)
+                                                            }
+                                                        }
+                                                }
+                                            }
+                                        } else {
+                                            // For many pages, show text
+                                            Text("\(currentPageIndex + 1) / \(documentPageCount)")
+                                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                                .foregroundStyle(.secondary)
+                                                .monospacedDigit()
+                                        }
+                                        
+                                        // Next button
+                                        Button {
+                                            if currentPageIndex < documentPageCount - 1 {
+                                                navigateToPage(currentPageIndex + 1, path: path, direction: .left)
+                                            }
+                                        } label: {
+                                            Image(systemName: "chevron.right")
+                                        }
+                                        .buttonStyle(DroppyCircleButtonStyle(size: 28))
+                                        .disabled(currentPageIndex == documentPageCount - 1)
+                                        .opacity(currentPageIndex < documentPageCount - 1 ? 1.0 : 0.4)
+                                        
+                                        // Zoom button for expanded preview
+                                        Button {
+                                            showZoomedPreview = true
+                                        } label: {
+                                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                        }
+                                        .buttonStyle(DroppyCircleButtonStyle(size: 28))
+                                        .help("Expand Preview")
+                                    }
+                                    .padding(.top, 4)
+                                }
+                                
+                                // Zoom button for single-page docs (when page nav isn't shown)
+                                if documentPageCount == 1 {
+                                    Button {
+                                        showZoomedPreview = true
+                                    } label: {
+                                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                    }
+                                    .buttonStyle(DroppyCircleButtonStyle(size: 28))
+                                    .help("Expand Preview")
+                                    .padding(.top, 4)
+                                }
+                            }
+                            
+                            // File name (shared between video and document)
+                            VStack(spacing: 4) {
+                                Text(URL(fileURLWithPath: path).lastPathComponent)
+                                    .font(.headline)
+                                    .foregroundStyle(.white)
+                                    .multilineTextAlignment(.center)
+                                Text(path)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
+                            }
+                        }
+                        .task(id: item.id) {
+                            // Check if this is a video file
+                            if isVideoPath(path) {
+                                await MainActor.run {
+                                    isVideoFile = true
+                                    let url = URL(fileURLWithPath: path)
+                                    videoPlayer = AVPlayer(url: url)
+                                }
+                                return
+                            }
+                            
+                            // Not a video - load document info and first page
+                            await MainActor.run {
+                                isVideoFile = false
+                                videoPlayer = nil
+                            }
+                            
+                            currentPageIndex = 0
+                            documentPageCount = ThumbnailCache.shared.pageCount(for: path)
+                            
+                            isLoadingPreview = true
+                            let preview = await ThumbnailCache.shared.loadDocumentPage(path: path, pageIndex: 0, size: CGSize(width: 400, height: 400))
+                            await MainActor.run {
+                                cachedFilePreview = preview
+                                isLoadingPreview = false
+                            }
+                        }
+                        .sheet(isPresented: $showZoomedPreview) {
+                            ZoomedDocumentPreviewSheet(
+                                item: item,
+                                initialPageIndex: currentPageIndex,
+                                pageCount: documentPageCount
+                            )
                         }
                     }
                 default:
@@ -1717,6 +1989,7 @@ struct ClipboardPreviewView: View {
             // Release cached images when view disappears to free memory
             cachedImage = nil
             cachedAttributedText = nil
+            cachedFilePreview = nil
             linkPreviewImage = nil
             linkPreviewIcon = nil
         }
@@ -1727,9 +2000,15 @@ struct ClipboardPreviewView: View {
             // Clear previous cache immediately to avoid flicker or wrong previews
             cachedImage = nil
             cachedAttributedText = nil
+            cachedFilePreview = nil
             linkPreviewTitle = nil
             linkPreviewImage = nil
             isDirectImageLink = false
+            
+            // Reset page navigation state
+            currentPageIndex = 0
+            documentPageCount = 1
+            swipeOffset = 0
             
             switch item.type {
             case .image:
@@ -1849,6 +2128,497 @@ nonisolated private func rtfToAttributedString(_ data: Data) throws -> Attribute
     return AttributedString(mutable)
 }
 
+// MARK: - Zoomed Document Preview Sheet
+
+/// Full-screen sheet for viewing documents with larger preview, page navigation, OCR and all actions
+struct ZoomedDocumentPreviewSheet: View {
+    let item: ClipboardItem
+    let initialPageIndex: Int
+    let pageCount: Int
+    
+    @Environment(\.dismiss) private var dismiss
+    @State private var currentPage: Int = 0
+    @State private var pagePreview: NSImage?
+    @State private var isLoading = true
+    @State private var swipeOffset: CGFloat = 0
+    @State private var isPerformingOCR = false
+    @State private var showCopySuccess = false
+    @State private var showOCRSuccess = false
+    @State private var ocrCopiedText: String = ""
+    
+    // Zoom state
+    @State private var zoomScale: CGFloat = 1.0
+    @State private var lastZoomScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+    
+    private let minZoom: CGFloat = 1.0
+    private let maxZoom: CGFloat = 5.0
+    
+    private var filePath: String? { item.content }
+    private var fileName: String {
+        guard let path = filePath else { return "Document" }
+        return URL(fileURLWithPath: path).lastPathComponent
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header with title and close button
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(fileName)
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    
+                    if pageCount > 1 {
+                        Text("Page \(currentPage + 1) of \(pageCount)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(DroppyCircleButtonStyle(size: 28))
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+            
+            // Large preview area with zoom and swipe
+            GeometryReader { geometry in
+                ZStack {
+                    if let preview = pagePreview {
+                        Image(nsImage: preview)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .scaleEffect(zoomScale, anchor: .center)
+                            .offset(x: swipeOffset + offset.width, y: offset.height)
+                            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: swipeOffset)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .shadow(color: .black.opacity(0.4), radius: 20, y: 10)
+                            .gesture(
+                                MagnificationGesture()
+                                    .onChanged { value in
+                                        let newScale = lastZoomScale * value
+                                        zoomScale = min(max(newScale, minZoom), maxZoom)
+                                    }
+                                    .onEnded { _ in
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            // Snap to 1x if close
+                                            if zoomScale < 1.1 {
+                                                zoomScale = 1.0
+                                                offset = .zero
+                                                lastOffset = .zero
+                                            }
+                                            lastZoomScale = zoomScale
+                                        }
+                                    }
+                            )
+                            .simultaneousGesture(
+                                DragGesture()
+                                    .onChanged { value in
+                                        if zoomScale > 1.0 {
+                                            // Pan when zoomed
+                                            offset = CGSize(
+                                                width: lastOffset.width + value.translation.width,
+                                                height: lastOffset.height + value.translation.height
+                                            )
+                                        } else if pageCount > 1 {
+                                            // Page swipe when not zoomed
+                                            swipeOffset = value.translation.width * 0.5
+                                        }
+                                    }
+                                    .onEnded { value in
+                                        if zoomScale > 1.0 {
+                                            // Clamp pan offset within bounds
+                                            let maxOffsetX = geometry.size.width * (zoomScale - 1) / 2
+                                            let maxOffsetY = geometry.size.height * (zoomScale - 1) / 2
+                                            
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                offset = CGSize(
+                                                    width: min(max(offset.width, -maxOffsetX), maxOffsetX),
+                                                    height: min(max(offset.height, -maxOffsetY), maxOffsetY)
+                                                )
+                                            }
+                                            lastOffset = offset
+                                        } else if pageCount > 1 {
+                                            let threshold: CGFloat = 80
+                                            
+                                            if value.translation.width < -threshold && currentPage < pageCount - 1 {
+                                                navigateToPage(currentPage + 1, direction: .left)
+                                            } else if value.translation.width > threshold && currentPage > 0 {
+                                                navigateToPage(currentPage - 1, direction: .right)
+                                            } else {
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                    swipeOffset = 0
+                                                }
+                                            }
+                                        }
+                                    }
+                            )
+                            .gesture(
+                                TapGesture(count: 2)
+                                    .onEnded {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            if zoomScale > 1.0 {
+                                                // Reset to 1x
+                                                zoomScale = 1.0
+                                                lastZoomScale = 1.0
+                                                offset = .zero
+                                                lastOffset = .zero
+                                            } else {
+                                                // Zoom to 2x
+                                                zoomScale = 2.0
+                                                lastZoomScale = 2.0
+                                            }
+                                        }
+                                    }
+                            )
+                        
+                        // Zoom controls overlay
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Spacer()
+                                HStack(spacing: 8) {
+                                    // Zoom out
+                                    Button {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            zoomScale = max(zoomScale - 0.5, minZoom)
+                                            lastZoomScale = zoomScale
+                                            if zoomScale <= 1.0 {
+                                                offset = .zero
+                                                lastOffset = .zero
+                                            }
+                                        }
+                                    } label: {
+                                        Image(systemName: "minus.magnifyingglass")
+                                    }
+                                    .buttonStyle(DroppyCircleButtonStyle(size: 32))
+                                    .disabled(zoomScale <= minZoom)
+                                    .opacity(zoomScale <= minZoom ? 0.4 : 1.0)
+                                    
+                                    // Zoom level indicator
+                                    Text("\(Int(zoomScale * 100))%")
+                                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                                        .foregroundStyle(.white.opacity(0.8))
+                                        .monospacedDigit()
+                                        .frame(width: 44)
+                                    
+                                    // Zoom in
+                                    Button {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            zoomScale = min(zoomScale + 0.5, maxZoom)
+                                            lastZoomScale = zoomScale
+                                        }
+                                    } label: {
+                                        Image(systemName: "plus.magnifyingglass")
+                                    }
+                                    .buttonStyle(DroppyCircleButtonStyle(size: 32))
+                                    .disabled(zoomScale >= maxZoom)
+                                    .opacity(zoomScale >= maxZoom ? 0.4 : 1.0)
+                                    
+                                    // Reset zoom (only show when zoomed)
+                                    if zoomScale > 1.0 {
+                                        Button {
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                zoomScale = 1.0
+                                                lastZoomScale = 1.0
+                                                offset = .zero
+                                                lastOffset = .zero
+                                            }
+                                        } label: {
+                                            Image(systemName: "arrow.counterclockwise")
+                                        }
+                                        .buttonStyle(DroppyCircleButtonStyle(size: 32))
+                                        .transition(.scale.combined(with: .opacity))
+                                    }
+                                }
+                                .padding(8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                        .fill(.ultraThinMaterial)
+                                )
+                            }
+                            .padding(12)
+                        }
+                    } else if isLoading {
+                        ProgressView()
+                            .controlSize(.large)
+                    } else if let path = filePath {
+                        Image(nsImage: ThumbnailCache.shared.cachedIcon(forPath: path))
+                            .resizable()
+                            .frame(width: 120, height: 120)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 24)
+            .contentShape(Rectangle())
+            
+            // Page navigation
+            if pageCount > 1 {
+                HStack(spacing: 12) {
+                    Button {
+                        if currentPage > 0 {
+                            navigateToPage(currentPage - 1, direction: .right)
+                        }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    .buttonStyle(DroppyCircleButtonStyle(size: 36))
+                    .disabled(currentPage == 0)
+                    .opacity(currentPage > 0 ? 1.0 : 0.4)
+                    
+                    // Page dots or text
+                    if pageCount <= 12 {
+                        HStack(spacing: 8) {
+                            ForEach(0..<pageCount, id: \.self) { index in
+                                Circle()
+                                    .fill(index == currentPage ? Color.white : Color.white.opacity(0.3))
+                                    .frame(width: 8, height: 8)
+                                    .scaleEffect(index == currentPage ? 1.3 : 1.0)
+                                    .animation(.spring(response: 0.25, dampingFraction: 0.7), value: currentPage)
+                                    .onTapGesture {
+                                        if index != currentPage {
+                                            navigateToPage(index, direction: index > currentPage ? .left : .right)
+                                        }
+                                    }
+                            }
+                        }
+                    } else {
+                        Text("\(currentPage + 1) / \(pageCount)")
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .monospacedDigit()
+                    }
+                    
+                    Button {
+                        if currentPage < pageCount - 1 {
+                            navigateToPage(currentPage + 1, direction: .left)
+                        }
+                    } label: {
+                        Image(systemName: "chevron.right")
+                    }
+                    .buttonStyle(DroppyCircleButtonStyle(size: 36))
+                    .disabled(currentPage == pageCount - 1)
+                    .opacity(currentPage < pageCount - 1 ? 1.0 : 0.4)
+                }
+                .padding(.vertical, 16)
+            }
+            
+            // Action buttons with Droppy pill style
+            HStack(spacing: 12) {
+                // OCR Button
+                Group {
+                    if showOCRSuccess {
+                        Button {
+                            performOCR()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark")
+                                Text("Text Copied!")
+                            }
+                        }
+                        .buttonStyle(DroppyAccentButtonStyle(color: .green, size: .medium))
+                    } else {
+                        Button {
+                            performOCR()
+                        } label: {
+                            HStack(spacing: 6) {
+                                if isPerformingOCR {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Image(systemName: "text.viewfinder")
+                                }
+                                Text("OCR")
+                            }
+                        }
+                        .buttonStyle(DroppyPillButtonStyle(size: .medium))
+                        .disabled(isPerformingOCR)
+                    }
+                }
+                
+                // Copy Button
+                Button {
+                    copyFile()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: showCopySuccess ? "checkmark" : "doc.on.doc")
+                        Text(showCopySuccess ? "Copied!" : "Copy")
+                    }
+                }
+                .buttonStyle(showCopySuccess ? DroppyAccentButtonStyle(color: .green, size: .medium) : DroppyAccentButtonStyle(color: .blue, size: .medium))
+                
+                // Open in Finder
+                Button {
+                    openInFinder()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "folder")
+                        Text("Finder")
+                    }
+                }
+                .buttonStyle(DroppyPillButtonStyle(size: .medium))
+                
+                // QuickLook
+                Button {
+                    openWithQuickLook()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "eye")
+                        Text("QuickLook")
+                    }
+                }
+                .buttonStyle(DroppyPillButtonStyle(size: .medium))
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 24)
+        }
+        .frame(minWidth: 700, minHeight: 600)
+        .background(Color.black.opacity(0.95))
+        .focusable()
+        .focusEffectDisabled()
+        .onKeyPress(.leftArrow) {
+            if currentPage > 0 && pageCount > 1 {
+                navigateToPage(currentPage - 1, direction: .right)
+                return .handled
+            }
+            return .ignored
+        }
+        .onKeyPress(.rightArrow) {
+            if currentPage < pageCount - 1 && pageCount > 1 {
+                navigateToPage(currentPage + 1, direction: .left)
+                return .handled
+            }
+            return .ignored
+        }
+        .interactiveDismissDisabled(true)
+        .onAppear {
+            currentPage = initialPageIndex
+            loadPage(initialPageIndex)
+        }
+    }
+    
+    private enum SwipeDirection {
+        case left, right
+    }
+    
+    private func navigateToPage(_ pageIndex: Int, direction: SwipeDirection) {
+        guard pageIndex >= 0 && pageIndex < pageCount else { return }
+        
+        // Animate out
+        let exitOffset: CGFloat = direction == .left ? -400 : 400
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+            swipeOffset = exitOffset
+        }
+        
+        // Load new page
+        isLoading = true
+        Task {
+            guard let path = filePath else { return }
+            let newPreview = await ThumbnailCache.shared.loadDocumentPage(path: path, pageIndex: pageIndex, size: CGSize(width: 800, height: 800))
+            
+            await MainActor.run {
+                currentPage = pageIndex
+                
+                // Reset zoom and pan when changing pages
+                zoomScale = 1.0
+                lastZoomScale = 1.0
+                offset = .zero
+                lastOffset = .zero
+                
+                // Reset offset to opposite side
+                swipeOffset = direction == .left ? 400 : -400
+                
+                pagePreview = newPreview
+                isLoading = false
+                
+                // Animate in
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    swipeOffset = 0
+                }
+            }
+        }
+    }
+    
+    private func loadPage(_ pageIndex: Int) {
+        guard let path = filePath else { return }
+        isLoading = true
+        
+        Task {
+            let preview = await ThumbnailCache.shared.loadDocumentPage(path: path, pageIndex: pageIndex, size: CGSize(width: 800, height: 800))
+            await MainActor.run {
+                pagePreview = preview
+                isLoading = false
+            }
+        }
+    }
+    
+    private func performOCR() {
+        guard let preview = pagePreview else { return }
+        isPerformingOCR = true
+        
+        Task {
+            do {
+                let ocrResult = try await OCRService.shared.performOCR(on: preview)
+                await MainActor.run {
+                    isPerformingOCR = false
+                    if !ocrResult.isEmpty {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(ocrResult, forType: .string)
+                        ocrCopiedText = ocrResult
+                        showOCRSuccess = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            showOCRSuccess = false
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isPerformingOCR = false
+                }
+            }
+        }
+    }
+    
+    private func copyFile() {
+        guard let path = filePath else { return }
+        let url = URL(fileURLWithPath: path)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.writeObjects([url as NSURL])
+        
+        withAnimation {
+            showCopySuccess = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation {
+                showCopySuccess = false
+            }
+        }
+    }
+    
+    private func openInFinder() {
+        guard let path = filePath else { return }
+        let url = URL(fileURLWithPath: path)
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+    
+    private func openWithQuickLook() {
+        guard let path = filePath else { return }
+        let url = URL(fileURLWithPath: path)
+        NSWorkspace.shared.open(url)
+    }
+}
 
 // MARK: - Multi-Select Preview View
 

@@ -120,14 +120,16 @@ class AudioSpectrum: NSView {
             let targetScale: CGFloat
             
             if let audioLevel = externalAudioLevel {
-                // REAL AUDIO MODE: iPhone-like reactive bars
+                // REAL AUDIO MODE: iPhone-like reactive bars (v21.69 refinement)
                 // Each bar gets independent variation for natural look
-                let barVariation = CGFloat.random(in: -0.25...0.25)
+                let barVariation = CGFloat.random(in: -0.15...0.15)
                 
-                // Apply audio level with variation - more reactive to loud music
-                // Minimum 0.15 (small bars when quiet), max 1.0 (full height when loud)
-                let baseScale = 0.15 + (audioLevel * 0.85)
-                targetScale = max(0.15, min(1.0, baseScale + barVariation))
+                // Apply logarithmic scaling to make bars less sensitive
+                // This prevents them from hitting 100% too quickly
+                // Minimum 0.12 (small bars when quiet), max 0.85 (never fully maxed)
+                let logLevel = log10(1 + audioLevel * 9) / log10(10)  // Logarithmic curve
+                let baseScale = 0.12 + (logLevel * 0.55)  // Max ~0.67 before variation
+                targetScale = max(0.12, min(0.85, baseScale + barVariation))
             } else {
                 // SIMULATION MODE: Enhanced wave patterns with track progress
                 let energyMultiplier: CGFloat

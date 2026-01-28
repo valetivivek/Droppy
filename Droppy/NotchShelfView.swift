@@ -208,6 +208,12 @@ struct NotchShelfView: View {
         isExternalDisplay && useTransparentBackground
     }
     
+    /// Whether floating buttons should use transparent glass effect
+    /// Combines DI mode and external notch style transparency
+    private var shouldUseFloatingButtonTransparent: Bool {
+        shouldUseDynamicIslandTransparent || shouldUseExternalNotchTransparent
+    }
+    
     /// Whether the HUD should show a title in the center
     /// True for Dynamic Island mode OR external displays (no physical camera blocking the center)
     private var shouldShowTitleInHUD: Bool {
@@ -244,8 +250,8 @@ struct NotchShelfView: View {
     /// Top margin for Dynamic Island from SSOT - creates floating effect like iPhone
     private var dynamicIslandTopMargin: CGFloat { NotchLayoutConstants.dynamicIslandTopMargin }
     
-    /// Width when showing files (narrower - 5 items × 64px + 4 gaps × 8px + 2 × 20px padding = 392px)
-    private let shelfWidth: CGFloat = 392
+    /// Width when showing files (matches media player width for visual consistency)
+    private let shelfWidth: CGFloat = 450
     
     /// Width when showing media player (wider for album art + controls)
     private let mediaPlayerWidth: CGFloat = 450
@@ -267,9 +273,9 @@ struct NotchShelfView: View {
     /// Wider but shorter for horizontal album art + controls layout
     private let mediaPlayerExpandedWidth: CGFloat = 480
     /// Content height matching shelf pattern exactly (SSOT: uses NotchLayoutConstants):
-    /// DI/external mode: 100pt (album) + 20pt top + 20pt bottom = 140pt
-    /// Built-in notch mode: 100pt + notchHeight (top) + 20pt (bottom) = totalHeight varies
-    private let mediaPlayerContentHeight: CGFloat = 140
+    /// DI/external mode (v21.68): 30pt top + 100pt album + 30pt bottom = 160pt (30pt symmetry)
+    /// Built-in notch mode: notchHeight (top) + 100pt album + 20pt (bottom) = notchHeight + 120
+    private let mediaPlayerContentHeight: CGFloat = 160
     
     /// Fixed wing sizes (area left/right of notch for content)  
     /// Using fixed sizes ensures consistent content positioning across all screen resolutions
@@ -313,7 +319,6 @@ struct NotchShelfView: View {
         // - External notch style: needs 160pt base (was 180pt with compensation)
         let diContentWidth: CGFloat = 100
         let externalNotchWidth: CGFloat = 180  // Matches original working width
-        let curvedCornerCompensation: CGFloat = 20
         
         if isDynamicIslandMode {
             return diContentWidth
@@ -453,8 +458,12 @@ struct NotchShelfView: View {
             return notchHeight  // Update HUD just uses notch height (no slider)
         } else if HUDManager.shared.isNotificationHUDVisible && NotificationHUDManager.shared.isInstalled {
             // Notification HUD: mode-aware height
-            // Dynamic Island: compact height, Notch: taller to clear physical notch
-            return isDynamicIslandMode ? 70 : 110
+            // SSOT (v21.72): Different heights per mode
+            // - Island mode: 70pt compact
+            // - External notch style: 78pt (20 top + 38 icon + 20 bottom)
+            // - Built-in notch: 110pt
+            let isExternalNotchStyle = isExternalDisplay && !externalDisplayUseDynamicIsland
+            return isDynamicIslandMode ? 70 : (isExternalNotchStyle ? 78 : 110)
         } else if shouldShowMediaHUD {
             // No vertical expansion on media HUD hover - just stay at notch height
             return notchHeight
@@ -469,15 +478,22 @@ struct NotchShelfView: View {
     private var currentExpandedHeight: CGFloat {
         // TERMINAL: Expanded height when terminal has output
         if terminalManager.isInstalled && terminalManager.isVisible {
-            // Base height for terminal (taller than media player to fit content)
-            let baseTerminalHeight: CGFloat = 180
-            // SSOT: Use contentLayoutNotchHeight for consistent sizing
-            // Same logic as media player: delta = notchHeight - 20 for built-in notch mode
-            let topPaddingDelta: CGFloat = contentLayoutNotchHeight == 0 ? 0 : (contentLayoutNotchHeight - 20)
-            let terminalHeight = baseTerminalHeight + topPaddingDelta
-            
-            // Height stays constant - no expansion when output is present
-            return terminalHeight
+            // SSOT (v21.72): Different base heights for different modes:
+            // - Pure Island mode: 30 (top) + 140 content + 30 (bottom) = 200pt
+            // - External notch style: 20 (top) + 140 content + 20 (bottom) = 180pt
+            // - Built-in notch mode: notchHeight (top) + 140 content + 20 (bottom)
+            let isExternalNotchStyle = isExternalDisplay && !externalDisplayUseDynamicIsland
+            if contentLayoutNotchHeight > 0 {
+                // Built-in notch mode: notchHeight + 160
+                return contentLayoutNotchHeight + 160
+            } else if isExternalNotchStyle {
+                // External notch style: 180pt (20 top + 140 content + 20 bottom)
+                // Symmetric vertical padding for visual balance
+                return 180
+            } else {
+                // Pure Island mode: 180pt (20+140+20)
+                return 180
+            }
         }
         
         // Determine if we're showing media player or shelf
@@ -486,12 +502,22 @@ struct NotchShelfView: View {
         
         // MEDIA PLAYER: Content height based on layout
         if showMediaPlayer && shouldShowMediaPlayer && !musicManager.isPlayerIdle {
-            // SSOT: Use contentLayoutNotchHeight for consistent sizing
-            // DI/external mode: 20 (top) + 100 (album) + 20 (bottom) = 140pt (no delta)
-            // Built-in notch mode: notchHeight (top) + 100 (album) + 20 (bottom) = notchHeight + 120
-            // Delta from base 140: notchHeight - 20
-            let topPaddingDelta: CGFloat = contentLayoutNotchHeight == 0 ? 0 : (contentLayoutNotchHeight - 20)
-            return mediaPlayerContentHeight + topPaddingDelta
+            // SSOT (v21.68): Different base heights for different modes:
+            // - Pure Island mode: 30 (top) + 100 (album) + 30 (bottom) = 160pt
+            // - External notch style: 20 (top) + 100 (album) + 20 (bottom) = 140pt
+            // - Built-in notch mode: notchHeight (top) + 100 (album) + 20 (bottom)
+            let isExternalNotchStyle = isExternalDisplay && !externalDisplayUseDynamicIsland
+            if contentLayoutNotchHeight > 0 {
+                // Built-in notch mode: use notchHeight + 120 formula
+                return mediaPlayerContentHeight + (contentLayoutNotchHeight - 40)
+            } else if isExternalNotchStyle {
+                // External notch style: 140pt (20 top + 100 content + 20 bottom)
+                // Symmetric vertical padding for visual balance
+                return 140
+            } else {
+                // Pure Island mode: 140pt (20+100+20)
+                return 140
+            }
         }
         
         // SHELF: DYNAMIC height (grows with files up to max 3 rows)
@@ -609,7 +635,7 @@ struct NotchShelfView: View {
                             }) {
                                 Image(systemName: "arrow.up.forward.app")
                             }
-                            .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseDynamicIslandTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
+                            .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseFloatingButtonTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
                             .help("Open in Terminal.app")
                             .transition(.scale(scale: 0.8).combined(with: .opacity))
                             
@@ -619,7 +645,7 @@ struct NotchShelfView: View {
                                 }) {
                                     Image(systemName: "arrow.counterclockwise")
                                 }
-                                .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseDynamicIslandTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
+                                .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseFloatingButtonTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
                                 .help("Clear terminal output")
                                 .transition(.scale(scale: 0.8).combined(with: .opacity))
                             }
@@ -632,7 +658,7 @@ struct NotchShelfView: View {
                         }) {
                             Image(systemName: terminalManager.isVisible ? "xmark" : "terminal")
                         }
-                        .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseDynamicIslandTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
+                        .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseFloatingButtonTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
                         .transition(.scale(scale: 0.8).combined(with: .opacity))
                     }
                     
@@ -646,7 +672,7 @@ struct NotchShelfView: View {
                         }) {
                             Image(systemName: "xmark")
                         }
-                        .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseDynamicIslandTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
+                        .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseFloatingButtonTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
                     }
                 }
                 // Position exactly below the expanded content using SSOT gap
@@ -1040,7 +1066,7 @@ struct NotchShelfView: View {
                     .animation(.smooth(duration: 0.35), value: currentExpandedHeight)
                     .animation(.smooth(duration: 0.35), value: musicManager.isMediaHUDForced)
                     .animation(.smooth(duration: 0.35), value: musicManager.isMediaHUDHidden)
-                    .clipShape(isDynamicIslandMode ? AnyShape(DynamicIslandShape(cornerRadius: 40)) : AnyShape(NotchShape(bottomRadius: 40)))
+                    .clipShape(isDynamicIslandMode ? AnyShape(DynamicIslandShape(cornerRadius: 50)) : AnyShape(NotchShape(bottomRadius: 40)))
                     .geometryGroup()
                     .zIndex(2)
             }
@@ -1067,7 +1093,7 @@ struct NotchShelfView: View {
         .mask {
             Group {
                 if isDynamicIslandMode {
-                    DynamicIslandShape(cornerRadius: isExpandedOnThisScreen ? 40 : 50)
+                    DynamicIslandShape(cornerRadius: 50)
                 } else {
                     NotchShape(bottomRadius: isExpandedOnThisScreen ? 40 : (hudIsVisible ? 18 : 16))
                 }
@@ -1181,7 +1207,12 @@ struct NotchShelfView: View {
         if HUDManager.shared.isNotificationHUDVisible && !hudIsVisible && !isExpandedOnThisScreen,
            let _ = NotificationHUDManager.shared.currentNotification {
             let notifWidth = isDynamicIslandMode ? hudWidth : expandedWidth
-            let notifHeight: CGFloat = isDynamicIslandMode ? 70 : 110
+            // SSOT (v21.72): Different heights for different modes
+            // - Island mode: 70pt compact
+            // - External notch style: 78pt (20 top + 38 icon + 20 bottom)
+            // - Built-in notch: 110pt (notchHeight ~37 + content)
+            let isExternalNotchStyle = isExternalDisplay && !externalDisplayUseDynamicIsland
+            let notifHeight: CGFloat = isDynamicIslandMode ? 70 : (isExternalNotchStyle ? 78 : 110)
             
             NotificationHUDView(
                 manager: NotificationHUDManager.shared,
@@ -1260,28 +1291,33 @@ struct NotchShelfView: View {
             
             // HUD X position: Album art at left edge with symmetricPadding inset
             // Use FIXED HUD container width to prevent jumping during transitions
-            // +10pt compensation for curved wing corners (topCornerRadius)
-            let hudSymmetricPadding: CGFloat = isDynamicIslandMode ? (notchHeight - hudSize) / 2 : max((notchHeight - hudSize) / 2, 6) + 10
+            // +wingCornerCompensation for curved wing corners (topCornerRadius)
+            let hudSymmetricPadding: CGFloat = isDynamicIslandMode ? (notchHeight - hudSize) / 2 : max((notchHeight - hudSize) / 2, 6) + NotchLayoutConstants.wingCornerCompensation
             // In DI mode, use notchHeight as the fixed HUD height. In notch mode, use actual notchHeight.
             let fixedHUDHeight: CGFloat = isDynamicIslandMode ? notchHeight : notchHeight
             let fixedHUDContainerWidth: CGFloat = isDynamicIslandMode ? 260 : (notchWidth + (mediaWingWidth * 2))
             let hudXOffset = -(fixedHUDContainerWidth / 2) + hudSymmetricPadding + (hudSize / 2)
             
-            // Expanded X position: Album art at left side with content padding
-            let expandedPadding: CGFloat = 20  // NotchLayoutConstants content padding
-            let expandedXOffset = -(expandedWidth / 2) + expandedPadding + (expandedSize / 2)
+            // Expanded X position: Album art at left side with appropriate padding
+            // - DI mode: 20pt (contentPadding)
+            // - Notch modes: 30pt (contentPadding + wingCornerCompensation)
+            let horizontalPadding: CGFloat = isDynamicIslandMode 
+                ? NotchLayoutConstants.contentPadding 
+                : NotchLayoutConstants.contentPadding + NotchLayoutConstants.wingCornerCompensation
+            let expandedXOffset = -(expandedWidth / 2) + horizontalPadding + (expandedSize / 2)
             
             let currentXOffset = isExpandedOnThisScreen ? expandedXOffset : hudXOffset
             
             // Y position: ZStack is .top aligned, so offset moves the view's TOP edge down
             // HUD: Center icon vertically = offset by (containerHeight - iconHeight) / 2
             let hudYOffset = (fixedHUDHeight - hudSize) / 2
-            // Expanded: Position album art top edge at content padding position
             // SSOT: Must match NotchLayoutConstants.contentEdgeInsets exactly
-            // - DI/external mode: top padding = 20 (contentPadding)
-            // - Built-in notch mode: top padding = notchHeight + 10 (wing corner compensation)
-            let wingCompensation: CGFloat = contentLayoutNotchHeight > 0 ? 10 : 0
-            let expandedTopPadding: CGFloat = contentLayoutNotchHeight == 0 ? expandedPadding : contentLayoutNotchHeight + wingCompensation
+            // - DI mode: 20pt (contentPadding)
+            // - External notch style: 20pt (contentPadding)  
+            // - Built-in notch mode: notchHeight
+            let expandedTopPadding: CGFloat = contentLayoutNotchHeight > 0 
+                ? contentLayoutNotchHeight 
+                : NotchLayoutConstants.contentPadding
             let expandedYOffset = expandedTopPadding
             let currentYOffset = isExpandedOnThisScreen ? expandedYOffset : hudYOffset
             
@@ -1439,8 +1475,8 @@ struct NotchShelfView: View {
             // Calculate position offsets
             // Use fixed dimensions for HUD to prevent jumping on hover
             let fixedHUDHeight: CGFloat = notchHeight
-            // +10pt compensation for curved wing corners (topCornerRadius)
-            let hudSymmetricPadding: CGFloat = isDynamicIslandMode ? (notchHeight - hudHeight) / 2 : max((notchHeight - hudHeight) / 2, 6) + 10
+            // +wingCornerCompensation for curved wing corners (topCornerRadius)
+            let hudSymmetricPadding: CGFloat = isDynamicIslandMode ? (notchHeight - hudHeight) / 2 : max((notchHeight - hudHeight) / 2, 6) + NotchLayoutConstants.wingCornerCompensation
             
             // HUD X: Right side of HUD (mirror of album art position)
             // Use FIXED HUD container width to prevent jumping during transitions
@@ -1448,25 +1484,29 @@ struct NotchShelfView: View {
             let visualizerHudXOffset = (fixedHUDContainerWidth / 2) - hudSymmetricPadding - (hudWidth / 2)
             
             // Expanded X: Align visualizer RIGHT edge with timestamp RIGHT edge
-            let expandedPadding: CGFloat = 20
-            // Timestamp right edge is at container edge - padding = 450 - 20 = 430pt from left
+            // - DI mode: 20pt padding
+            // - Notch modes: 30pt padding
+            let horizontalPadding: CGFloat = isDynamicIslandMode 
+                ? NotchLayoutConstants.contentPadding 
+                : NotchLayoutConstants.contentPadding + NotchLayoutConstants.wingCornerCompensation
+            // Timestamp right edge is at container edge - padding
             // The actual MediaPlayerView frames the visualizer at 28pt but content is only 23pt centered within
             // So visualizer content right edge = frame right edge - (28-23)/2 = frame right - 2.5pt
             // To align content precisely, we need to match where the ACTUAL bars end
-            // MediaPlayerView visualizer frame right = 430pt, content right = 430 - 2.5 = 427.5pt
-            // Our visualizer is 23pt, so center should be at 427.5 - 11.5 = 416pt from left = 191pt from center
             let frameToContentOffset: CGFloat = 2.5  // MediaPlayerView uses 28pt frame for 23pt content
-            let expandedXOffset = (self.expandedWidth / 2) - expandedPadding - (expandedWidth / 2) - frameToContentOffset
+            let expandedXOffset = (self.expandedWidth / 2) - horizontalPadding - (expandedWidth / 2) - frameToContentOffset
             
             let currentXOffset = isExpandedOnThisScreen ? expandedXOffset : visualizerHudXOffset
             
             // Y position: centered in HUD, at top of expanded content (in title row)
             let hudYOffset = (fixedHUDHeight - hudHeight) / 2
-            // Expanded: in the title row area, aligned with title text
             // SSOT: Must match NotchLayoutConstants.contentEdgeInsets exactly
-            // +10pt wing corner compensation in notch mode
-            let wingCompensation: CGFloat = contentLayoutNotchHeight > 0 ? 10 : 0
-            let expandedTopPadding: CGFloat = contentLayoutNotchHeight == 0 ? expandedPadding : contentLayoutNotchHeight + wingCompensation
+            // - DI mode: 20pt (contentPadding)
+            // - External notch style: 20pt (contentPadding)
+            // - Built-in notch mode: notchHeight
+            let expandedTopPadding: CGFloat = contentLayoutNotchHeight > 0 
+                ? contentLayoutNotchHeight 
+                : NotchLayoutConstants.contentPadding
             let expandedYOffset = expandedTopPadding + 1  // +1 to vertically center visualizer with title row
             let currentYOffset = isExpandedOnThisScreen ? expandedYOffset : hudYOffset
             
@@ -1515,11 +1555,15 @@ struct NotchShelfView: View {
                 // HUD: centered with padding for album art (36pt each side)
                 // Expanded: available width after album art + spacing + visualizer
                 let hudTitleWidth: CGFloat = 180
-                let expandedPadding: CGFloat = 20
+                // - DI mode: 20pt padding
+                // - Notch modes: 30pt padding
+                let horizontalPadding: CGFloat = isDynamicIslandMode 
+                    ? NotchLayoutConstants.contentPadding 
+                    : NotchLayoutConstants.contentPadding + NotchLayoutConstants.wingCornerCompensation
                 let albumArtSize: CGFloat = 100
                 let contentSpacing: CGFloat = 16
                 let visualizerWidth: CGFloat = 28
-                let expandedTitleWidth: CGFloat = expandedWidth - (expandedPadding * 2) - albumArtSize - contentSpacing - visualizerWidth - 8
+                let expandedTitleWidth: CGFloat = expandedWidth - (horizontalPadding * 2) - albumArtSize - contentSpacing - visualizerWidth - 8
                 let currentTitleWidth = isExpandedOnThisScreen ? expandedTitleWidth : hudTitleWidth
                 
                 // Calculate position offsets
@@ -1529,7 +1573,7 @@ struct NotchShelfView: View {
                 let hudXOffset: CGFloat = 0
                 
                 // Expanded X: After album art + spacing, centered in remaining title area
-                let titleLeftEdge = -(expandedWidth / 2) + expandedPadding + albumArtSize + contentSpacing
+                let titleLeftEdge = -(expandedWidth / 2) + horizontalPadding + albumArtSize + contentSpacing
                 let expandedXOffset = titleLeftEdge + (expandedTitleWidth / 2)
                 let currentXOffset = isExpandedOnThisScreen ? expandedXOffset : hudXOffset
                 
@@ -1538,10 +1582,13 @@ struct NotchShelfView: View {
                 let hudYOffset: CGFloat = ((fixedHUDHeight - 20) / 2) + 2
                 
                 // SSOT: Must match NotchLayoutConstants.contentEdgeInsets exactly
-                // - DI/external mode: top padding = 20 (contentPadding)
-                // - Built-in notch mode: top padding = notchHeight
+                // - DI mode: 20pt (contentPadding)
+                // - External notch style: 20pt (contentPadding)
+                // - Built-in notch mode: notchHeight
                 // Title TOP must align with album art TOP
-                let expandedTopPadding: CGFloat = contentLayoutNotchHeight == 0 ? expandedPadding : contentLayoutNotchHeight
+                let expandedTopPadding: CGFloat = contentLayoutNotchHeight > 0 
+                    ? contentLayoutNotchHeight 
+                    : NotchLayoutConstants.contentPadding
                 let expandedYOffset: CGFloat = expandedTopPadding  // No offset - title top = album art top
                 let currentYOffset = isExpandedOnThisScreen ? expandedYOffset : hudYOffset
                 
@@ -1609,7 +1656,7 @@ struct NotchShelfView: View {
         ZStack {
             // Dynamic Island shape (pill)
             // When transparent DI is enabled, use glass material instead of gray
-            DynamicIslandShape(cornerRadius: isExpandedOnThisScreen ? 40 : 50)
+            DynamicIslandShape(cornerRadius: 50)
                 .fill(shouldUseDynamicIslandTransparent ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(dynamicIslandGray))
                 .opacity(isDynamicIslandMode ? 1 : 0)
                 .scaleEffect(isDynamicIslandMode ? 1 : 0.85)
@@ -1631,7 +1678,7 @@ struct NotchShelfView: View {
                 // Premium pill shadow for Dynamic Island (only when NOT transparent)
                 // Shadow visible when expanded OR hovering (premium depth effect)
                 let showShadow = isExpandedOnThisScreen || isHoveringOnThisScreen
-                DynamicIslandShape(cornerRadius: isExpandedOnThisScreen ? 40 : 50)
+                DynamicIslandShape(cornerRadius: 50)
                     .fill(dynamicIslandGray)
                     .shadow(
                         // PREMIUM EXACT: .black.opacity(0.7) radius 6
@@ -1829,9 +1876,8 @@ struct NotchShelfView: View {
     // NOTE: In regular notch mode, indicators are solid black.
     // In transparent DI mode OR external notch transparent mode, indicators use glass material.
     private var indicatorBackground: some View {
-        let useTransparent = shouldUseDynamicIslandTransparent || shouldUseExternalNotchTransparent
-        return RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .fill(useTransparent ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(shouldUseFloatingButtonTransparent ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(Color.white.opacity(0.2), lineWidth: 1)
@@ -2010,10 +2056,11 @@ struct NotchShelfView: View {
                              }
                     )
                 
-                // Items grid using LazyVGrid for efficient rendering
-                let columns = Array(repeating: GridItem(.fixed(64), spacing: 8), count: 5)
+                // Items grid using LazyVGrid with flexible layout to fill available space
+                // Use flexible columns that expand to fill the container width evenly
+                let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 5)
                 
-                LazyVGrid(columns: columns, spacing: 8) {
+                LazyVGrid(columns: columns, spacing: 12) {
                     // Power Folders first
                     ForEach(state.shelfPowerFolders) { folder in
                         NotchItemView(
@@ -2044,11 +2091,12 @@ struct NotchShelfView: View {
                         .transition(.scale.combined(with: .opacity))
                     }
                 }
-                .padding(.horizontal, 8)
                 // SSOT: Top padding clears physical notch in built-in notch mode
                 // External displays and DI mode use smaller symmetrical padding
                 .padding(.top, contentLayoutNotchHeight == 0 ? 8 : contentLayoutNotchHeight + 4)
                 .padding(.bottom, 6)
+                // Horizontal padding: 20pt for DI mode, 30pt for notch modes
+                .padding(.horizontal, isDynamicIslandMode ? NotchLayoutConstants.contentPadding : NotchLayoutConstants.contentPadding + NotchLayoutConstants.wingCornerCompensation)
             }
         }
         // Enable scrolling when more than 3 rows, disable otherwise
@@ -2338,11 +2386,10 @@ extension NotchShelfView {
         .scaleEffect((state.isDropTargeted || state.isShelfAirDropZoneTargeted) ? 0.97 : 1.0)
         .animation(DroppyAnimation.hoverBouncy, value: state.isDropTargeted)
         .animation(DroppyAnimation.hoverBouncy, value: state.isShelfAirDropZoneTargeted)
-        // Use SSOT for consistent padding across all expanded views
-        // Island mode: 20pt uniform on ALL sides
-        // Notch mode: top = notchHeight (just below physical notch), 20pt on left/right/bottom
-        // External notch style: 20pt vertical, 30pt horizontal (for curved corners)
-        // SSOT: contentLayoutNotchHeight for consistent shelf content layout
+        // Use SSOT for consistent padding across all expanded views (v21.68 VERIFIED)
+        // - Built-in notch mode: top = notchHeight, left/right = 30pt, bottom = 20pt
+        // - External notch style: top/bottom = 20pt, left/right = 30pt
+        // - Island mode: 30pt on ALL 4 edges
         .padding(NotchLayoutConstants.contentEdgeInsets(notchHeight: contentLayoutNotchHeight, isExternalWithNotchStyle: isExternalDisplay && !externalDisplayUseDynamicIsland))
         .onAppear {
             withAnimation(.linear(duration: 25).repeatForever(autoreverses: false)) {

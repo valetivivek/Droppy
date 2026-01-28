@@ -18,6 +18,10 @@ enum NotchLayoutConstants {
     /// Standard content padding (left, right, bottom) - equal on all three edges
     static let contentPadding: CGFloat = 20
     
+    /// Horizontal padding compensation for curved wing corners (topCornerRadius)
+    /// Applied in: built-in notch mode, external notch style
+    static let wingCornerCompensation: CGFloat = 10
+    
     // MARK: - Dynamic Island Dimensions (collapsed state)
     
     /// Dynamic Island collapsed width
@@ -98,26 +102,30 @@ enum NotchLayoutConstants {
             return !externalUseDI
         }()
         
+        // v21.72: Same values as contentEdgeInsets(notchHeight:isExternalWithNotchStyle:)
+        let symmetricPadding = contentPadding + wingCornerCompensation  // 30pt
+        
         if notch > 0 {
-            // NOTCH MODE: Top padding = notchHeight + 10 (wing corner compensation)
-            // Left/Right = contentPadding, Bottom = contentPadding - 10 (to balance)
-            // The curved wing corners add 10pt visual inset at top corners
+            // NOTCH MODE: Top = notchHeight (just below physical notch)
+            // Left/Right = 30pt for curved corner clearance
+            // Bottom = 20pt
             return EdgeInsets(
-                top: notch + 10,
-                leading: contentPadding,
-                bottom: contentPadding - 10,
-                trailing: contentPadding
+                top: notch,
+                leading: symmetricPadding,
+                bottom: contentPadding,
+                trailing: symmetricPadding
             )
         } else if isExternalWithNotchStyle {
-            // EXTERNAL WITH NOTCH STYLE: +10pt horizontal for curved corners, normal vertical
+            // EXTERNAL WITH NOTCH STYLE (v21.72): Symmetric vertical, DI-style horizontal
+            // Top/Bottom = 20pt, Left/Right = 30pt
             return EdgeInsets(
                 top: contentPadding,
-                leading: contentPadding + 10,
+                leading: symmetricPadding,
                 bottom: contentPadding,
-                trailing: contentPadding + 10
+                trailing: symmetricPadding
             )
         } else {
-            // PURE ISLAND MODE: 100% symmetrical padding on all edges
+            // PURE ISLAND MODE: 20pt symmetrical on ALL 4 edges for compact look
             return EdgeInsets(
                 top: contentPadding,
                 leading: contentPadding,
@@ -133,24 +141,29 @@ enum NotchLayoutConstants {
     ///   - isExternalWithNotchStyle: Whether this is an external display with notch visual style
     /// - Returns: EdgeInsets for the content
     static func contentEdgeInsets(notchHeight: CGFloat, isExternalWithNotchStyle: Bool = false) -> EdgeInsets {
+        // v21.68: All modes use 30pt (contentPadding + wingCornerCompensation) for horizontal edges
+        // Island mode: 30pt on ALL 4 edges for 100% symmetry
+        let symmetricPadding = contentPadding + wingCornerCompensation  // 30pt
+        
         if notchHeight > 0 {
-            // NOTCH MODE: Top + 10pt wing compensation, Bottom - 10pt to balance
+            // NOTCH MODE: Top = notchHeight, Left/Right = 30pt, Bottom = 20pt
             return EdgeInsets(
-                top: notchHeight + 10,
-                leading: contentPadding,
-                bottom: contentPadding - 10,
-                trailing: contentPadding
+                top: notchHeight,
+                leading: symmetricPadding,
+                bottom: contentPadding,
+                trailing: symmetricPadding
             )
         } else if isExternalWithNotchStyle {
-            // EXTERNAL WITH NOTCH STYLE: +10pt horizontal for curved corners, normal vertical
+            // EXTERNAL WITH NOTCH STYLE (v21.72): Symmetric vertical, DI-style horizontal
+            // Top/Bottom = 20pt (symmetrical vertical), Left/Right = 30pt (matches DI)
             return EdgeInsets(
-                top: contentPadding,
-                leading: contentPadding + 10,
-                bottom: contentPadding,
-                trailing: contentPadding + 10
+                top: contentPadding,  // 20pt
+                leading: symmetricPadding,  // 30pt
+                bottom: contentPadding,  // 20pt (matches top for visual balance)
+                trailing: symmetricPadding  // 30pt
             )
         } else {
-            // PURE ISLAND MODE: 100% symmetrical
+            // PURE ISLAND MODE: 20pt symmetrical on ALL 4 edges for compact look
             return EdgeInsets(
                 top: contentPadding,
                 leading: contentPadding,

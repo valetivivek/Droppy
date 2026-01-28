@@ -9,6 +9,7 @@
 import AppKit
 import Foundation
 import ImageIO
+import PDFKit
 import QuickLookThumbnailing
 import UniformTypeIdentifiers
 
@@ -29,6 +30,9 @@ final class ThumbnailCache {
     /// Cache for system icons (very fast lookup)
     private let iconCache = NSCache<NSString, NSImage>()
     
+    /// Cache for multi-page document previews (PDFs, Office docs)
+    private let pageCache = NSCache<NSString, NSImage>()
+    
     private init() {
         // Limit cache to ~50 thumbnails (each ~16KB = ~800KB max)
         cache.countLimit = 50
@@ -41,6 +45,10 @@ final class ThumbnailCache {
         // Icon cache (very small, just file icons)
         iconCache.countLimit = 200
         iconCache.totalCostLimit = 512 * 1024 // 512KB max
+        
+        // Page cache for multi-page documents (PDFs, Office docs)
+        pageCache.countLimit = 50
+        pageCache.totalCostLimit = 4 * 1024 * 1024 // 4MB max
         
         // CRITICAL: Warmup QuickLook and Metal shaders on background thread during startup
         // This eliminates the ~1 second lag on first file drop by forcing Metal shader compilation now
@@ -263,6 +271,112 @@ final class ThumbnailCache {
         return icon
     }
     
+    /// Async load QuickLook thumbnail for any file path (used by clipboard)
+    /// Returns nil if no QuickLook thumbnail available - caller should use icon fallback
+    func loadFileThumbnailAsync(path: String, size: CGSize = CGSize(width: 120, height: 120)) async -> NSImage? {
+        let cacheKey = "file:\(path):\(Int(size.width))" as NSString
+        
+        // Check cache first
+        if let cached = fileCache.object(forKey: cacheKey) {
+            return cached
+        }
+        
+        // Generate async using QuickLook
+        let url = URL(fileURLWithPath: path)
+        let request = QLThumbnailGenerator.Request(
+            fileAt: url,
+            size: size,
+            scale: NSScreen.main?.backingScaleFactor ?? 2.0,
+            representationTypes: .all  // Include icon fallbacks
+        )
+        
+        do {
+            let rep = try await QLThumbnailGenerator.shared.generateBestRepresentation(for: request)
+            let thumbnail = rep.nsImage
+            let estimatedCost = Int(size.width * size.height * 4)
+            fileCache.setObject(thumbnail, forKey: cacheKey, cost: estimatedCost)
+            return thumbnail
+        } catch {
+            // Return nil - let caller use icon fallback
+            return nil
+        }
+    }
+    
+    // MARK: - Multi-Page Document Support
+    
+    /// Get the number of pages in a document (PDF, or 1 for other types)
+    func pageCount(for path: String) -> Int {
+        let url = URL(fileURLWithPath: path)
+        let ext = url.pathExtension.lowercased()
+        
+        // PDFs have native page support
+        if ext == "pdf" {
+            guard let pdf = PDFDocument(url: url) else { return 1 }
+            return pdf.pageCount
+        }
+        
+        // Office documents use QuickLook which only provides first page
+        // Future: Could use document frameworks for true multi-page
+        return 1
+    }
+    
+    /// Load a specific page from a multi-page document as an image
+    /// Returns nil if page doesn't exist or can't be rendered
+    func loadDocumentPage(path: String, pageIndex: Int, size: CGSize = CGSize(width: 400, height: 400)) async -> NSImage? {
+        let cacheKey = "page:\(path):\(pageIndex):\(Int(size.width))" as NSString
+        
+        // Check cache first
+        if let cached = pageCache.object(forKey: cacheKey) {
+            return cached
+        }
+        
+        let url = URL(fileURLWithPath: path)
+        let ext = url.pathExtension.lowercased()
+        
+        // PDFs: Use PDFKit for high-quality page rendering
+        if ext == "pdf" {
+            return await Task.detached(priority: .userInitiated) {
+                guard let pdf = PDFDocument(url: url),
+                      let page = pdf.page(at: pageIndex) else { return nil }
+                
+                let pageRect = page.bounds(for: .mediaBox)
+                let scale = min(size.width / pageRect.width, size.height / pageRect.height)
+                let scaledSize = CGSize(
+                    width: pageRect.width * scale,
+                    height: pageRect.height * scale
+                )
+                
+                let image = NSImage(size: scaledSize)
+                image.lockFocus()
+                
+                if let context = NSGraphicsContext.current?.cgContext {
+                    context.setFillColor(NSColor.white.cgColor)
+                    context.fill(CGRect(origin: .zero, size: scaledSize))
+                    
+                    context.scaleBy(x: scale, y: scale)
+                    page.draw(with: .mediaBox, to: context)
+                }
+                
+                image.unlockFocus()
+                
+                // Cache on main thread
+                await MainActor.run {
+                    let estimatedCost = Int(scaledSize.width * scaledSize.height * 4)
+                    self.pageCache.setObject(image, forKey: cacheKey, cost: estimatedCost)
+                }
+                
+                return image
+            }.value
+        }
+        
+        // For other file types (first page only via QuickLook)
+        if pageIndex == 0 {
+            return await loadFileThumbnailAsync(path: path, size: size)
+        }
+        
+        return nil
+    }
+    
     /// Generate a scaled-down thumbnail from image data using ImageIO
     /// This is faster and more memory-efficient than NSImage drawing
     /// (Cherry-picked from PR #87)
@@ -299,6 +413,7 @@ final class ThumbnailCache {
         cache.removeAllObjects()
         fileCache.removeAllObjects()
         iconCache.removeAllObjects()
+        pageCache.removeAllObjects()
     }
 }
 

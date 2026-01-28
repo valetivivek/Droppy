@@ -72,9 +72,9 @@ struct NotchHUDView: View {
                 // DYNAMIC ISLAND: Compact horizontal layout - icon + slider only (no text label)
                 // This creates a minimal, clean appearance matching the DI aesthetic
                 let iconSize: CGFloat = 18
-                // +10pt when external display uses notch style (curved topCornerRadius)
+                // +wingCornerCompensation when external display uses notch style (curved topCornerRadius)
                 let basePadding = (notchHeight - iconSize) / 2
-                let symmetricPadding = isExternalWithNotchStyle ? basePadding + 10 : basePadding
+                let symmetricPadding = isExternalWithNotchStyle ? basePadding + NotchLayoutConstants.wingCornerCompensation : basePadding
                 
                 HStack(spacing: 12) {
                     // Left side: Icon with BUTTERY SMOOTH SCALING
@@ -106,8 +106,8 @@ struct NotchHUDView: View {
                 // NOTCH MODE: Wide layout - icon + label on left wing, slider on right wing
                 // Using Droppy pattern: 20px icons with symmetricPadding for outer-wing alignment
                 let iconSize: CGFloat = 20
-                // +10pt compensation for curved wing corners (topCornerRadius)
-                let symmetricPadding = max((notchHeight - iconSize) / 2, 6) + 10
+                // +wingCornerCompensation for curved wing corners (topCornerRadius)
+                let symmetricPadding = max((notchHeight - iconSize) / 2, 6) + NotchLayoutConstants.wingCornerCompensation
                 
                 HStack(spacing: 0) {
                     // Left wing: Icon + Label

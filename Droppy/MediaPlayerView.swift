@@ -264,7 +264,9 @@ struct MediaPlayerView: View {
             let currentDate = context.date
             
             // MARK: - Horizontal Layout: Big Album Art Left | Controls Right
-            HStack(alignment: .bottom, spacing: 16) {
+            // ALIGNMENT STANDARD (v21.68): .top alignment ensures title aligns with top of album art
+            // Controls are pushed to bottom via the VStack's internal layout
+            HStack(alignment: .top, spacing: 16) {
                 // MARK: - Left: Large Album Art (100x100) with glow
                 // PREMIUM: When showAlbumArt is false, morphing is handled externally
                 if showAlbumArt {
@@ -275,17 +277,20 @@ struct MediaPlayerView: View {
                 }
                 
                 // MARK: - Right: Stacked Controls
-                // Spacing reduced to 2pt to match morphing overlay visual gap on external displays
-                VStack(alignment: .leading, spacing: 2) {
-                    // Row 1: Song Title + Visualizer (extracted to reduce type-checker complexity)
-                    titleRowView
+                // ALIGNMENT STANDARD (v21.68): Three content groups with equal spacing between them
+                // Group 1: Title + Artist (top-aligned with album art)
+                // Group 2: Progress bar (vertically centered)
+                // Group 3: Controls (bottom-aligned with album art)
+                VStack(alignment: .leading, spacing: 0) {
+                    // GROUP 1: Title + Artist (TOP)
+                    VStack(alignment: .leading, spacing: 2) {
+                        titleRowView
+                        artistRowView
+                    }
                     
-                    // Row 2: Artist Name (extracted to reduce type-checker complexity)
-                    artistRowView
+                    Spacer(minLength: 4)
                     
-                    Spacer(minLength: 0)
-                    
-                    // Row 3: Progress Bar with Timestamps
+                    // GROUP 2: Progress Bar (CENTER)
                     HStack(spacing: 8) {
                         Text(elapsedTimeString(at: currentDate))
                             .font(.system(size: 11, weight: .medium))
@@ -302,10 +307,10 @@ struct MediaPlayerView: View {
                             .frame(width: 40, alignment: .trailing)
                     }
                     
-                    // Row 4: Media Controls (centered)
-                    // Push controls slightly lower to align button bottoms with album art bottom
+                    Spacer(minLength: 4)
+                    
+                    // GROUP 3: Controls (BOTTOM - aligned with album art bottom)
                     controlsRowCompact
-                        .padding(.bottom, 6)
                 }
                 // Controls bottom-aligned with album art bottom edge
                 .frame(maxWidth: .infinity, minHeight: albumArtSize, maxHeight: albumArtSize)
@@ -323,7 +328,10 @@ struct MediaPlayerView: View {
                 }
             }
             // Use SSOT for consistent padding across all expanded views
-            // +10pt horizontal only for external notch style (curved corners don't affect top/bottom)
+            // contentEdgeInsets provides correct padding for each mode:
+            // - Built-in notch: notchHeight top, 30pt left/right, 20pt bottom
+            // - External notch style: 20pt top/bottom, 30pt left/right
+            // - Pure Island mode: 30pt on all 4 edges
             .padding(NotchLayoutConstants.contentEdgeInsets(notchHeight: notchHeight, isExternalWithNotchStyle: isExternalWithNotchStyle))
             // MARK: - Premium Ambient Glow (from bottom-left corner to top-right)
             // AFTER padding so it anchors at actual container corner

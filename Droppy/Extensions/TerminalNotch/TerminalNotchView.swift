@@ -20,7 +20,9 @@ struct TerminalNotchView: View {
     }
     
     /// Content padding from SSOT - ensures perfect consistency
-    /// +10pt horizontal only for external notch style (curved corners don't affect top/bottom)
+    /// - Built-in notch: notchHeight top, 30pt left/right, 20pt bottom
+    /// - External notch style: 20pt top/bottom, 30pt left/right
+    /// - Island mode: 30pt on all 4 edges
     private var contentPadding: EdgeInsets {
         NotchLayoutConstants.contentEdgeInsets(notchHeight: notchHeight, isExternalWithNotchStyle: isExternalWithNotchStyle)
     }
@@ -324,6 +326,8 @@ struct TerminalNotchView: View {
             }
             .frame(height: 300)
         }
+        // Use SSOT for consistent padding across all expanded views
+        .padding(contentPadding)
     }
     
     // MARK: - Background

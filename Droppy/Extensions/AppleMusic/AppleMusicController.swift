@@ -315,7 +315,7 @@ final class AppleMusicController {
         let script = """
         tell application "Music"
             if player state is not stopped then
-                return loved of current track
+                return favorited of current track
             end if
             return false
         end tell
@@ -371,8 +371,8 @@ final class AppleMusicController {
         
         let script = """
         tell application "Music"
-            set loved of current track to true
-            return loved of current track
+            set favorited of current track to true
+            return favorited of current track
         end tell
         """
         
@@ -381,7 +381,7 @@ final class AppleMusicController {
                 self?.isLoveLoading = false
                 if let loved = result as? Bool {
                     self?.isCurrentTrackLoved = loved
-                    print("AppleMusicController: Track loved successfully")
+                    print("AppleMusicController: Track favorited successfully")
                 }
             }
         }
@@ -393,8 +393,8 @@ final class AppleMusicController {
         
         let script = """
         tell application "Music"
-            set loved of current track to false
-            return loved of current track
+            set favorited of current track to false
+            return favorited of current track
         end tell
         """
         
@@ -403,7 +403,7 @@ final class AppleMusicController {
                 self?.isLoveLoading = false
                 if let loved = result as? Bool {
                     self?.isCurrentTrackLoved = loved
-                    print("AppleMusicController: Track unloved successfully")
+                    print("AppleMusicController: Track unfavorited successfully")
                 }
             }
         }

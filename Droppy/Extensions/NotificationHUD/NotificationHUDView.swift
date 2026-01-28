@@ -30,8 +30,13 @@ struct NotificationHUDView: View {
     }
 
     /// Whether we're in compact mode (Dynamic Island style)
+    /// External displays with notch visual style should use expanded layout, not compact
     private var isCompact: Bool {
-        layout.isDynamicIslandMode
+        // If external with notch style, use expanded layout (not compact DI pill)
+        if isExternalWithNotchStyle {
+            return false
+        }
+        return layout.isDynamicIslandMode
     }
 
     /// Whether notification is expanded to show full content
@@ -251,10 +256,37 @@ struct NotificationHUDView: View {
                     .transition(.scale.combined(with: .opacity))
             }
         }
-        // SSOT: Use exact same padding as MediaPlayerView
-        // +10pt horizontal only for external notch style (curved corners don't affect top/bottom)
-        .padding(NotchLayoutConstants.contentEdgeInsets(notchHeight: layout.notchHeight, isExternalWithNotchStyle: layout.isExternalWithNotchStyle))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // Use SSOT for consistent padding across all expanded views
+        // contentEdgeInsets provides correct padding for each mode:
+        // - Built-in notch: notchHeight top, 30pt left/right, 20pt bottom
+        // - External notch style: 20pt top/bottom, 30pt left/right
+        // - Pure Island mode: 30pt on all 4 edges
+        .padding(NotchLayoutConstants.contentEdgeInsets(
+            notchHeight: contentLayoutNotchHeight,
+            isExternalWithNotchStyle: isExternalWithNotchStyle
+        ))
+    }
+    
+    /// Content layout notch height - 0 for external displays (no physical notch)
+    private var contentLayoutNotchHeight: CGFloat {
+        guard let screen = targetScreen ?? NSScreen.main else { return 0 }
+        // Only built-in displays with physical notch return a positive height
+        if screen.isBuiltIn {
+            let hasNotch = screen.auxiliaryTopLeftArea != nil && screen.auxiliaryTopRightArea != nil
+            if hasNotch {
+                return screen.safeAreaInsets.top
+            }
+        }
+        return 0
+    }
+    
+    
+    /// Whether this is an external display with notch visual style
+    private var isExternalWithNotchStyle: Bool {
+        guard let screen = targetScreen ?? NSScreen.main else { return false }
+        if screen.isBuiltIn { return false }
+        let externalUseDI = (UserDefaults.standard.object(forKey: "externalDisplayUseDynamicIsland") as? Bool) ?? true
+        return !externalUseDI
     }
 
     // MARK: - Shared Components
