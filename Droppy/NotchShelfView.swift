@@ -580,13 +580,23 @@ struct NotchShelfView: View {
             if dragMonitor.isDragging || isHoveringOnThisScreen || state.isDropTargeted { return true }
         }
         
-        // Hide on external displays when setting is enabled (static state only)
-        if hideNotchOnExternalDisplays && !isBuiltInDisplay {
+        // External displays and notchless MacBooks: hide when idle (no physical camera to cover)
+        // This includes both "Dynamic Island" and "Notch" style on external/notchless displays
+        if !isBuiltInDisplay {
+            // No physical notch - hide when nothing to show
             return false
         }
         
-        // Show idle notch only if shelf is enabled
-        return enableNotchShelf
+        // Check if built-in display has a notch (only show idle notch if there's a physical notch to cover)
+        if let screen = targetScreen ?? NSScreen.builtInWithNotch {
+            // Built-in display WITH notch: show idle notch to cover camera
+            if screen.safeAreaInsets.top > 0 {
+                return enableNotchShelf
+            }
+        }
+        
+        // Built-in display WITHOUT notch (old MacBook Air, etc.): hide when idle
+        return false
     }
     
     /// Returns appropriate shape for current mode
