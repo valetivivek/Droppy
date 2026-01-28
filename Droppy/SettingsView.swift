@@ -1458,7 +1458,7 @@ struct SettingsView: View {
                                 }
                             }
                             .buttonStyle(.plain)
-                            .padding(.leading, 20)
+                            .padding(.leading, 28)
                             .sheet(isPresented: $showMediaSourceFilterSheet) {
                                 MediaSourceFilterSheet(allowedBundles: $mediaSourceAllowedBundles)
                             }
