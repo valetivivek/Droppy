@@ -92,6 +92,8 @@ struct SettingsView: View {
             if screen.isBuiltIn && screen.safeAreaInsets.top > 0 {
                 return true
             }
+        }
+        return false
     }
 
     var body: some View {
