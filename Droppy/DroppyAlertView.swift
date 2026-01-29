@@ -164,6 +164,9 @@ class DroppyAlertController {
         secondaryButtonTitle: String? = nil
     ) async -> Bool {
         return await withCheckedContinuation { continuation in
+            // Flag to prevent double-resume crash
+            var hasResumed = false
+            
             let alertView = DroppyAlertView(
                 style: style,
                 title: title,
@@ -171,13 +174,17 @@ class DroppyAlertController {
                 primaryButtonTitle: primaryButtonTitle,
                 secondaryButtonTitle: secondaryButtonTitle,
                 onPrimary: { [weak self] in
+                    guard !hasResumed else { return }
+                    hasResumed = true
                     self?.dismiss()
                     continuation.resume(returning: true)
                 },
-                onSecondary: { [weak self] in
+                onSecondary: secondaryButtonTitle != nil ? { [weak self] in
+                    guard !hasResumed else { return }
+                    hasResumed = true
                     self?.dismiss()
                     continuation.resume(returning: false)
-                }
+                } : nil
             )
             
             let hostingView = NSHostingView(rootView: alertView.preferredColorScheme(.dark)) // Force dark mode
