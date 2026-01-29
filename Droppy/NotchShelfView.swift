@@ -287,7 +287,7 @@ struct NotchShelfView: View {
     /// Using fixed sizes ensures consistent content positioning across all screen resolutions
     private let volumeWingWidth: CGFloat = 135  // For volume/brightness - wide for icon + label + slider
     private let batteryWingWidth: CGFloat = 55  // For battery icon + percentage  
-    private let highAlertWingWidth: CGFloat = 70  // For High Alert - icon + "Active/Inactive" text
+    private let highAlertWingWidth: CGFloat = 80  // For High Alert - icon + timer text in monospace
     private let mediaWingWidth: CGFloat = 50    // For album art + visualizer
     private let updateWingWidth: CGFloat = 110  // For Update HUD - icon + "Update" + "Droppy X.X.X"
     
