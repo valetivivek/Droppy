@@ -525,21 +525,21 @@ struct NotchShelfView: View {
             }
         }
         
-        // HIGH ALERT (CAFFEINE): Use EXACT same height formula as Terminal
-        // This ensures identical left/right/bottom padding behavior
+        // HIGH ALERT (CAFFEINE): Compact height for toggle + 2 rows of timer buttons
+        // Content is ~80pt tall (toggle 66pt + vertical center buffer)
+        // Much smaller than Terminal which needs 180pt for text field + output
         let caffeineShouldShow = UserDefaults.standard.preference(AppPreferenceKey.caffeineEnabled, default: PreferenceDefault.caffeineEnabled)
         if showCaffeineView && caffeineShouldShow {
-            // SSOT: EXACT same formula as Terminal for consistent padding
             let isExternalNotchStyle = isExternalDisplay && !externalDisplayUseDynamicIsland
             if contentLayoutNotchHeight > 0 {
-                // Built-in notch mode: notchHeight + 160 (same as Terminal)
-                return contentLayoutNotchHeight + 160
+                // Built-in notch mode: notchHeight + 100pt (content + bottom padding)
+                return contentLayoutNotchHeight + 100
             } else if isExternalNotchStyle {
-                // External notch style: 180pt (same as Terminal)
-                return 180
+                // External notch style: 120pt (20 top + 80 content + 20 bottom)
+                return 120
             } else {
-                // Pure Island mode: 180pt (same as Terminal)
-                return 180
+                // Pure Island mode: 140pt (30 top + 80 content + 30 bottom)
+                return 140
             }
         }
         
