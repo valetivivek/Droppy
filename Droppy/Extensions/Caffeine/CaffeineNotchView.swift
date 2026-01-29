@@ -23,76 +23,75 @@ struct CaffeineNotchView: View {
     private let hourPresets: [CaffeineDuration] = [.hours(1), .hours(2), .hours(3), .hours(4), .hours(5)]
     
     var body: some View {
-        // EXACT SAME PATTERN AS TerminalNotchView.initialCommandView:
-        // ZStack naturally centers content within parent's frame
-        ZStack {
-            // Content (ZStack centers this automatically)
-            HStack(alignment: .center, spacing: 16) {
-                // Toggle Section
-                VStack(spacing: 6) {
-                    Button {
-                        toggleCaffeine()
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .fill(manager.isActive ? .orange.opacity(0.2) : .white.opacity(0.05))
-                                .frame(width: 44, height: 44)
-                                .overlay(
-                                    Circle()
-                                        .stroke(manager.isActive ? .orange : .white.opacity(0.1), lineWidth: 2)
-                                )
-                            
-                            Image(systemName: manager.isActive ? "eyes" : "eyes")
-                                .font(.system(size: 20))
-                                .foregroundStyle(manager.isActive ? .orange : .white.opacity(0.8))
-                                .contentTransition(.symbolEffect(.replace))
-                        }
+        // MATCH NotificationHUDView.expandedNotchLayout pattern exactly:
+        // Just content HStack + SSOT padding, no ZStack wrapper
+        HStack(alignment: .center, spacing: 16) {
+            // Toggle Section
+            VStack(spacing: 6) {
+                Button {
+                    toggleCaffeine()
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(manager.isActive ? .orange.opacity(0.2) : .white.opacity(0.05))
+                            .frame(width: 44, height: 44)
+                            .overlay(
+                                Circle()
+                                    .stroke(manager.isActive ? .orange : .white.opacity(0.1), lineWidth: 2)
+                            )
+                        
+                        Image(systemName: manager.isActive ? "eyes" : "eyes")
+                            .font(.system(size: 20))
+                            .foregroundStyle(manager.isActive ? .orange : .white.opacity(0.8))
+                            .contentTransition(.symbolEffect(.replace))
                     }
-                    .buttonStyle(DroppyCircleButtonStyle(size: 44))
-                    
-                    Text(statusText)
-                        .font(.system(size: statusText == "∞" ? 22 : 11, weight: .medium, design: .monospaced))
-                        .offset(y: statusText == "∞" ? -3 : 0)
-                        .foregroundStyle(manager.isActive ? .orange : .white.opacity(0.5))
-                        .animation(.smooth, value: statusText)
                 }
-                .frame(width: 60)
+                .buttonStyle(DroppyCircleButtonStyle(size: 44))
                 
-                Divider()
-                    .background(Color.white.opacity(0.15))
-                    .frame(height: 50)
-                
-                // Timer Controls
-                VStack(spacing: 8) {
-                    // Top row: Minutes (wider buttons)
-                    HStack(spacing: 8) {
-                        ForEach(minutePresets, id: \.displayName) { duration in
-                            CaffeineTimerButton(
-                                duration: duration,
-                                isActive: manager.isActive && manager.currentDuration == duration
-                            ) {
-                                selectDuration(duration)
-                            }
+                Text(statusText)
+                    .font(.system(size: statusText == "∞" ? 22 : 11, weight: .medium, design: .monospaced))
+                    .offset(y: statusText == "∞" ? -3 : 0)
+                    .foregroundStyle(manager.isActive ? .orange : .white.opacity(0.5))
+                    .animation(.smooth, value: statusText)
+            }
+            .frame(width: 60)
+            
+            Divider()
+                .background(Color.white.opacity(0.15))
+                .frame(height: 50)
+            
+            // Timer Controls
+            VStack(spacing: 8) {
+                // Top row: Minutes (wider buttons)
+                HStack(spacing: 8) {
+                    ForEach(minutePresets, id: \.displayName) { duration in
+                        CaffeineTimerButton(
+                            duration: duration,
+                            isActive: manager.isActive && manager.currentDuration == duration
+                        ) {
+                            selectDuration(duration)
                         }
                     }
-                    
-                    // Bottom row: Hours (compact grid)
-                    HStack(spacing: 8) {
-                        ForEach(hourPresets, id: \.displayName) { duration in
-                            CaffeineTimerButton(
-                                duration: duration,
-                                isActive: manager.isActive && manager.currentDuration == duration
-                            ) {
-                                selectDuration(duration)
-                            }
+                }
+                
+                // Bottom row: Hours (compact grid)
+                HStack(spacing: 8) {
+                    ForEach(hourPresets, id: \.displayName) { duration in
+                        CaffeineTimerButton(
+                            duration: duration,
+                            isActive: manager.isActive && manager.currentDuration == duration
+                        ) {
+                            selectDuration(duration)
                         }
                     }
                 }
             }
-            .padding(24)  // INNER 24pt BUFFER - same as Terminal's initialCommandView
         }
-        // SSOT contentPadding applied to ZStack (same as Terminal)
+        // SSOT contentPadding FIRST - creates the edge insets
         .padding(contentPadding)
+        // THEN fill the remaining space (parent provides full frame, padding shrinks it,
+        // this frame expands within the padded area)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     private var statusText: String {
