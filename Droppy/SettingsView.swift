@@ -1606,7 +1606,7 @@ struct SettingsView: View {
                         NotificationCenter.default.post(
                             name: NSNotification.Name("OpenExtensionStore"),
                             object: nil,
-                            userInfo: ["extension": ExtensionDefinition.terminalNotch.id]
+                            userInfo: ["extension": TermiNotchExtension.id]
                         )
                     } label: {
                         HStack(spacing: 12) {
@@ -1657,7 +1657,7 @@ struct SettingsView: View {
                         NotificationCenter.default.post(
                             name: NSNotification.Name("OpenExtensionStore"),
                             object: nil,
-                            userInfo: ["extension": ExtensionDefinition.caffeine.id]
+                            userInfo: ["extension": CaffeineExtension.id]
                         )
                     } label: {
                         HStack(spacing: 12) {
