@@ -25,7 +25,9 @@
 
 ## See Droppy in Action
 
-https://github.com/user-attachments/assets/813c3eea-6588-4f23-880f-135833d26a16
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/813c3eea-6588-4f23-880f-135833d26a16" width="100%" autoplay loop muted playsinline></video>
+</p>
 
 ---
 
