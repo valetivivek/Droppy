@@ -89,6 +89,7 @@ struct CaffeineNotchView: View {
                     }
                 }
             }
+            .padding(24)  // INNER 24pt BUFFER - same as Terminal's initialCommandView
         }
         // SSOT contentPadding applied to ZStack (same as Terminal)
         .padding(contentPadding)
