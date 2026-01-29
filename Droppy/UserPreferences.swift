@@ -103,6 +103,7 @@ enum AppPreferenceKey {
     
     // MARK: - Extension: Terminal Notch
     static let terminalNotchInstalled = "terminalNotch_installed"
+    static let terminalNotchEnabled = "terminalNotch_enabled"  // Whether to show in HUD section
     
     // MARK: - Extension: Notification HUD
     static let notificationHUDInstalled = "notificationHUD_installed"
@@ -111,6 +112,7 @@ enum AppPreferenceKey {
     
     // MARK: - Extension: Caffeine
     static let caffeineInstalled = "caffeine_installed"
+    static let caffeineEnabled = "caffeine_enabled"  // Whether to show in HUD section
     static let caffeineMode = "caffeine_mode"  // CaffeineMode rawValue
     
     // MARK: - Extension: Video Compression (Legacy - migrated to Smart Export)
@@ -225,6 +227,7 @@ enum PreferenceDefault {
     
     // MARK: - Extension: Terminal Notch
     static let terminalNotchInstalled = false
+    static let terminalNotchEnabled = true  // Enabled by default when installed
     
     // MARK: - Extension: Notification HUD
     static let notificationHUDInstalled = false
@@ -233,6 +236,7 @@ enum PreferenceDefault {
     
     // MARK: - Extension: Caffeine
     static let caffeineInstalled = false  // Disabled by default, user installs from Extension Store
+    static let caffeineEnabled = true  // Enabled by default when installed
     static let caffeineMode = "Both"  // CaffeineMode.both.rawValue
     
     // MARK: - Extension: Video Compression (Legacy)

@@ -41,7 +41,9 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKey.notificationHUDInstalled) private var isNotificationHUDInstalled = PreferenceDefault.notificationHUDInstalled
     @AppStorage(AppPreferenceKey.notificationHUDEnabled) private var enableNotificationHUD = PreferenceDefault.notificationHUDEnabled
     @AppStorage(AppPreferenceKey.terminalNotchInstalled) private var isTerminalNotchInstalled = PreferenceDefault.terminalNotchInstalled
+    @AppStorage(AppPreferenceKey.terminalNotchEnabled) private var enableTerminalNotch = PreferenceDefault.terminalNotchEnabled
     @AppStorage(AppPreferenceKey.caffeineInstalled) private var isCaffeineInstalled = PreferenceDefault.caffeineInstalled
+    @AppStorage(AppPreferenceKey.caffeineEnabled) private var enableCaffeine = PreferenceDefault.caffeineEnabled
     @AppStorage(AppPreferenceKey.enableLockScreenMediaWidget) private var enableLockScreenMediaWidget = PreferenceDefault.enableLockScreenMediaWidget
     @AppStorage(AppPreferenceKey.showMediaPlayer) private var showMediaPlayer = PreferenceDefault.showMediaPlayer
     @AppStorage(AppPreferenceKey.autoFadeMediaHUD) private var autoFadeMediaHUD = PreferenceDefault.autoFadeMediaHUD
@@ -1584,11 +1586,11 @@ struct SettingsView: View {
                 
                 // Terminal Notch Extension
                 HStack(spacing: 12) {
-                    TerminalHUDIcon(isEnabled: isTerminalNotchInstalled)
+                    TerminalHUDIcon(isEnabled: isTerminalNotchInstalled && enableTerminalNotch)
                     
                     if isTerminalNotchInstalled {
-                        // Extension is installed - show on/off toggle
-                        Toggle(isOn: $isTerminalNotchInstalled) {
+                        // Extension is installed - show on/off toggle for HUD visibility
+                        Toggle(isOn: $enableTerminalNotch) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Terminal Notch")
                                 Text("Quick command bar in the shelf")
@@ -1611,11 +1613,11 @@ struct SettingsView: View {
                 
                 // Caffeine Extension
                 HStack(spacing: 12) {
-                    CaffeineHUDIcon(isEnabled: isCaffeineInstalled && CaffeineManager.shared.isActive)
+                    CaffeineHUDIcon(isEnabled: isCaffeineInstalled && enableCaffeine && CaffeineManager.shared.isActive)
                     
                     if isCaffeineInstalled {
-                        // Extension is installed - show on/off toggle (controls installation state)
-                        Toggle(isOn: $isCaffeineInstalled) {
+                        // Extension is installed - show on/off toggle for HUD visibility
+                        Toggle(isOn: $enableCaffeine) {
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 6) {
                                     Text("Caffeine")
