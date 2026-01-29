@@ -481,7 +481,8 @@ struct NotchShelfView: View {
     
     private var currentExpandedHeight: CGFloat {
         // TERMINAL: Expanded height when terminal has output
-        if terminalManager.isInstalled && terminalManager.isVisible {
+        let terminalEnabled = UserDefaults.standard.preference(AppPreferenceKey.terminalNotchEnabled, default: PreferenceDefault.terminalNotchEnabled)
+        if terminalManager.isInstalled && terminalEnabled && terminalManager.isVisible {
             // SSOT (v21.72): Different base heights for different modes:
             // - Pure Island mode: 30 (top) + 140 content + 30 (bottom) = 200pt
             // - External notch style: 20 (top) + 140 content + 20 (bottom) = 180pt
@@ -650,7 +651,12 @@ struct NotchShelfView: View {
             // QUICK ACTIONS: Show when dragging files over expanded shelf (even if empty)
             // REGULAR BUTTONS: Show otherwise (terminal/caffeine/close buttons)
             // SMOOTH MORPH: Uses spring animation for seamless transition
+            // Check both installed AND enabled for each extension
             let caffeineInstalled = UserDefaults.standard.preference(AppPreferenceKey.caffeineInstalled, default: PreferenceDefault.caffeineInstalled)
+            let caffeineEnabled = UserDefaults.standard.preference(AppPreferenceKey.caffeineEnabled, default: PreferenceDefault.caffeineEnabled)
+            let terminalEnabled = UserDefaults.standard.preference(AppPreferenceKey.terminalNotchEnabled, default: PreferenceDefault.terminalNotchEnabled)
+            let caffeineShouldShow = caffeineInstalled && caffeineEnabled
+            let terminalShouldShow = terminalManager.isInstalled && terminalEnabled
             if enableNotchShelf && isExpandedOnThisScreen {
                 // FLOATING BUTTONS: ZStack enables smooth crossfade between button states
                 // - Quick Actions: Shown when dragging files
@@ -678,10 +684,10 @@ struct NotchShelfView: View {
                     }
                     
                     // Regular floating buttons (caffeine/terminal/close) - appear when NOT dragging
-                    if !dragMonitor.isDragging && (caffeineInstalled || terminalManager.isInstalled || !autoCollapseShelf) {
+                    if !dragMonitor.isDragging && (caffeineShouldShow || terminalShouldShow || !autoCollapseShelf) {
                         HStack(spacing: 12) {
-                            // Caffeine button (if extension installed)
-                            if caffeineInstalled {
+                            // Caffeine button (if extension installed AND enabled)
+                            if caffeineShouldShow {
                                 let isHighlight = showCaffeineView || CaffeineManager.shared.isActive
                                 
                                 Button(action: {
@@ -705,8 +711,8 @@ struct NotchShelfView: View {
                                 .transition(.scale(scale: 0.8).combined(with: .opacity))
                             }
                             
-                            // Terminal button (if extension installed)
-                            if terminalManager.isInstalled {
+                            // Terminal button (if extension installed AND enabled)
+                            if terminalShouldShow {
                                 // Open in Terminal.app button (only when terminal is visible)
                                 if terminalManager.isVisible {
                                     Button(action: {
@@ -1745,8 +1751,9 @@ struct NotchShelfView: View {
     /// Whether the expanded media player should be visible (for morphing calculation)
     private var shouldShowExpandedMediaPlayerForMorphing: Bool {
         guard isExpandedOnThisScreen && enableNotchShelf else { return false }
-        // TERMINOTCH: Don't show morphing overlays when terminal is visible
-        guard !(terminalManager.isInstalled && terminalManager.isVisible) else { return false }
+        // TERMINOTCH: Don't show morphing overlays when terminal is visible (and enabled)
+        let terminalEnabled = UserDefaults.standard.preference(AppPreferenceKey.terminalNotchEnabled, default: PreferenceDefault.terminalNotchEnabled)
+        guard !(terminalManager.isInstalled && terminalEnabled && terminalManager.isVisible) else { return false }
         let dragMonitor = DragMonitor.shared
         return showMediaPlayer && !musicManager.isPlayerIdle && !state.isDropTargeted && !dragMonitor.isDragging &&
                (musicManager.isMediaHUDForced || (autoOpenMediaHUDOnShelfExpand && !musicManager.isMediaHUDHidden) ||
@@ -1999,9 +2006,14 @@ struct NotchShelfView: View {
     private var expandedShelfContent: some View {
         // Grid Items or Media Player or Drop Zone or Terminal
         // No header row - auto-collapse handles hiding, right-click for settings/clipboard
+        // Check both installed AND enabled for each extension
+        let terminalEnabled = UserDefaults.standard.preference(AppPreferenceKey.terminalNotchEnabled, default: PreferenceDefault.terminalNotchEnabled)
+        let caffeineEnabled = UserDefaults.standard.preference(AppPreferenceKey.caffeineEnabled, default: PreferenceDefault.caffeineEnabled)
+        let caffeineShouldShow = UserDefaults.standard.preference(AppPreferenceKey.caffeineInstalled, default: PreferenceDefault.caffeineInstalled) && caffeineEnabled
+        
         ZStack {
             // TERMINAL VIEW: Highest priority - takes over the shelf when active
-            if terminalManager.isInstalled && terminalManager.isVisible {
+            if terminalManager.isInstalled && terminalEnabled && terminalManager.isVisible {
                 // SSOT: contentLayoutNotchHeight for consistent terminal content layout
                 TerminalNotchView(manager: terminalManager, notchHeight: contentLayoutNotchHeight, isExternalWithNotchStyle: isExternalDisplay && !externalDisplayUseDynamicIsland)
                     .frame(height: currentExpandedHeight, alignment: .top)
@@ -2010,7 +2022,7 @@ struct NotchShelfView: View {
                     .notchTransition()
             }
             // CAFFEINE VIEW: Show when user clicks caffeine button in shelf
-            else if showCaffeineView && UserDefaults.standard.preference(AppPreferenceKey.caffeineInstalled, default: PreferenceDefault.caffeineInstalled) {
+            else if showCaffeineView && caffeineShouldShow {
                 CaffeineNotchView(manager: CaffeineManager.shared, isVisible: $showCaffeineView, notchHeight: contentLayoutNotchHeight, isExternalWithNotchStyle: isExternalDisplay && !externalDisplayUseDynamicIsland)
                     .frame(height: currentExpandedHeight, alignment: .top)
                     .id("caffeine-view")
