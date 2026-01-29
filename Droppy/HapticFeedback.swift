@@ -91,4 +91,9 @@ enum HapticFeedback {
     static func hover() {
         HapticFeedback.light.perform()
     }
+    
+    /// Light tap for button presses
+    static func tap() {
+        HapticFeedback.light.perform()
+    }
 }
