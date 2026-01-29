@@ -143,20 +143,32 @@ Your support helps cover development costs and keeps Droppy free for everyone!
 
 ## Credits & Acknowledgements
 
-### Contributors
+<details>
+<summary><b>Contributors</b></summary>
+<br>
 Thank you to everyone who has contributed code, features, and extensions!
+</details>
 
-### Alcove
-Great inspiration for creating a beautiful notch app. One of the founding fathers of good-looking notch apps on macOS.  
-→ [tryalcove.com](https://tryalcove.com/)
+<details>
+<summary><b>Alcove</b></summary>
+<br>
+Great inspiration for creating a beautiful notch app. One of the founding fathers of good-looking notch apps on macOS.
+<br>→ <a href="https://tryalcove.com/">tryalcove.com</a>
+</details>
 
-### Atoll  
-Inspired some animations and foundational functionalities. A fork of Boringnotch.  
-→ [github.com/Ebullioscopic/Atoll](https://github.com/Ebullioscopic/Atoll)
+<details>
+<summary><b>Atoll</b></summary>
+<br>
+Inspired some animations and foundational functionalities. A fork of Boringnotch.
+<br>→ <a href="https://github.com/Ebullioscopic/Atoll">github.com/Ebullioscopic/Atoll</a>
+</details>
 
-### Boringnotch
-The original project that pioneered notch creativity on macOS.  
-→ [github.com/TheBoredTeam/boring.notch](https://github.com/TheBoredTeam/boring.notch)
+<details>
+<summary><b>Boringnotch</b></summary>
+<br>
+The original project that pioneered notch creativity on macOS.
+<br>→ <a href="https://github.com/TheBoredTeam/boring.notch">github.com/TheBoredTeam/boring.notch</a>
+</details>
 
 ---
 
