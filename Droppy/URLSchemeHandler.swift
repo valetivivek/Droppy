@@ -152,8 +152,6 @@ struct URLSchemeHandler {
             extensionType = .ffmpegVideoCompression
         case "termi-notch", "terminotch", "terminal", "terminal-notch":
             extensionType = .terminalNotch
-        case "menu-bar-manager", "menubarmanager", "menu-bar":
-            extensionType = .menuBarManager
         case "quickshare", "quick-share":
             extensionType = .quickshare
         default:

@@ -128,7 +128,6 @@ final class ExtensionRegistry {
         register(VoiceTranscribeExtension.self)
         register(VideoTargetSizeExtension.self)
         register(TermiNotchExtension.self)
-        register(MenuBarManagerExtension.self)
         register(QuickshareExtension.self)
         register(AppleMusicExtension.self)
         register(NotificationHUDExtension.self)

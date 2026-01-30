@@ -1049,15 +1049,7 @@
             <div class="card-sub">Grab UI elements</div>
         </div>
     </div>
-    <div class="card l7" data-rot="-5" style="--op:0.65">
-        <div class="checkbox checked"><svg viewBox="0 0 24 24" fill="none">
-                <path d="M6 13l4 4 8-9" />
-            </svg></div>
-        <div class="card-body">
-            <div class="card-title">Menu Bar Manager</div>
-            <div class="card-sub">Hide icons</div>
-        </div>
-    </div>
+
     <div class="card l8" data-rot="4" style="--op:0.55">
         <div class="checkbox"></div>
         <div class="card-body">
@@ -1290,28 +1282,6 @@
                     class="extension-tag">Integration</span></div>
         </div>
 
-        <div class="extension-card" data-extension="menu-bar-manager" data-category="productivity">
-            <div class="extension-header">
-                <img src="assets/icons/menu-bar-manager.jpg" alt="Menu Bar Manager" class="extension-icon">
-                <div class="extension-meta">
-                    <h3>Menu Bar Manager</h3><span>Productivity</span>
-                </div>
-            </div>
-            <div class="extension-stats">
-                <div class="stat-item"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                    </svg><span class="stat-value" data-install-count="menu-bar-manager">0</span> installs</div>
-                <div class="stat-item"><svg fill="currentColor" viewBox="0 0 24 24">
-                        <path
-                            d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                    </svg><span class="stat-value" data-rating="menu-bar-manager">—</span><span
-                        data-rating-count="menu-bar-manager">(0)</span></div>
-            </div>
-            <p class="extension-description">Hide unused menu bar icons and reveal them with a click. Keep your
-                menu bar clean and organized.</p>
-            <div class="extension-tags"><span class="extension-tag">Menu Bar</span><span
-                    class="extension-tag">Productivity</span></div>
-        </div>
 
         <div class="extension-card" data-extension="spotify" data-category="media">
             <div class="extension-header">
@@ -1519,7 +1489,7 @@
     </div>
 
     <script>
-        const SUPABASE_URL = 'https://anannmonpspjsnfgdglb.supabase.co';
+        const SUP'https://anannmonpspjsnfgdglb.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFuYW5ubW9ucHNwanNuZmdkZ2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1NDgxODQsImV4cCI6MjA4MzEyNDE4NH0.5BvuW5cS0kJCuA2Nm5HCVDLNWNzn6EA_8JVVrW6pfnY';
 
         // Map website IDs to Supabase analytics IDs
@@ -1533,7 +1503,7 @@
             'window-snap': 'windowSnap',
             'video-target-size': 'ffmpegVideoCompression',
             'termi-notch': 'terminalNotch',
-            'menu-bar-manager': 'menuBarManager',
+
             'quickshare': 'quickshare',
             'notify-me': 'notificationHUD'
         };
@@ -1550,7 +1520,7 @@
             'window-snap': { icon: 'assets/icons/window-snap.jpg', title: 'Window Snap', category: 'Productivity', deepUrl: 'droppy://extension/window-snap', screenshot: 'assets/images/window-snap-screenshot.png', description: 'Snap windows to halves, quarters, thirds, or full screen with customizable keyboard shortcuts. Multi-monitor support included.', features: ['Keyboard shortcuts', 'Custom snap areas', 'Multi-monitor support', 'Edge snapping', 'Remembers positions'] },
             'video-target-size': { icon: 'assets/icons/video-target-size.png', title: 'Video Target Size', category: 'Media', deepUrl: 'droppy://extension/video-target-size', screenshot: 'assets/images/video-target-size-screenshot.png', description: 'Compress videos to exact file sizes using FFmpeg two-pass encoding. Perfect for Discord, email, or social media limits.', features: ['Exact file size targeting', 'Two-pass encoding', 'H.264/AAC output', 'One-time FFmpeg install', 'Fast processing'] },
             'termi-notch': { icon: 'assets/icons/termi-notch.jpg', title: 'Termi-Notch', category: 'Productivity', deepUrl: 'droppy://extension/termi-notch', screenshot: 'assets/images/terminal-notch-screenshot.png', description: 'Quick terminal access from your notch. Run commands instantly with a custom shortcut or by clicking the terminal icon in the expanded shelf.', features: ['Full terminal emulation', 'Custom keyboard shortcut', 'Quick command mode', 'Expanded mode for output', 'Open in Terminal.app'] },
-            'menu-bar-manager': { icon: 'assets/icons/menu-bar-manager.jpg', title: 'Menu Bar Manager', category: 'Productivity', deepUrl: 'droppy://extension/menu-bar-manager', screenshot: 'assets/screenshots/menu-bar-manager.png', description: 'Hide unused menu bar icons and reveal them with a click. Keep your menu bar clean and organized with always-visible, auto-hide, and always-hidden preferences for each icon.', features: ['Hide/show menu bar icons', 'Click chevron to expand hidden icons', 'Always visible icons stay put', 'Command+drag to rearrange', 'State persists across reboots'] },
+
             'quickshare': { icon: 'assets/icons/quickshare.jpg', title: 'Droppy Quickshare', category: 'Utilities', deepUrl: 'droppy://extension/quickshare', screenshot: 'assets/images/quickshare-screenshot.png', description: 'Upload files to the cloud and get instant shareable links via 0x0.st. Files auto-expire based on size (30-365 days). No account required.', features: ['Instant shareable links', 'Auto-expiring files', 'No account needed', 'Drag & drop upload', 'Built-in file manager'] },
             'notify-me': { icon: 'assets/icons/notification-hud.png', title: 'Notify me!', category: 'Productivity • Community', deepUrl: 'droppy://extension/notification-hud', screenshot: null, description: 'Capture macOS notifications and display them directly in the notch, like iPhone\'s Dynamic Island. Click to open the source app, swipe up to dismiss. A community extension by Valetivivek.', features: ['Display notifications in the notch', 'Show app icon and preview text', 'Click to open, swipe to dismiss', 'Per-app notification filtering', 'Requires Full Disk Access'] },
             'high-alert': { icon: 'assets/icons/high-alert.jpg', title: 'High Alert', category: 'Productivity • Community', deepUrl: 'droppy://extension/caffeine', screenshot: 'assets/images/high-alert-screenshot.gif', description: 'Prevent your Mac from going to sleep. Choose indefinite mode or set a timer for hours or minutes. Perfect for downloads, presentations, or long-running tasks. A community extension by Valetivivek.', features: ['Keep Mac awake indefinitely', 'Set sleep prevention timer', 'Hover notch to see remaining time', 'Lightweight, no battery drain', 'Quick toggle from notch'] }
@@ -1840,8 +1810,7 @@
         });
 
         // Staggered fade-in for cards with rotation
-        document.querySelectorAll('.card').forEach((card, i) => {
-            const rot = card.dataset.rot || 0;
+        doct.querySelectorAll('.card').forEach((card, i) =>   const rot = card.dataset.rot || 0;
             card.style.transform = `rotate(${rot}deg)`;
             setTimeout(() => card.classList.add('visible'), 80 + Math.random() * 500);
         });

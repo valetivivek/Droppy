@@ -754,7 +754,6 @@ final class WindowSnapManager: ObservableObject {
     
     /// Get target screen for a display movement action
     private func getTargetScreen(for action: SnapAction, from currentScreen: NSScreen) -> NSScreen? {
-        let sortedScreens = getScreensSortedByPosition()
         let allScreens = NSScreen.screens  // [0] is always primary
         
         switch action {

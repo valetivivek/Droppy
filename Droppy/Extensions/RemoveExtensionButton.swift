@@ -92,8 +92,6 @@ struct DisableExtensionButton: View {
             return "This will disable Video Target Size compression. You can enable it again later."
         case .terminalNotch:
             return "This will disable the terminal extension. You can enable it again later."
-        case .menuBarManager:
-            return "This will remove the menu bar separator and restore all hidden icons. You can enable it again later."
         case .quickshare:
             return "Droppy Quickshare is a core extension and cannot be disabled."
         case .notificationHUD:
@@ -151,9 +149,6 @@ struct DisableExtensionButton: View {
             case .appleMusic:
                 // Apple Music will auto-refresh when music plays
                 AppleMusicController.shared.refreshState()
-            case .menuBarManager:
-                // Re-enable the menu bar manager
-                MenuBarManager.shared.enable()
             case .notificationHUD:
                 // Re-enable notification monitoring
                 NotificationHUDManager.shared.startMonitoring()

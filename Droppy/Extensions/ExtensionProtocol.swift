@@ -20,7 +20,6 @@ enum ExtensionType: String, CaseIterable, Identifiable {
     case voiceTranscribe
     case ffmpegVideoCompression
     case terminalNotch
-    case menuBarManager
     case quickshare
     case appleMusic
     case notificationHUD
