@@ -1073,20 +1073,32 @@ struct NotchShelfView: View {
     }
     
     private func startMediaFadeTimer() {
-        // Only start timer if auto-fade is enabled
+        // Only start timer if auto-fade is enabled globally
         guard autoFadeMediaHUD else { return }
+        
+        // Get display ID for this screen
+        let displayID = targetScreen?.displayID ?? 0
+        
+        // Check display-specific rule
+        guard AutofadeManager.shared.isDisplayEnabled(displayID) else { return }
+        
+        // Get effective delay (considers app rules + default)
+        // Returns nil if autofade should be disabled (e.g., "never" rule)
+        guard let delay = AutofadeManager.shared.effectiveDelay(for: displayID) else {
+            return  // Autofade disabled for this context
+        }
         
         // Cancel any existing timer
         mediaFadeWorkItem?.cancel()
         
-        // Start 5-second timer to fade out media HUD
+        // Start timer with calculated delay
         let workItem = DispatchWorkItem { [self] in
             withAnimation(.easeOut(duration: 0.4)) {
                 mediaHUDFadedOut = true
             }
         }
         mediaFadeWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
     
     // MARK: - Auto-Shrink Timer

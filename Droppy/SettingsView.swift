@@ -24,6 +24,8 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKey.hideNotchOnExternalDisplays) private var hideNotchOnExternalDisplays = PreferenceDefault.hideNotchOnExternalDisplays
     @AppStorage(AppPreferenceKey.hideNotchFromScreenshots) private var hideNotchFromScreenshots = PreferenceDefault.hideNotchFromScreenshots
     @AppStorage(AppPreferenceKey.enableRightClickHide) private var enableRightClickHide = PreferenceDefault.enableRightClickHide
+    @AppStorage(AppPreferenceKey.hidePhysicalNotch) private var hidePhysicalNotch = PreferenceDefault.hidePhysicalNotch
+    @AppStorage(AppPreferenceKey.hidePhysicalNotchOnExternals) private var hidePhysicalNotchOnExternals = PreferenceDefault.hidePhysicalNotchOnExternals
     @AppStorage(AppPreferenceKey.enableHapticFeedback) private var enableHapticFeedback = PreferenceDefault.enableHapticFeedback
     @AppStorage(AppPreferenceKey.useDynamicIslandStyle) private var useDynamicIslandStyle = PreferenceDefault.useDynamicIslandStyle
     @AppStorage(AppPreferenceKey.useDynamicIslandTransparent) private var useDynamicIslandTransparent = PreferenceDefault.useDynamicIslandTransparent
@@ -759,6 +761,47 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                
+                // Hide Physical Notch - only makes sense in Notch mode, not Dynamic Island
+                Toggle(isOn: $hidePhysicalNotch) {
+                    VStack(alignment: .leading) {
+                        HStack(spacing: 6) {
+                            Text("Hide Physical Notch")
+                            Text("new")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.droppyAccent))
+                        }
+                        Text("Draw a black bar to hide the notch, allowing menu bar icons to use that space. Only applies in Notch mode.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .onChange(of: hidePhysicalNotch) { _, newValue in
+                    if newValue {
+                        HideNotchManager.shared.enable()
+                    } else {
+                        HideNotchManager.shared.disable()
+                    }
+                }
+                
+                // Sub-option: Include external displays
+                if hidePhysicalNotch {
+                    Toggle(isOn: $hidePhysicalNotchOnExternals) {
+                        VStack(alignment: .leading) {
+                            Text("Include External Displays")
+                            Text("Also draw black bar on external monitors in Notch mode")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.leading, 20)
+                    .onChange(of: hidePhysicalNotchOnExternals) { _, _ in
+                        HideNotchManager.shared.refreshWindows()
+                    }
+                }
             } header: {
                 Text("Interface")
             }
@@ -1361,14 +1404,8 @@ struct SettingsView: View {
                     }
                     
                     if showMediaPlayer {
-                        Toggle(isOn: $autoFadeMediaHUD) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Auto-Hide Preview")
-                                Text("Fade out mini player after 5 seconds")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                        // Advanced Auto-Fade settings (Issue #79)
+                        AdvancedAutofadeSettingsRow()
                         
                         Toggle(isOn: $autoHideOnFullscreen) {
                             VStack(alignment: .leading, spacing: 2) {
@@ -4440,5 +4477,384 @@ private struct MediaSourceAppRow: View {
         .padding(.horizontal, 10)
         .background(Color.white.opacity(0.03))
         .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.small, style: .continuous))
+    }
+}
+
+// MARK: - Advanced Autofade Settings (Issue #79)
+
+/// Info button for Advanced Autofade feature
+struct AdvancedAutofadeInfoButton: View {
+    @State private var showPopover = false
+    
+    var body: some View {
+        Button {
+            showPopover.toggle()
+        } label: {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Advanced Auto-Fade")
+                    .font(.headline)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Configure when the media HUD auto-fades", systemImage: "clock")
+                    Label("Set different delays per app", systemImage: "app.badge")
+                    Label("Enable/disable per display", systemImage: "display.2")
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            }
+            .padding()
+            .frame(width: 280)
+        }
+    }
+}
+
+/// Main settings row for Advanced Autofade
+struct AdvancedAutofadeSettingsRow: View {
+    @AppStorage(AppPreferenceKey.autoFadeMediaHUD) private var autoFadeEnabled = PreferenceDefault.autoFadeMediaHUD
+    @AppStorage(AppPreferenceKey.autofadeDefaultDelay) private var defaultDelay = PreferenceDefault.autofadeDefaultDelay
+    @AppStorage(AppPreferenceKey.autofadeAppRulesEnabled) private var appRulesEnabled = PreferenceDefault.autofadeAppRulesEnabled
+    @AppStorage(AppPreferenceKey.autofadeDisplayRulesEnabled) private var displayRulesEnabled = PreferenceDefault.autofadeDisplayRulesEnabled
+    @StateObject private var manager = AutofadeManager.shared
+    @State private var showAppPicker = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Main toggle with info button
+            HStack(spacing: 8) {
+                AdvancedAutofadeInfoButton()
+                Toggle(isOn: $autoFadeEnabled) {
+                    VStack(alignment: .leading) {
+                        HStack(alignment: .center, spacing: 6) {
+                            Text("Auto-Hide Preview")
+                            Text("advanced")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.white.opacity(0.08)))
+                                .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
+                        }
+                        Text("Fade out mini player after delay")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            
+            // Sub-options (when enabled)
+            if autoFadeEnabled {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Default delay slider
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Default Delay")
+                                .font(.subheadline)
+                            Spacer()
+                            Text("\(Int(defaultDelay))s")
+                                .font(.subheadline.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(value: $defaultDelay, in: 1...30, step: 1)
+                            .tint(.droppyAccent)
+                    }
+                    
+                    Divider()
+                        .opacity(0.3)
+                    
+                    // App-specific rules section
+                    Toggle(isOn: $appRulesEnabled) {
+                        VStack(alignment: .leading) {
+                            Text("App-Specific Rules")
+                                .font(.subheadline)
+                            Text("Different delays per app")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    
+                    if appRulesEnabled {
+                        VStack(alignment: .leading, spacing: 8) {
+                            // App rules list
+                            ForEach(manager.appRules) { rule in
+                                AutofadeAppRuleRow(rule: rule)
+                            }
+                            
+                            // Add app button
+                            Button {
+                                showAppPicker = true
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "plus.circle.fill")
+                                    Text("Add App")
+                                }
+                            }
+                            .buttonStyle(DroppyPillButtonStyle(size: .small))
+                        }
+                        .padding(.leading, 20)
+                    }
+                    
+                    // Display-specific section (only show if multiple displays)
+                    if NSScreen.screens.count > 1 {
+                        Divider()
+                            .opacity(0.3)
+                        
+                        Toggle(isOn: $displayRulesEnabled) {
+                            VStack(alignment: .leading) {
+                                Text("Display-Specific Rules")
+                                    .font(.subheadline)
+                                Text("Enable/disable per display")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        if displayRulesEnabled {
+                            VStack(alignment: .leading, spacing: 8) {
+                                ForEach(NSScreen.screens, id: \.displayID) { screen in
+                                    AutofadeDisplayRow(screen: screen)
+                                }
+                            }
+                            .padding(.leading, 20)
+                        }
+                    }
+                }
+                .padding(.leading, 28)
+            }
+        }
+        .sheet(isPresented: $showAppPicker) {
+            AutofadeAppPicker(isPresented: $showAppPicker)
+        }
+    }
+}
+
+/// Row for a single app-specific autofade rule
+struct AutofadeAppRuleRow: View {
+    let rule: AutofadeAppRule
+    @StateObject private var manager = AutofadeManager.shared
+    @State private var isHovering = false
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            // App icon
+            if let iconPath = rule.appIconPath {
+                let icon = NSWorkspace.shared.icon(forFile: iconPath)
+                Image(nsImage: icon)
+                    .resizable()
+                    .frame(width: 24, height: 24)
+            } else {
+                Image(systemName: "app.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, height: 24)
+            }
+            
+            // App name
+            Text(rule.appName)
+                .font(.subheadline)
+                .lineLimit(1)
+            
+            Spacer()
+            
+            // Delay picker
+            Picker("", selection: Binding(
+                get: { rule.fadeDelay },
+                set: { manager.updateAppRule(id: rule.id, delay: $0) }
+            )) {
+                ForEach(AutofadeDelay.standardCases, id: \.self) { delay in
+                    Text(delay.displayName).tag(delay)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(width: 120)
+            
+            // Remove button
+            Button {
+                manager.removeAppRule(id: rule.id)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(isHovering ? .red : .secondary.opacity(0.6))
+            }
+            .buttonStyle(.plain)
+            .onHover { isHovering = $0 }
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(Color.white.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.small, style: .continuous))
+    }
+}
+
+/// Row for display-specific autofade toggle
+struct AutofadeDisplayRow: View {
+    let screen: NSScreen
+    @StateObject private var manager = AutofadeManager.shared
+    
+    private var displayName: String {
+        screen.localizedName
+    }
+    
+    private var isEnabled: Bool {
+        manager.isDisplayEnabled(screen.displayID)
+    }
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            // Display icon
+            Image(systemName: screen.isBuiltIn ? "laptopcomputer" : "display")
+                .font(.system(size: 16))
+                .foregroundStyle(.secondary)
+                .frame(width: 24)
+            
+            // Display name
+            Text(displayName)
+                .font(.subheadline)
+                .lineLimit(1)
+            
+            Spacer()
+            
+            // Enable/disable toggle
+            Toggle("", isOn: Binding(
+                get: { isEnabled },
+                set: { manager.setDisplayEnabled(screen.displayID, enabled: $0) }
+            ))
+            .toggleStyle(.switch)
+            .labelsHidden()
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(Color.white.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.small, style: .continuous))
+    }
+}
+
+/// App picker sheet for adding autofade rules
+struct AutofadeAppPicker: View {
+    @Binding var isPresented: Bool
+    @StateObject private var manager = AutofadeManager.shared
+    @State private var searchText = ""
+    @State private var selectedDelay: AutofadeDelay = .never
+    
+    private var filteredApps: [(bundleID: String, name: String, icon: NSImage?)] {
+        let apps = manager.runningApps()
+        if searchText.isEmpty {
+            return apps
+        }
+        return apps.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Add App Rule")
+                    .font(.headline)
+                Spacer()
+                Button("Done") {
+                    isPresented = false
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+            }
+            .padding()
+            
+            Divider()
+            
+            // Delay picker
+            HStack {
+                Text("Auto-fade delay:")
+                    .font(.subheadline)
+                Spacer()
+                Picker("", selection: $selectedDelay) {
+                    ForEach(AutofadeDelay.standardCases, id: \.self) { delay in
+                        Text(delay.displayName).tag(delay)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 140)
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            
+            Divider()
+            
+            // Search field
+            TextField("Search apps...", text: $searchText)
+                .textFieldStyle(.roundedBorder)
+                .padding()
+            
+            // App list
+            ScrollView {
+                LazyVStack(spacing: 4) {
+                    ForEach(filteredApps, id: \.bundleID) { app in
+                        AppPickerRow(
+                            name: app.name,
+                            icon: app.icon,
+                            isAlreadyAdded: manager.appRules.contains { $0.bundleIdentifier == app.bundleID }
+                        ) {
+                            manager.addAppRule(bundleID: app.bundleID, appName: app.name, delay: selectedDelay)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .frame(maxHeight: 300)
+        }
+        .frame(width: 400, height: 500)
+    }
+}
+
+/// Row in the app picker
+struct AppPickerRow: View {
+    let name: String
+    let icon: NSImage?
+    let isAlreadyAdded: Bool
+    let onAdd: () -> Void
+    
+    @State private var isHovering = false
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // App icon
+            if let icon = icon {
+                Image(nsImage: icon)
+                    .resizable()
+                    .frame(width: 28, height: 28)
+            } else {
+                Image(systemName: "app.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+            }
+            
+            // App name
+            Text(name)
+                .font(.subheadline)
+                .lineLimit(1)
+            
+            Spacer()
+            
+            // Add button or checkmark
+            if isAlreadyAdded {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            } else {
+                Button("Add") {
+                    onAdd()
+                }
+                .buttonStyle(DroppyPillButtonStyle(size: .small))
+                .opacity(isHovering ? 1 : 0.7)
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(isHovering ? Color.white.opacity(0.05) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.small, style: .continuous))
+        .onHover { isHovering = $0 }
     }
 }

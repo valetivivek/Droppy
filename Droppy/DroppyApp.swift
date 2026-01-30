@@ -443,6 +443,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NotificationHUDManager.shared.startMonitoring()
             }
             
+            // 8. Hide Physical Notch (black bar to hide the notch cutout)
+            let hidePhysicalNotchEnabled = UserDefaults.standard.bool(forKey: AppPreferenceKey.hidePhysicalNotch)
+            if hidePhysicalNotchEnabled {
+                print("⬛ Droppy: Enabling Hide Physical Notch")
+                HideNotchManager.shared.enable()
+            }
+            
             // 6. AUTO-PROMPT FOR PERMISSIONS
             // If any accessibility-dependent feature is enabled but permission not granted, prompt
             let needsAccessibility = hudEnabled || clipboardEnabled

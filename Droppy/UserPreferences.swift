@@ -33,10 +33,15 @@ enum AppPreferenceKey {
     static let hideMediaOnlyOnFullscreen = "hideMediaOnlyOnFullscreen"  // Sub-option: only hide media, not HUDs
     static let enableParallaxEffect = "enableParallaxEffect"
     static let enableRightClickHide = "enableRightClickHide"
+    static let hidePhysicalNotch = "hidePhysicalNotch"  // Draw black bar to hide the notch cutout
+    static let hidePhysicalNotchOnExternals = "hidePhysicalNotchOnExternals"  // Sub-option: also apply to external displays
     
     // MARK: - Media Player
     static let showMediaPlayer = "showMediaPlayer"
     static let autoFadeMediaHUD = "autoFadeMediaHUD"
+    static let autofadeDefaultDelay = "autofadeDefaultDelay"  // Default delay in seconds
+    static let autofadeAppRulesEnabled = "autofadeAppRulesEnabled"  // Enable app-specific rules
+    static let autofadeDisplayRulesEnabled = "autofadeDisplayRulesEnabled"  // Enable display-specific rules
     static let debounceMediaChanges = "debounceMediaChanges"
     static let enableRealAudioVisualizer = "enableRealAudioVisualizer"
 
@@ -158,10 +163,15 @@ enum PreferenceDefault {
     static let enableParallaxEffect = true   // 3D parallax tilt on hover (album art, etc.)
     static let enableRightClickHide = false  // Right-click to quickly hide notch/island
     static let enableHapticFeedback = true   // Haptic feedback for trackpad (on by default)
+    static let hidePhysicalNotch = false     // Draw black bar to hide the notch cutout
+    static let hidePhysicalNotchOnExternals = false  // Sub-option: also apply to external displays
     
     // MARK: - Media Player
     static let showMediaPlayer = true
     static let autoFadeMediaHUD = true
+    static let autofadeDefaultDelay: Double = 5.0  // 5 seconds default
+    static let autofadeAppRulesEnabled = false  // App-specific rules disabled by default
+    static let autofadeDisplayRulesEnabled = false  // Display-specific rules disabled by default
     static let debounceMediaChanges = false
     static let enableRealAudioVisualizer = false  // Opt-in: requires Screen Recording
 
