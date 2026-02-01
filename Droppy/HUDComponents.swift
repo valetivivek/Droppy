@@ -483,9 +483,10 @@ struct SubtleScrollingText: View {
         case scrollingStart // Scrolling back to start
     }
     
-    /// Whether text overflows the container (needs scrolling)
-    private var needsScroll: Bool {
-        textWidth > containerWidth + 1 // Small tolerance for rounding
+    /// Whether text overflows the container (needs fade/scrolling)
+    /// CRITICAL: Require containerWidth > 0 to ensure measurements are ready
+    private var needsFade: Bool {
+        textWidth > containerWidth && containerWidth > 0 && textWidth > 0
     }
     
     /// Maximum scroll offset (how far to scroll)
@@ -495,76 +496,64 @@ struct SubtleScrollingText: View {
     
     /// Effective alignment: centered when text fits, leading when overflowing
     private var effectiveAlignment: Alignment {
-        needsScroll ? .leading : (alignment == .center ? .center : .leading)
+        needsFade ? .leading : (alignment == .center ? .center : .leading)
     }
     
     var body: some View {
         GeometryReader { geo in
-            ZStack(alignment: effectiveAlignment) {
-                // Hidden text to measure full width
-                Text(text)
-                    .font(font)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .background(GeometryReader { textGeo in
-                        Color.clear
-                            .onAppear { textWidth = textGeo.size.width }
-                            .onChange(of: text) { _, _ in
-                                DispatchQueue.main.async {
-                                    textWidth = textGeo.size.width
-                                    resetScroll()
-                                }
-                            }
-                    })
-                    .hidden()
-                
-                // Visible clipped text with horizontal scroll offset
+            ZStack(alignment: .leading) {
+                // Text with measurement and fade mask (matches MarqueeText approach)
                 Text(text)
                     .font(font)
                     .foregroundStyle(foregroundStyle)
                     .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .offset(x: -scrollOffset)
-                    // Apply fade mask when text overflows - always show right fade, left fade only when scrolled
-                    .mask(
-                        Group {
-                            if needsScroll {
-                                HStack(spacing: 0) {
-                                    // Left fade - only when scrolled away from start
-                                    if scrollOffset > 0 {
-                                        LinearGradient(
-                                            colors: [.clear, .white],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                        .frame(width: 10)
-                                    } else {
-                                        Color.white.frame(width: 0)
-                                    }
-                                    
-                                    Rectangle()
-                                    
-                                    // Right fade - always show when text overflows (except at end)
-                                    if scrollOffset < maxScrollOffset {
-                                        LinearGradient(
-                                            colors: [.white, .clear],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                        .frame(width: 12)
-                                    } else {
-                                        Color.white.frame(width: 0)
+                    .fixedSize()
+                    .background(
+                        GeometryReader { textGeo in
+                            Color.clear
+                                .onAppear {
+                                    textWidth = textGeo.size.width
+                                }
+                                .onChange(of: text) { _, _ in
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                        textWidth = textGeo.size.width
+                                        resetScroll()
                                     }
                                 }
-                            } else {
-                                // No mask for non-scrolling text - keeps it sharp
-                                Rectangle()
+                        }
+                    )
+                    .offset(x: -scrollOffset)
+                    .frame(maxWidth: geo.size.width, alignment: effectiveAlignment)
+                    // PREMIUM: Gradient mask to fade out right edge (matches MarqueeText)
+                    .mask(
+                        HStack(spacing: 0) {
+                            // Left fade - only when scrolled away from start
+                            if scrollOffset > 0 {
+                                LinearGradient(
+                                    colors: [.clear, .white],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                .frame(width: 10)
+                            }
+                            
+                            Rectangle()
+                            
+                            // Right fade - always show when text overflows
+                            if needsFade {
+                                LinearGradient(
+                                    stops: [
+                                        .init(color: .white, location: 0),
+                                        .init(color: .clear, location: 1)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                .frame(width: 12)
                             }
                         }
                     )
             }
-            .frame(width: geo.size.width, height: geo.size.height, alignment: effectiveAlignment)
-            .clipped()
             .onAppear {
                 containerWidth = geo.size.width
             }
@@ -577,7 +566,7 @@ struct SubtleScrollingText: View {
             }
             .onHover { hovering in
                 isHovering = hovering
-                if hovering && needsScroll {
+                if hovering && needsFade {
                     startHoverScroll()
                 } else {
                     stopScrollAndReset()
@@ -605,7 +594,7 @@ struct SubtleScrollingText: View {
     }
     
     private func startHoverScroll() {
-        guard needsScroll && isHovering else { return }
+        guard needsFade && isHovering else { return }
         
         scrollPhase = .waitingToScroll
         
