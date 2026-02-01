@@ -140,7 +140,7 @@ struct FFmpegInstallView: View {
                 }
                 
                 // Main icon
-                CachedAsyncImage(url: URL(string: "https://getdroppy.app/assets/icons/video-target-size.png")) { image in
+                CachedAsyncImage(url: URL(string: "https://getdroppy.app/assets/icons/targeted-video-size.jpg")) { image in
                     image.resizable().aspectRatio(contentMode: .fill)
                 } placeholder: {
                     Image(systemName: "film").font(.system(size: 32)).foregroundStyle(.green)
