@@ -447,7 +447,25 @@ final class ControlItem {
         
         switch event.type {
         case .leftMouseUp:
-            section?.toggle()
+            // When hover mode is enabled, clicking toggles the locked visible state
+            if let manager = manager, manager.showOnHover {
+                if let hiddenSection = section, hiddenSection.name == .hidden || hiddenSection.name == .visible {
+                    if manager.isLockedVisible {
+                        // Currently locked visible - unlock and hide
+                        manager.isLockedVisible = false
+                        section?.hide()
+                    } else {
+                        // Not locked - lock visible and show
+                        manager.isLockedVisible = true
+                        section?.show()
+                    }
+                } else {
+                    section?.toggle()
+                }
+            } else {
+                // Normal toggle behavior when hover is disabled
+                section?.toggle()
+            }
         case .rightMouseUp:
             showContextMenu()
         default:
@@ -677,6 +695,10 @@ final class MenuBarManager: ObservableObject {
     
     /// Whether spacing changes are pending restart
     @Published var spacingChangesPending: Bool = false
+    
+    /// Whether icons are locked visible (overrides hover behavior)
+    /// When true, clicking the eye locks icons visible; clicking again unlocks
+    @Published var isLockedVisible: Bool = false
     
     /// Whether currently applying spacing changes
     @Published var isApplyingSpacing: Bool = false
@@ -915,6 +937,9 @@ final class MenuBarManager: ObservableObject {
     /// Handles mouse movement for show on hover.
     private func handleMouseMoved() {
         guard showOnHover else { return }
+        
+        // When icons are locked visible via eye click, skip hover behavior
+        guard !isLockedVisible else { return }
         
         guard let screen = NSScreen.main else { return }
         let mouseLocation = NSEvent.mouseLocation

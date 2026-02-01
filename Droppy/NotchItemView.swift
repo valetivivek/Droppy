@@ -1175,14 +1175,9 @@ struct NotchItemView: View {
             // Create new DroppedItem for the folder
             let newFolderItem = DroppedItem(url: folderURL)
             
-            // Replace items with the new folder
+            // Replace items with the new folder (atomic operation like ZIP creation)
             withAnimation(DroppyAnimation.state) {
-                // Remove all processed items
-                for fileItem in itemsToProcess {
-                    state.removeItemByID(fileItem.id)
-                }
-                // Add the new folder
-                state.addItem(newFolderItem)
+                state.replaceItems(itemsToProcess, with: newFolderItem)
             }
             
             state.deselectAll()
