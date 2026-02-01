@@ -58,38 +58,21 @@ enum MBMIconSet: String, CaseIterable, Identifiable {
 
 /// Proxy getters and setters for status item's user defaults values
 private enum StatusItemDefaults {
-    enum Key<Value> {
-        @MainActor static var preferredPosition: Key<CGFloat> { Key<CGFloat>() }
-        @MainActor static var visible: Key<Bool> { Key<Bool>() }
+    static func preferredPosition(for autosaveName: String) -> CGFloat? {
+        UserDefaults.standard.object(forKey: "NSStatusItem Preferred Position \(autosaveName)") as? CGFloat
     }
     
-    static subscript<Value>(key: Key<Value>, autosaveName: String) -> Value? {
-        get {
-            let stringKey: String
-            if Value.self == CGFloat.self {
-                stringKey = "NSStatusItem Preferred Position \(autosaveName)"
-            } else if Value.self == Bool.self {
-                stringKey = "NSStatusItem Visible \(autosaveName)"
-            } else {
-                return nil
-            }
-            return UserDefaults.standard.object(forKey: stringKey) as? Value
+    static func setPreferredPosition(_ value: CGFloat?, for autosaveName: String) {
+        let key = "NSStatusItem Preferred Position \(autosaveName)"
+        if let value {
+            UserDefaults.standard.set(value, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
         }
-        set {
-            let stringKey: String
-            if Value.self == CGFloat.self {
-                stringKey = "NSStatusItem Preferred Position \(autosaveName)"
-            } else if Value.self == Bool.self {
-                stringKey = "NSStatusItem Visible \(autosaveName)"
-            } else {
-                return
-            }
-            if let value = newValue {
-                UserDefaults.standard.set(value, forKey: stringKey)
-            } else {
-                UserDefaults.standard.removeObject(forKey: stringKey)
-            }
-        }
+    }
+    
+    static func removePreferredPosition(for autosaveName: String) {
+        UserDefaults.standard.removeObject(forKey: "NSStatusItem Preferred Position \(autosaveName)")
     }
 }
 
@@ -245,12 +228,12 @@ final class ControlItem {
         let autosaveName = identifier.rawValue
         
         // If the status item doesn't have a preferred position, seed a default
-        if StatusItemDefaults[.preferredPosition, autosaveName] == nil {
+        if StatusItemDefaults.preferredPosition(for: autosaveName) == nil {
             switch identifier {
             case .toggleIcon:
-                StatusItemDefaults[.preferredPosition, autosaveName] = 0
+                StatusItemDefaults.setPreferredPosition(0, for: autosaveName)
             case .hidden:
-                StatusItemDefaults[.preferredPosition, autosaveName] = 1
+                StatusItemDefaults.setPreferredPosition(1, for: autosaveName)
             }
         }
         
@@ -281,7 +264,7 @@ final class ControlItem {
         
         configureStatusItem()
         
-        print("[ControlItem] Created \(autosaveName), position=\(String(describing: StatusItemDefaults[.preferredPosition, autosaveName]))")
+        print("[ControlItem] Created \(autosaveName), position=\(String(describing: StatusItemDefaults.preferredPosition(for: autosaveName)))")
     }
     
     /// Removes the status item without clearing its stored position
@@ -289,9 +272,9 @@ final class ControlItem {
         // Removing the status item has the unwanted side effect of deleting
         // the preferredPosition. Cache and restore it.
         let autosaveName = statusItem.autosaveName as String
-        let cached: CGFloat? = StatusItemDefaults[.preferredPosition, autosaveName]
+        let cached = StatusItemDefaults.preferredPosition(for: autosaveName)
         NSStatusBar.system.removeStatusItem(statusItem)
-        StatusItemDefaults[.preferredPosition, autosaveName] = cached
+        StatusItemDefaults.setPreferredPosition(cached, for: autosaveName)
         print("[ControlItem] deinit \(autosaveName), preserved position=\(String(describing: cached))")
     }
     
@@ -441,9 +424,9 @@ final class ControlItem {
         // Setting statusItem.isVisible to false has the unwanted side effect
         // of deleting the preferredPosition. Cache and restore it.
         let autosaveName = statusItem.autosaveName as String
-        let cached: CGFloat? = StatusItemDefaults[.preferredPosition, autosaveName]
+        let cached = StatusItemDefaults.preferredPosition(for: autosaveName)
         statusItem.isVisible = false
-        StatusItemDefaults[.preferredPosition, autosaveName] = cached
+        StatusItemDefaults.setPreferredPosition(cached, for: autosaveName)
     }
     
     /// Adds the control item to the menu bar
@@ -710,8 +693,8 @@ final class MenuBarManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: Keys.iconSet)
         
         // Clear saved positions
-        StatusItemDefaults[.preferredPosition, "DroppyMBM_Icon"] = nil
-        StatusItemDefaults[.preferredPosition, "DroppyMBM_Hidden"] = nil
+        StatusItemDefaults.removePreferredPosition(for: "DroppyMBM_Icon")
+        StatusItemDefaults.removePreferredPosition(for: "DroppyMBM_Hidden")
         
         print("[MenuBarManager] Cleanup complete")
     }
