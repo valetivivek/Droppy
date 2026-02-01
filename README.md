@@ -82,11 +82,11 @@ Modular extensions add even more functionality. Install only what you need.
 | <img src="https://getdroppy.app/assets/icons/notification-hud.png" width="24"> | **Notify Me!** | Beautiful notification banners in your notch |
 | <img src="https://getdroppy.app/assets/icons/window-snap.jpg" width="24"> | **Window Snap** | Keyboard shortcuts for window management |
 | <img src="https://getdroppy.app/assets/icons/high-alert.jpg" width="24"> | **High Alert** | Keep your Mac awake with timers |
-| <img src="https://getdroppy.app/assets/icons/termi-notch.jpg" width="24"> | **Termi-Notch** | Quick terminal access from the notch |
+| <img src="https://getdroppy.app/assets/icons/terminotch.jpg" width="24"> | **Termi-Notch** | Quick terminal access from the notch |
 | <img src="https://getdroppy.app/assets/icons/alfred.png" width="24"> | **Alfred** | Deep Alfred integration for workflows |
 | <img src="https://getdroppy.app/assets/icons/finder.png" width="24"> | **Finder Services** | Quick actions for Finder items |
 | <img src="https://getdroppy.app/assets/icons/quickshare.jpg" width="24"> | **Quickshare** | Share files instantly via cloud services |
-| <img src="https://getdroppy.app/assets/icons/video-target-size.png" width="24"> | **Video Target Size** | Compress videos to exact file sizes |
+| <img src="https://getdroppy.app/assets/icons/targeted-video-size.jpg" width="24"> | **Video Target Size** | Compress videos to exact file sizes |
 | <img src="https://getdroppy.app/assets/icons/element-capture.jpg" width="24"> | **Element Capture** | Capture UI elements from any app |
 | <img src="https://getdroppy.app/assets/icons/voice-transcribe.jpg" width="24"> | **Voice Transcribe** | Transcribe audio using AI |
 | <img src="https://getdroppy.app/assets/icons/ai-bg.jpg" width="24"> | **Background Removal** | AI-powered background removal |
