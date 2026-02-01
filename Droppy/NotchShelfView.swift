@@ -105,6 +105,9 @@ struct NotchShelfView: View {
     // PREMIUM: Dedicated state for hover scale effect - ensures clean single-value animation
     @State private var hoverScaleActive: Bool = false
     
+    // FIX #126: Haptic debounce to prevent spam from rapid hover oscillation
+    @State private var lastHoverHapticTime: Date = .distantPast
+    
     // PREMIUM: Album art interaction states
     @State private var albumArtNudgeOffset: CGFloat = 0  // ±6pt nudge on prev/next tap
     @State private var albumArtParallaxOffset: CGSize = .zero  // Cursor-following parallax effect
@@ -1223,16 +1226,19 @@ struct NotchShelfView: View {
             // and this overlay provides the smooth morphing animation.
             morphingAlbumArtOverlay
                 .zIndex(10)  // Above all content for smooth morphing visibility
+                .allowsHitTesting(isExpandedOnThisScreen)  // FIX #126: Pass through hover when collapsed
             
             // MARK: - Morphing Visualizer Overlay (Droppy Proxy Pattern)
             // Same approach as album art - single visualizer that morphs position
             morphingVisualizerOverlay
                 .zIndex(11)  // Above album art for visibility
+                .allowsHitTesting(isExpandedOnThisScreen)  // FIX #126: Pass through hover when collapsed
             
             // MARK: - Morphing Title Overlay (Droppy Proxy Pattern)
             // Same approach - single title that morphs from HUD to expanded position
             morphingTitleOverlay
                 .zIndex(12)  // Above visualizer for visibility
+                .allowsHitTesting(isExpandedOnThisScreen)  // FIX #126: Pass through hover when collapsed
         }
         .opacity(notchController.isTemporarilyHidden ? 0 : 1)
         .frame(width: currentNotchWidth, height: currentNotchHeight)
@@ -2053,8 +2059,13 @@ struct NotchShelfView: View {
                     // Direct state update - animation handled by view-level .animation() modifier
                     if enableNotchShelf {
                         // PREMIUM: Subtle haptic on hover enter (not when expanded)
+                        // FIX #126: Debounce haptic to prevent spam from rapid hover oscillation
                         if isHovering && !isExpandedOnThisScreen && !state.isHovering(for: displayID) {
-                            HapticFeedback.hover()
+                            let now = Date()
+                            if now.timeIntervalSince(lastHoverHapticTime) > 0.2 {
+                                HapticFeedback.hover()
+                                lastHoverHapticTime = now
+                            }
                         }
                         state.setHovering(for: displayID, isHovering: isHovering)
                         

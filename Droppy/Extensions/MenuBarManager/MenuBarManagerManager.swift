@@ -948,14 +948,15 @@ final class MenuBarManager: ObservableObject {
         let menuBarHeight: CGFloat = 24
         let isAtTop = mouseLocation.y >= screen.frame.maxY - menuBarHeight
         
-        // CRITICAL: Exclude the notch/island area in the center of the screen
+        // CRITICAL: Only reveal on the RIGHT side of the notch
+        // Left side contains Apple menu bar items, right side contains app/third-party items
         // The notch/Dynamic Island belongs to Droppy's shelf, not the menu bar
-        // Approximate notch zone: center ±150px (wider to be safe with different island widths)
         let screenCenterX = screen.frame.midX
         let notchExclusionWidth: CGFloat = 200  // ±100px from center
-        let isOverNotchArea = abs(mouseLocation.x - screenCenterX) < notchExclusionWidth
+        let isOnRightSideOfNotch = mouseLocation.x > screenCenterX + (notchExclusionWidth / 2)
         
-        let isInMenuBar = isAtTop && !isOverNotchArea
+        let isInMenuBar = isAtTop && isOnRightSideOfNotch
+
         
         if let hiddenSection = section(withName: .hidden) {
             if isInMenuBar && hiddenSection.isHidden {

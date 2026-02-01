@@ -1,2 +1,68 @@
+📢 Important
+- Major update with 119 changes since v10.1.1 — the biggest Droppy update yet!
+
+✨ New Features
+
+🖥️ Hide Physical Notch
+- Added black bar to hide the physical notch cutout on built-in displays
+- Optional support for external displays
+- Automatically adapts to screen changes and display mode
+
+🔒 Incognito Browser Media Filtering  
+- Hide media from private/incognito browsing windows
+- Supports Chrome, Safari, Firefox, Edge, Arc, Brave, Vivaldi, Opera
+- Toggle in Settings → Media → Hide Incognito Media
+
+⏱️ Advanced Autofade (Issue #79)
+- Configurable default autofade delay (1-30 seconds)
+- App-specific autofade rules — set different timers per app
+- Display-specific autofade rules — configure per monitor
+- Smart frontmost app monitoring
+
+📊 Menu Bar Manager — Complete Rewrite
+- Modern reactive architecture with Combine
+- 8 icon sets: Eye, Chevron, Circle, Lines, Dot, Arrow, Square, Diamond
+- Optional gradient icon styling
+- Hover-to-reveal with configurable delay (right side of notch only)
+- Auto-hide timer when cursor leaves menu bar
+- Lock visible mode — click eye icon to lock icons visible
+- Menu bar item spacing adjustment (compresses/expands icon gaps)
+- Chevron separator option
+
+📁 Folder & File Management
+- Interact with items directly inside folder previews
+- Create new folders from shelf/basket context menu with auto-rename
+- Unzip archives directly from context menu
+- Tracked folders now open basket at last scroll position
+
+🎨 Visual Refresh
+- All extension icons redesigned with premium new styles
+- Synced in-app icons with website assets
+- Extension accent colors match icon colors
+- Dark mode app icon on website and README
+
 🐛 Bug Fixes
-- Fixed Droppy not launching from Finder, Spotlight, or Dock on macOS Tahoe (#123)
+
+Performance
+- Fixed Brightness HUD failing after reboot (Issue #125)
+- Fixed drag causing high CPU with event throttling
+- Fixed video seeking causing media flicker (Issue #128)
+
+Multi-Monitor
+- Fixed Element Capture not working on external monitors
+- Fixed Window Snap Display 2 targeting wrong display
+- Added hardware-indexed display targeting
+
+UI & Interaction
+- Fixed shelf auto-collapse zone not including floating buttons
+- Fixed High Alert HUD overlapping with Media HUD
+- Fixed quick actions race condition
+- Fixed accessibility/screen recording prompts on every reboot
+
+🎯 Polish & Refinements
+- Reduced small HUD icon sizes for cleaner appearance
+- Long file names now left-align with smooth gradient fade
+- Media HUD uses HUDLayoutCalculator for consistent sizing
+- Removed unstable Classic Folder Stack feature
+- Updated website with mobile-responsive video embed
+- README updated with YouTube demo and dark mode icon
