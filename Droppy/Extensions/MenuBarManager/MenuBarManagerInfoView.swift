@@ -15,8 +15,12 @@ struct MenuBarManagerInfoView: View {
     var installCount: Int?
     var rating: AnalyticsService.ExtensionRating?
     
-    
     @State private var showReviewsSheet = false
+    
+    /// Use ExtensionType.isRemoved as single source of truth
+    private var isActive: Bool {
+        !ExtensionType.menuBarManager.isRemoved && manager.isEnabled
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -31,14 +35,16 @@ struct MenuBarManagerInfoView: View {
                 VStack(spacing: 20) {
                     // Features section
                     featuresSection
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     
-
                     // Usage instructions (when enabled)
-                    if manager.isEnabled {
+                    if isActive {
                         usageSection
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         
                         // Settings section
                         settingsSection
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -148,20 +154,6 @@ struct MenuBarManagerInfoView: View {
                 featureRow(icon: "hand.draw", text: "Drag icons left of chevron to hide")
                 featureRow(icon: "arrow.left.arrow.right", text: "Rearrange by holding ⌘ and dragging")
             }
-            
-            // Screenshot
-            CachedAsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/images/menu-bar-manager-screenshot.png")) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(AdaptiveColors.subtleBorderAuto, lineWidth: 1)
-                    )
-            } placeholder: {
-                EmptyView()
-            }
         }
     }
     
@@ -177,8 +169,6 @@ struct MenuBarManagerInfoView: View {
                 .foregroundStyle(.primary)
         }
     }
-    
-
     
     private var usageSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -325,12 +315,15 @@ struct MenuBarManagerInfoView: View {
             
             Spacer()
             
-            if manager.isEnabled {
+            if isActive {
                 DisableExtensionButton(extensionType: .menuBarManager)
             } else {
                 Button {
+                    // Enable via ExtensionType and manager
+                    ExtensionType.menuBarManager.setRemoved(false)
                     manager.isEnabled = true
                     AnalyticsService.shared.trackExtensionActivation(extensionId: "menuBarManager")
+                    NotificationCenter.default.post(name: .extensionStateChanged, object: ExtensionType.menuBarManager)
                 } label: {
                     Text("Enable")
                 }

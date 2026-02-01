@@ -587,8 +587,12 @@ final class MenuBarManager: ObservableObject {
     
     /// Initializes a new menu bar manager instance.
     init() {
-        // Load saved settings first
-        let savedEnabled = !UserDefaults.standard.bool(forKey: "MenuBarManager_Removed")
+        // Load saved settings - use unified ExtensionType.isRemoved as primary source
+        // Also check legacy key for backwards compatibility
+        let isRemovedViaExtension = ExtensionType.menuBarManager.isRemoved
+        let isRemovedViaLegacy = UserDefaults.standard.bool(forKey: "MenuBarManager_Removed")
+        let savedEnabled = !isRemovedViaExtension && !isRemovedViaLegacy
+        
         self.isEnabled = savedEnabled
         self.showOnHover = UserDefaults.standard.bool(forKey: "MenuBarManager_ShowOnHover")
         let storedDelay = UserDefaults.standard.double(forKey: "MenuBarManager_ShowOnHoverDelay")
@@ -730,7 +734,9 @@ final class MenuBarManager: ObservableObject {
     
     /// Enables the menu bar manager.
     func enable() {
+        // Clear both legacy and unified removed flags
         UserDefaults.standard.set(false, forKey: "MenuBarManager_Removed")
+        ExtensionType.menuBarManager.setRemoved(false)
         
         if sections.isEmpty {
             performSetup()
@@ -749,7 +755,9 @@ final class MenuBarManager: ObservableObject {
             section.controlItem.removeFromMenuBar()
         }
         
+        // Use unified state - both for backwards compatibility
         UserDefaults.standard.set(true, forKey: "MenuBarManager_Removed")
+        ExtensionType.menuBarManager.setRemoved(true)
         print("[MenuBarManager] Disabled")
     }
     
