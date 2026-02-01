@@ -32,62 +32,55 @@
   <sub>📱 Can't see the video? <a href="https://github.com/user-attachments/assets/813c3eea-6588-4f23-880f-135833d26a16">Watch it here</a></sub>
 </div>
 
----
 
 ## ✨ Core Features
 
+<div align="center">
 <table>
 <tr>
-<td width="50%">
+<td width="50%" align="center">
 
-### 📂 File Shelf
-Drop files into your notch for quick access. Your notch becomes a persistent staging area.
+**📂 File Shelf**<br>
+Drop files into your notch for quick access.
 
-- 🔍 Hover to peek at file contents
-- 🎯 Drag files out to use anywhere
-- 🔄 Auto-sync with tracked folders
-- ⚡ ZIP, unzip, convert, share & more
+🔍 Peek at contents · 🎯 Drag anywhere<br>
+🔄 Auto-sync folders · ⚡ ZIP & convert
 
 </td>
-<td width="50%">
+<td width="50%" align="center">
 
-### 🧺 Floating Basket
-Jiggle your mouse to summon a floating basket for temporary file staging.
+**🧺 Floating Basket**<br>
+Jiggle mouse to summon a floating basket.
 
-- 📍 Appears anywhere on screen
-- 📊 Grid or list view modes
-- ⚡ Quick actions for batch ops
-- 👻 Auto-hides when not needed
+📍 Appears anywhere · 📊 Grid/list view<br>
+⚡ Batch actions · 👻 Auto-hides
 
 </td>
 </tr>
 <tr>
-<td width="50%">
+<td width="50%" align="center">
 
-### 📋 Clipboard Manager
-Press `⌘⇧Space` to open your clipboard history with powerful organization.
+**📋 Clipboard Manager**<br>
+`⌘⇧Space` opens clipboard history.
 
-- 🔍 Unlimited history with search
-- 📌 Pin favorites for quick access
-- 🏷️ Tags for categorizing clips
-- 🖼️ Rich previews for all types
+🔍 Search history · 📌 Pin favorites<br>
+🏷️ Tag clips · 🖼️ Rich previews
 
 </td>
-<td width="50%">
+<td width="50%" align="center">
 
-### 🎨 Beautiful HUDs
-Gorgeous replacements for macOS system indicators — all in your notch.
+**🎨 Beautiful HUDs**<br>
+System indicators in your notch.
 
-- 🔊 Volume & brightness controls
-- 🎵 Now playing with album art
-- 🔋 Battery & charging status
-- 🎙️ Caps Lock, Focus & AirPods
+🔊 Volume/brightness · 🎵 Now playing<br>
+🔋 Battery status · 🎙️ AirPods & Focus
 
 </td>
 </tr>
 </table>
+</div>
 
----
+
 
 ## <img src="https://getdroppy.app/assets/icons/extensions.png" width="24"> Extensions
 
@@ -109,8 +102,6 @@ Modular extensions add even more power. **Install only what you need.**
 | <img src="https://getdroppy.app/assets/icons/voice-transcribe.jpg" width="24"> | [**Voice Transcribe**](https://getdroppy.app/extensions.html) | Transcribe audio to text using on-device AI |
 | <img src="https://getdroppy.app/assets/icons/ai-bg.jpg" width="24"> | [**Background Removal**](https://getdroppy.app/extensions.html) | Remove image backgrounds with AI — one click |
 | <img src="https://getdroppy.app/assets/icons/menubarmanager.png" width="24"> | [**Menu Bar Manager**](https://getdroppy.app/extensions.html) | Hide & organize menu bar icons with hover reveal |
-
----
 
 ## FAQ
 
@@ -144,8 +135,6 @@ Droppy has built-in update notifications. Or use Homebrew: <code>brew upgrade --
 Absolutely! PRs welcome. Check out the issues for ideas or propose your own.
 </details>
 
----
-
 ## Support Droppy
 
 Droppy is **completely free** and built by a single developer. If you find it useful, please consider supporting development:
@@ -163,13 +152,9 @@ Droppy is **completely free** and built by a single developer. If you find it us
 
 Your support helps cover development costs and keeps Droppy free for everyone!
 
----
-
 ## License
 
 Droppy is released under the [GPL-3.0 License with Commons Clause](LICENSE).
-
----
 
 <p align="center">
   <sub>Made with ❤️ for the Mac community</sub>
