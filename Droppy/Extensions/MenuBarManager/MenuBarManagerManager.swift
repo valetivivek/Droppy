@@ -306,23 +306,15 @@ final class ControlItem {
             }
             .store(in: &c)
         
-        // Length logic based on section name:
-        // .visible = always standard width
-        // .hidden = expands when hiding items
+        // Length logic - DISABLED EXPANSION FOR NOW
+        // Both sections use standard width until we fix the hiding mechanism
         Publishers.CombineLatest($isVisible, $state)
             .sink { [weak self] (isVisible, state) in
                 guard let self else { return }
                 
                 if isVisible {
-                    statusItem.length = switch sectionName {
-                    case .visible:
-                        Lengths.standard
-                    case .hidden:
-                        switch state {
-                        case .hideItems: Lengths.expanded
-                        case .showItems: Lengths.standard
-                        }
-                    }
+                    // Always use standard length for now
+                    statusItem.length = Lengths.standard
                     constraint?.isActive = true
                 } else {
                     // When not visible, use constraint hack for zero width
