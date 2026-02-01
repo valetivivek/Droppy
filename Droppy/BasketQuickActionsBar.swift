@@ -34,25 +34,37 @@ struct BasketQuickActionsBar: View {
     
     var body: some View {
         ZStack {
-            // Transparent hit area background - captures drags between buttons AND clears state when drag exits
-            if isExpanded {
-                Capsule()
-                    .fill(Color.white.opacity(0.001)) // Nearly invisible but captures events
-                    .frame(width: expandedBarWidth, height: buttonSize + 8)
-                    .transition(.opacity.animation(.easeInOut(duration: 0.2)))
-                    // Track when drag is over the bar area
-                    // Include file promise types for Photos.app compatibility
-                    .onDrop(of: [UTType.fileURL, UTType.image, UTType.movie, UTType.data], isTargeted: $isBarAreaTargeted) { _ in
-                        return false  // Don't handle drop here
-                    }
-                    // Clear global state when drag exits the bar area
-                    .onChange(of: isBarAreaTargeted) { _, targeted in
-                        if !targeted {
-                            // Drag left the bar area - clear the global targeting state
-                            DroppyState.shared.isQuickActionsTargeted = false
+            // ALWAYS render transparent hit area - sized dynamically
+            // This eliminates the race condition where the capsule appears after expansion
+            // When collapsed: small area around bolt. When expanded: full bar area.
+            Capsule()
+                .fill(Color.white.opacity(0.001)) // Nearly invisible but captures events
+                .frame(
+                    width: isExpanded ? expandedBarWidth : buttonSize + 16,
+                    height: buttonSize + 8
+                )
+                // Track when drag is over the bar area
+                // Include file promise types for Photos.app compatibility
+                .onDrop(of: [UTType.fileURL, UTType.image, UTType.movie, UTType.data], isTargeted: $isBarAreaTargeted) { _ in
+                    return false  // Don't handle drop here
+                }
+                // Keep expanded when drag is over bar area
+                .onChange(of: isBarAreaTargeted) { _, targeted in
+                    if targeted && !isExpanded {
+                        // Drag entered bar area while collapsed - expand
+                        withAnimation(DroppyAnimation.state) {
+                            isExpanded = true
+                        }
+                        HapticFeedback.expand()
+                    } else if !targeted && !isHovering && !isBoltTargeted && !DroppyState.shared.isQuickActionsTargeted {
+                        // Drag left the bar area completely - collapse
+                        DroppyState.shared.isQuickActionsTargeted = false
+                        DroppyState.shared.hoveredQuickAction = nil
+                        withAnimation(DroppyAnimation.state) {
+                            isExpanded = false
                         }
                     }
-            }
+                }
             
             HStack(spacing: spacing) {
                 if isExpanded {
@@ -110,9 +122,9 @@ struct BasketQuickActionsBar: View {
         }
         .onChange(of: isHovering) { _, hovering in
             // EXPANDED VIA HOVER: normal expand/collapse on hover
-            // But don't collapse if still dragging over quick action buttons
-            if !hovering && (DroppyState.shared.isQuickActionsTargeted || isBoltTargeted) {
-                return  // Keep expanded while dragging over bar
+            // But don't collapse if still dragging over bar area
+            if !hovering && isBarAreaTargeted {
+                return  // Keep expanded while dragging anywhere over bar
             }
             withAnimation(DroppyAnimation.state) {
                 isExpanded = hovering
@@ -134,17 +146,8 @@ struct BasketQuickActionsBar: View {
                 HapticFeedback.expand()
             }
         }
-        // COLLAPSE when quick action targeting ends (drag left the buttons)
-        // BUT only if drag also left the bar area (handles gaps between buttons)
-        // AND not still targeting the bolt (handles transition from bolt to expanded)
-        .onChange(of: DroppyState.shared.isQuickActionsTargeted) { _, targeted in
-            if !targeted && !isHovering && !isBarAreaTargeted && !isBoltTargeted && isExpanded {
-                DroppyState.shared.hoveredQuickAction = nil
-                withAnimation(DroppyAnimation.state) {
-                    isExpanded = false
-                }
-            }
-        }
+        // Note: Main collapse logic is handled by onChange(of: isBarAreaTargeted) above
+        // This handler is just for when buttons lose targeting but bar area keeps it
         // COLLAPSE when basket becomes targeted (drag moved to basket area)
         .onChange(of: DroppyState.shared.isBasketTargeted) { _, targeted in
             if targeted && isExpanded {
