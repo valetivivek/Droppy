@@ -1821,6 +1821,9 @@ struct SettingsView: View {
                 } else if extensionType == .ffmpegVideoCompression {
                     // FFmpeg Video Compression has its own install view
                     FFmpegInstallView(installCount: nil, rating: nil)
+                } else if extensionType == .menuBarManager {
+                    // Menu Bar Manager has its own configuration view
+                    MenuBarManagerInfoView(installCount: nil, rating: nil)
                 } else {
                     // All other extensions use ExtensionInfoView
                     ExtensionInfoView(extensionType: extensionType) {
