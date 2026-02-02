@@ -44,6 +44,9 @@ struct ElementCaptureInfoView: View {
                     
                     // Keyboard Shortcuts Section (all modes)
                     shortcutsSection
+                    
+                    // Editor shortcuts reference
+                    editorShortcutsSection
                 }
                 .padding(.horizontal, 24)
                 .padding(.vertical, 20)
@@ -213,6 +216,77 @@ struct ElementCaptureInfoView: View {
             RoundedRectangle(cornerRadius: DroppyRadius.ml, style: .continuous)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
+    }
+    
+    // MARK: - Editor Shortcuts Reference
+    
+    private var editorShortcutsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Editor Shortcuts")
+                .font(.headline)
+                .foregroundStyle(.primary)
+            
+            Text("Quick access while editing screenshots")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            
+            // Tools grid
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 8) {
+                editorShortcutItem(key: "A", label: "Arrow")
+                editorShortcutItem(key: "L", label: "Line")
+                editorShortcutItem(key: "R", label: "Rectangle")
+                editorShortcutItem(key: "O", label: "Ellipse")
+                editorShortcutItem(key: "F", label: "Freehand")
+                editorShortcutItem(key: "H", label: "Highlighter")
+                editorShortcutItem(key: "B", label: "Blur")
+                editorShortcutItem(key: "T", label: "Text")
+            }
+            
+            Divider()
+                .padding(.vertical, 4)
+            
+            // Other shortcuts
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 8) {
+                editorShortcutItem(key: "1-3", label: "Stroke Size")
+                editorShortcutItem(key: "+/-", label: "Zoom")
+                editorShortcutItem(key: "0", label: "Reset Zoom")
+                editorShortcutItem(key: "⌘Z", label: "Undo")
+                editorShortcutItem(key: "⌘⇧Z", label: "Redo")
+                editorShortcutItem(key: "Esc", label: "Cancel")
+                editorShortcutItem(key: "↵", label: "Done")
+            }
+        }
+        .padding(DroppySpacing.lg)
+        .background(AdaptiveColors.buttonBackgroundAuto.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.ml, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: DroppyRadius.ml, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+    
+    private func editorShortcutItem(key: String, label: String) -> some View {
+        HStack(spacing: 8) {
+            Text(key)
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.cyan)
+                .frame(width: 36, alignment: .center)
+                .padding(.vertical, 4)
+                .background(Color.white.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            
+            Spacer()
+        }
     }
     
     private func shortcutRow(mode: ElementCaptureMode, shortcut: Binding<SavedShortcut?>) -> some View {

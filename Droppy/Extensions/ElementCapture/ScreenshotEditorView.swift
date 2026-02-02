@@ -37,6 +37,25 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
         case .text: return "Text"
         }
     }
+    
+    /// Default keyboard shortcut key (single character, no modifiers)
+    var defaultShortcut: Character {
+        switch self {
+        case .arrow: return "a"
+        case .line: return "l"
+        case .rectangle: return "r"
+        case .ellipse: return "o"  // O for oval/ellipse
+        case .freehand: return "f"
+        case .highlighter: return "h"
+        case .blur: return "b"
+        case .text: return "t"
+        }
+    }
+    
+    /// Tooltip with shortcut hint
+    var tooltipWithShortcut: String {
+        "\(displayName) (\(defaultShortcut.uppercased()))"
+    }
 }
 
 struct Annotation: Identifiable {
@@ -178,6 +197,99 @@ struct ScreenshotEditorView: View {
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .sheet(isPresented: $showingTextInput) {
             textInputSheet
+        }
+        .onAppear {
+            setupKeyboardMonitor()
+        }
+        .onDisappear {
+            removeKeyboardMonitor()
+        }
+    }
+    
+    // MARK: - Keyboard Shortcuts
+    
+    @State private var keyboardMonitor: Any?
+    
+    private func setupKeyboardMonitor() {
+        keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
+            // Don't capture if text input sheet is showing
+            guard !showingTextInput else { return event }
+            
+            // Check for modifier keys
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            
+            // ⌘Z for Undo
+            if flags == .command && event.charactersIgnoringModifiers == "z" {
+                undo()
+                return nil
+            }
+            
+            // ⌘⇧Z for Redo
+            if flags == [.command, .shift] && event.charactersIgnoringModifiers == "z" {
+                redo()
+                return nil
+            }
+            
+            // Escape to cancel
+            if event.keyCode == 53 {
+                onCancel()
+                return nil
+            }
+            
+            // Enter/Return to finish
+            if event.keyCode == 36 {
+                saveAnnotatedImage()
+                return nil
+            }
+            
+            // Tool shortcuts (no modifiers)
+            guard flags.isEmpty || flags == .shift else { return event }
+            
+            if let char = event.charactersIgnoringModifiers?.lowercased().first {
+                // Check for tool shortcuts
+                for tool in AnnotationTool.allCases {
+                    if char == tool.defaultShortcut {
+                        selectedTool = tool
+                        return nil
+                    }
+                }
+                
+                // Number keys 1-3 for stroke width
+                if char == "1" {
+                    strokeWidth = 2
+                    return nil
+                } else if char == "2" {
+                    strokeWidth = 4
+                    return nil
+                } else if char == "3" {
+                    strokeWidth = 6
+                    return nil
+                }
+                
+                // +/- for zoom
+                if char == "=" || char == "+" {
+                    zoomScale = min(4.0, zoomScale + 0.25)
+                    return nil
+                } else if char == "-" {
+                    zoomScale = max(0.25, zoomScale - 0.25)
+                    return nil
+                }
+                
+                // 0 to reset zoom
+                if char == "0" {
+                    zoomScale = 1.0
+                    return nil
+                }
+            }
+            
+            return event
+        }
+    }
+    
+    private func removeKeyboardMonitor() {
+        if let monitor = keyboardMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyboardMonitor = nil
         }
     }
     
@@ -337,7 +449,7 @@ struct ScreenshotEditorView: View {
                     cornerRadius: 14,
                     accentColor: .accentColor
                 ))
-                .help(tool.displayName)
+                .help(tool.tooltipWithShortcut)
             }
             
             toolbarDivider
