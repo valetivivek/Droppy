@@ -241,7 +241,7 @@ struct ElementCaptureInfoView: View {
                 } label: {
                     Text("Load Defaults")
                         .font(.caption.weight(.medium))
-                        .foregroundStyle(.cyan)
+                        .foregroundStyle(.yellow)
                 }
                 .buttonStyle(DroppyPillButtonStyle(size: .small))
             }
@@ -295,7 +295,7 @@ struct ElementCaptureInfoView: View {
             // Icon
             Image(systemName: action.icon)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.cyan)
+                .foregroundStyle(.yellow)
                 .frame(width: 18)
             
             // Title
