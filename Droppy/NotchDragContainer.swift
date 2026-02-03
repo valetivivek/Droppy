@@ -528,6 +528,21 @@ class NotchDragContainer: NSView {
             return [] // Reject - let drag pass through to other apps
         }
         
+        // Issue #136 FIX: Manually activate DragMonitor for Dock folder/system drags
+        // NSPasteboard(name: .drag) polling doesn't detect Dock folder drags, but
+        // NSDraggingDestination does receive them. Force-set the drag state so the
+        // shelf shows action buttons (Share, AirDrop, etc.)
+        if !DragMonitor.shared.isDragging {
+            let dragLocation = sender.draggingLocation
+            if let windowFrame = self.window?.frame {
+                let screenLocation = NSPoint(x: windowFrame.origin.x + dragLocation.x,
+                                             y: windowFrame.origin.y + dragLocation.y)
+                DragMonitor.shared.forceSetDragging(true, location: screenLocation)
+            } else {
+                DragMonitor.shared.forceSetDragging(true)
+            }
+        }
+        
         // Auto-expand shelf when drag enters notch (replaces the drop indicator)
         if overNotch && !isExpanded {
             // Get the display ID from the notch window's screen
@@ -590,6 +605,13 @@ class NotchDragContainer: NSView {
                 DroppyState.shared.dropTargetDisplayID = nil
             }
         }
+        
+        // Issue #136: Also clear force-set drag state when drag exits
+        // Only if mouse button is no longer pressed (drag truly ended)
+        let mouseIsDown = NSEvent.pressedMouseButtons & 1 != 0
+        if !mouseIsDown {
+            DragMonitor.shared.forceSetDragging(false)
+        }
     }
     
     override func draggingEnded(_ sender: NSDraggingInfo) {
@@ -600,6 +622,9 @@ class NotchDragContainer: NSView {
                 DroppyState.shared.dropTargetDisplayID = nil
             }
         }
+        
+        // Issue #136: Clear force-set drag state when drag operation ends
+        DragMonitor.shared.forceSetDragging(false)
     }
     
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {

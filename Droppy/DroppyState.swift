@@ -369,10 +369,13 @@ final class DroppyState {
         
         // DYNAMIC BUTTON SPACE: Only add padding when floating buttons are actually visible
         // TermiNotch button shows when INSTALLED (not just when terminal output is visible)
-        // Buttons visible when: TermiNotch is installed OR auto-collapse is disabled
+        // Buttons visible when: TermiNotch is installed OR auto-collapse is disabled OR dragging (Quick Actions bar)
+        // Issue #134 FIX: Include isDragging since Quick Actions bar appears during file drags
         let terminalButtonVisible = TerminalNotchManager.shared.isInstalled
         let autoCollapseEnabled = (UserDefaults.standard.object(forKey: "autoCollapseShelf") as? Bool) ?? true
-        let hasFloatingButtons = terminalButtonVisible || !autoCollapseEnabled
+        let caffeineInstalled = UserDefaults.standard.bool(forKey: AppPreferenceKey.caffeineInstalled)
+        let caffeineEnabled = UserDefaults.standard.bool(forKey: AppPreferenceKey.caffeineEnabled)
+        let hasFloatingButtons = terminalButtonVisible || !autoCollapseEnabled || DragMonitor.shared.isDragging || (caffeineInstalled && caffeineEnabled)
         
         if hasFloatingButtons {
             // Button offset (12 gap + 6 island) + button height (46) + extra margin = 100pt

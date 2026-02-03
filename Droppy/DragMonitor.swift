@@ -77,6 +77,33 @@ final class DragMonitor: ObservableObject {
         lastDragDirection = .zero
     }
     
+    /// Manually set dragging state for system-initiated drags (e.g., Dock folder drags)
+    /// NSPasteboard(name: .drag) polling doesn't work for Dock folder drags - the changeCount
+    /// isn't updated until later in the drag. This allows NotchDragContainer.draggingEntered()
+    /// to manually activate the drag state when it receives a drag via NSDraggingDestination.
+    /// Fixes Issue #136: Dock folder drags not showing shelf action buttons.
+    func forceSetDragging(_ isDragging: Bool, location: CGPoint? = nil) {
+        guard self.isDragging != isDragging else { return }  // Avoid redundant changes
+        
+        print("🔧 DragMonitor.forceSetDragging(\(isDragging)) - Dock folder/system drag workaround")
+        
+        if isDragging {
+            dragActive = true
+            self.isDragging = true
+            if let loc = location {
+                dragLocation = loc
+                lastDragLocation = loc
+            }
+            dragEndNotified = false
+            resetJiggle()
+        } else {
+            dragActive = false
+            self.isDragging = false
+            dragEndNotified = true
+            resetJiggle()
+        }
+    }
+    
     /// Force reset ALL drag state (called after screen unlock when state may be corrupted)
     /// After SkyLight delegation, the drag polling state can get stuck, blocking hover detection
     func forceReset() {
