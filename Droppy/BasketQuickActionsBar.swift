@@ -17,9 +17,11 @@ struct BasketQuickActionsBar: View {
     @State private var isExpanded = false
     @State private var isHovering = false
     @State private var isBoltTargeted = false  // Track when files are dragged over collapsed bolt
+    @ObservedObject private var dragMonitor = DragMonitor.shared
     
     private let buttonSize: CGFloat = 48
     private let spacing: CGFloat = 12
+    private var isQuickshareEnabled: Bool { !ExtensionType.quickshare.isRemoved }
     
     // Colors based on transparency mode
     private var buttonFill: Color {
@@ -29,7 +31,8 @@ struct BasketQuickActionsBar: View {
     
     /// Computed width of expanded bar area: 4 buttons + 3 gaps
     private var expandedBarWidth: CGFloat {
-        (buttonSize * 4) + (spacing * 3) + 16  // Extra padding for safety
+        let actionCount = isQuickshareEnabled ? 4 : 3
+        return (buttonSize * CGFloat(actionCount)) + (spacing * CGFloat(actionCount - 1)) + 16
     }
     
     var body: some View {
@@ -56,8 +59,8 @@ struct BasketQuickActionsBar: View {
                             isExpanded = true
                         }
                         HapticFeedback.expand()
-                    } else if !targeted && !isHovering && !isBoltTargeted && !DroppyState.shared.isQuickActionsTargeted {
-                        // Drag left the bar area completely - collapse
+                    } else if !targeted && !isHovering && !isBoltTargeted && !DroppyState.shared.isQuickActionsTargeted && !dragMonitor.isDragging {
+                        // Drag left the bar area completely - collapse (only if not dragging)
                         DroppyState.shared.isQuickActionsTargeted = false
                         DroppyState.shared.hoveredQuickAction = nil
                         withAnimation(DroppyAnimation.state) {
@@ -84,11 +87,13 @@ struct BasketQuickActionsBar: View {
                             insertion: .scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.itemInsertion.delay(0.06)),
                             removal: .scale(scale: 0.5).combined(with: .opacity).animation(.easeOut(duration: 0.15))
                         ))
-                    QuickDropActionButton(actionType: .quickshare, useTransparent: useTransparentBackground, shareAction: quickShareTo0x0)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.itemInsertion.delay(0.09)),
-                            removal: .scale(scale: 0.5).combined(with: .opacity).animation(.easeOut(duration: 0.15))
-                        ))
+                    if isQuickshareEnabled {
+                        QuickDropActionButton(actionType: .quickshare, useTransparent: useTransparentBackground, shareAction: quickShareTo0x0)
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.itemInsertion.delay(0.09)),
+                                removal: .scale(scale: 0.5).combined(with: .opacity).animation(.easeOut(duration: 0.15))
+                            ))
+                    }
                 } else {
                     // Collapsed: Zap button - matches quick action icons with glass material
                     Circle()
@@ -123,7 +128,7 @@ struct BasketQuickActionsBar: View {
         .onChange(of: isHovering) { _, hovering in
             // EXPANDED VIA HOVER: normal expand/collapse on hover
             // But don't collapse if still dragging over bar area
-            if !hovering && isBarAreaTargeted {
+            if !hovering && (isBarAreaTargeted || dragMonitor.isDragging) {
                 return  // Keep expanded while dragging anywhere over bar
             }
             withAnimation(DroppyAnimation.state) {
@@ -144,6 +149,17 @@ struct BasketQuickActionsBar: View {
                     isExpanded = true
                 }
                 HapticFeedback.expand()
+            }
+        }
+        .onChange(of: dragMonitor.isDragging) { _, dragging in
+            if dragging {
+                return
+            }
+            if !isHovering && !isBarAreaTargeted && !isBoltTargeted && !DroppyState.shared.isQuickActionsTargeted {
+                withAnimation(DroppyAnimation.state) {
+                    isExpanded = false
+                }
+                DroppyState.shared.hoveredQuickAction = nil
             }
         }
         // Note: Main collapse logic is handled by onChange(of: isBarAreaTargeted) above
@@ -260,5 +276,3 @@ struct QuickDropActionButton: View {
         }
     }
 }
-
-

@@ -99,8 +99,6 @@ enum ExtensionType: String, CaseIterable, Identifiable {
     
     /// Check if this extension has been removed by the user
     var isRemoved: Bool {
-        // Quickshare is a core extension and cannot be removed
-        if self == .quickshare { return false }
         return UserDefaults.standard.bool(forKey: removedKey)
     }
     
@@ -115,4 +113,3 @@ enum ExtensionType: String, CaseIterable, Identifiable {
         definition?.cleanup()
     }
 }
-

@@ -210,7 +210,7 @@ struct SettingsSidebar: View {
         SettingsTab.allCases.filter { tab in
             switch tab {
             case .quickshare:
-                return showQuickshareInSidebar
+                return showQuickshareInSidebar && !ExtensionType.quickshare.isRemoved
             default:
                 return true
             }

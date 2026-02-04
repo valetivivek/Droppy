@@ -21,6 +21,7 @@ struct DroppedItemView: View {
     @State private var isHovering = false
     @State private var isPressed = false
     @State private var showRemoveButton = false
+    @State private var cachedSharingServices: [NSSharingService] = []
     
     var body: some View {
         VStack(spacing: 8) {
@@ -155,7 +156,7 @@ struct DroppedItemView: View {
             
             // Share submenu - positions correctly relative to context menu
             Menu {
-                ForEach(sharingServicesForItems([item.url]), id: \.title) { service in
+                ForEach(cachedSharingServices, id: \.title) { service in
                     Button {
                         service.perform(withItems: [item.url])
                     } label: {
@@ -185,6 +186,12 @@ struct DroppedItemView: View {
             // Load thumbnail from cache (no delay - cache handles throttling)
             thumbnail = await ThumbnailCache.shared.loadThumbnailAsync(for: item, size: CGSize(width: 128, height: 128))
         }
+        .onAppear {
+            refreshContextMenuCache()
+        }
+        .onChange(of: item.url) { _, _ in
+            refreshContextMenuCache()
+        }
         .animation(DroppyAnimation.bouncy, value: isSelected)
     }
     
@@ -206,6 +213,10 @@ struct DroppedItemView: View {
             return Color(NSColor.labelColor).opacity(0.1)
         }
         return .clear
+    }
+
+    private func refreshContextMenuCache() {
+        cachedSharingServices = sharingServicesForItems([item.url])
     }
 }
 
@@ -248,4 +259,3 @@ struct PressActions: ViewModifier {
             )
     }
 }
-

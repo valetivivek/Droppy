@@ -43,6 +43,8 @@ struct BasketItemView: View {
     @State private var hoverTask: Task<Void, Never>?  // Task for delayed hover show
     @State private var dismissTask: Task<Void, Never>?  // Task for delayed hover dismiss (to reach popover)
     @State private var isHoveringPopover = false  // Track if cursor is over popover content
+    @State private var cachedAvailableApps: [(name: String, icon: NSImage, url: URL)] = []
+    @State private var cachedSharingServices: [NSSharingService] = []
     
     private var isSelected: Bool {
         state.selectedBasketItems.contains(item.id)
@@ -522,6 +524,10 @@ struct BasketItemView: View {
                         state.clearPoof(for: item.id)
                     }
                 }
+                refreshContextMenuCache()
+            }
+            .onChange(of: item.url) { _, _ in
+                refreshContextMenuCache()
             }
             .contextMenu {
                 contextMenuContent()
@@ -586,7 +592,7 @@ struct BasketItemView: View {
         }
         
         // Open With submenu
-        let availableApps = item.getAvailableApplications()
+        let availableApps = cachedAvailableApps
         if !availableApps.isEmpty {
             Menu {
                 ForEach(availableApps, id: \.url) { app in
@@ -607,7 +613,7 @@ struct BasketItemView: View {
         
         // Share submenu - positions correctly relative to context menu
         Menu {
-            ForEach(sharingServicesForItems([item.url]), id: \.title) { service in
+            ForEach(cachedSharingServices, id: \.title) { service in
                 Button {
                     service.perform(withItems: [item.url])
                 } label: {
@@ -623,13 +629,15 @@ struct BasketItemView: View {
         }
         
         // Droppy Quickshare - upload and get shareable link
-        Button {
-            let itemsToShare = state.selectedBasketItems.isEmpty
-                ? [item.url]
-                : state.basketItems.filter { state.selectedBasketItems.contains($0.id) }.map { $0.url }
-            DroppyQuickshare.share(urls: itemsToShare)
-        } label: {
-            Label("Droppy Quickshare", systemImage: "drop.fill")
+        if !ExtensionType.quickshare.isRemoved {
+            Button {
+                let itemsToShare = state.selectedBasketItems.isEmpty
+                    ? [item.url]
+                    : state.basketItems.filter { state.selectedBasketItems.contains($0.id) }.map { $0.url }
+                DroppyQuickshare.share(urls: itemsToShare)
+            } label: {
+                Label("Droppy Quickshare", systemImage: "drop.fill")
+            }
         }
         
         Button {
@@ -861,6 +869,11 @@ struct BasketItemView: View {
                 Label("Remove from Basket", systemImage: "xmark")
             }
         }
+    }
+
+    private func refreshContextMenuCache() {
+        cachedAvailableApps = item.getAvailableApplications()
+        cachedSharingServices = sharingServicesForItems([item.url])
     }
     
     // MARK: - Actions

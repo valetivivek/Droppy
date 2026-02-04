@@ -37,6 +37,6 @@ struct QuickshareExtension: ExtensionDefinition {
     static let iconPlaceholderColor: Color = .cyan
     
     static func cleanup() {
-        // Quickshare is a core extension and handles its own cleanup via QuickshareManager
+        // Quickshare does not require explicit cleanup beyond shared history management
     }
 }

@@ -293,10 +293,12 @@ struct ScreenshotEditorView: View {
                         Label("Save to File...", systemImage: "square.and.arrow.down")
                     }
                     
-                    Button {
-                        shareViaQuickshare()
-                    } label: {
-                        Label("Quickshare", systemImage: "drop.fill")
+                    if !ExtensionType.quickshare.isRemoved {
+                        Button {
+                            shareViaQuickshare()
+                        } label: {
+                            Label("Quickshare", systemImage: "drop.fill")
+                        }
                     }
                     
                     Button {
@@ -525,6 +527,7 @@ struct ScreenshotEditorView: View {
     }
     
     private func shareViaQuickshare() {
+        guard !ExtensionType.quickshare.isRemoved else { return }
         let annotatedImage = renderAnnotatedImage()
         // Use Droppy's quickshare
         if let tiffData = annotatedImage.tiffRepresentation,

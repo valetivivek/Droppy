@@ -1326,17 +1326,6 @@ final class NotchWindowController: NSObject, ObservableObject {
             self?.repositionNotchWindow()
         }
         systemObservers.append(islandHeightObserver)
-        
-        // Physical notch height preference change - update window layout immediately
-        let notchHeightObserver = center.addObserver(
-            forName: NSNotification.Name("PhysicalNotchHeightChanged"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            print("📐 NotchWindowController: Notch height changed - updating layout")
-            self?.repositionNotchWindow()
-        }
-        systemObservers.append(notchHeightObserver)
     }
     
     /// Forces re-registration of all event monitors
@@ -2002,10 +1991,7 @@ class NotchWindow: NSPanel {
         if let leftArea = screen.auxiliaryTopLeftArea,
            let rightArea = screen.auxiliaryTopRightArea {
             // Correct calculation: the gap between the two auxiliary areas
-            let calculatedWidth = rightArea.minX - leftArea.maxX
-            notchWidth = max(calculatedWidth, 180)
-            print("📐 NotchWindowController: leftArea.maxX=\(leftArea.maxX), rightArea.minX=\(rightArea.minX), calculatedWidth=\(calculatedWidth), notchWidth=\(notchWidth)")
-            print("📐 NotchWindowController: screen.frame=\(screen.frame), backingScaleFactor=\(screen.backingScaleFactor)")
+            notchWidth = max(rightArea.minX - leftArea.maxX, 180)
             // Derive X position directly from auxiliary areas (already in screen-local coordinates)
             // Convert to global coordinates by adding screen origin
             notchX = screen.frame.origin.x + leftArea.maxX
@@ -2032,14 +2018,12 @@ class NotchWindow: NSPanel {
         // Y position in global coordinates
         let notchY = screen.frame.origin.y + screen.frame.height - notchHeight
 
-        let finalFrame = NSRect(
+        return NSRect(
             x: notchX,
             y: notchY,
             width: notchWidth,
             height: notchHeight
         )
-        print("📐 NotchWindowController.calculateNotchFrame: returning frame=\(finalFrame)")
-        return finalFrame
     }
     
     /// Public accessor for the real hardware notch rect in screen coordinates
@@ -2362,6 +2346,14 @@ class NotchWindow: NSPanel {
         // Verify window is still valid before any property access
         guard self.contentView != nil else {
             isValid = false
+            return
+        }
+
+        // If the notch is temporarily hidden, always ignore mouse events
+        if NotchWindowController.shared.isTemporarilyHidden {
+            if !self.ignoresMouseEvents {
+                self.ignoresMouseEvents = true
+            }
             return
         }
         

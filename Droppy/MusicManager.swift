@@ -142,6 +142,10 @@ final class MusicManager: ObservableObject {
     /// Last applied metadata signature to detect true track changes
     private var lastAppliedMetadataSignature: String = ""
 
+    // MARK: - Apple Music Metadata Sync
+    /// Periodic AppleScript sync to keep Apple Music metadata accurate
+    private var appleMusicMetadataSyncTimer: Timer?
+
     // MARK: - Media Source Filter
 
     /// Whether media source filtering is enabled
@@ -307,6 +311,14 @@ final class MusicManager: ObservableObject {
                 }
                 return
             }
+        }
+
+        // Apple Music does not need activation to receive AppleScript commands
+        if displayedBundle == AppleMusicController.appleMusicBundleId {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                completion()
+            }
+            return
         }
 
         // App is running, activate it to ensure it receives the command
@@ -854,6 +866,7 @@ final class MusicManager: ObservableObject {
         bundleIdentifier = nil
         wasRecentlyPlaying = false
         isMediaHUDForced = false
+        stopAppleMusicMetadataSyncTimer()
     }
     
     /// Called when screen wakes from sleep - restart the adapter to prevent frozen HUD
@@ -1192,6 +1205,7 @@ final class MusicManager: ObservableObject {
             // Refresh Apple Music state when source changes to Apple Music
             if isAppleMusicSource && !wasAppleMusic {
                 AppleMusicController.shared.refreshState()
+                startAppleMusicMetadataSyncTimer()
             }
             
             // PERFORMANCE FIX: Stop Spotify's position sync timer when switching away
@@ -1203,6 +1217,7 @@ final class MusicManager: ObservableObject {
             // PERFORMANCE FIX: Stop Apple Music's position sync timer when switching away
             if wasAppleMusic && !isAppleMusicSource {
                 AppleMusicController.shared.stopPositionSyncTimer()
+                stopAppleMusicMetadataSyncTimer()
             }
         }
         
@@ -1267,6 +1282,71 @@ final class MusicManager: ObservableObject {
         
         // Clear pending state
         pendingMetadataUpdate = nil
+    }
+
+    // MARK: - Apple Music Metadata Sync
+
+    /// Start periodic Apple Music metadata reconciliation
+    private func startAppleMusicMetadataSyncTimer() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.stopAppleMusicMetadataSyncTimer()
+
+            let timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+                self?.syncAppleMusicTrackInfo()
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            self.appleMusicMetadataSyncTimer = timer
+
+            self.syncAppleMusicTrackInfo()
+        }
+    }
+
+    /// Stop periodic Apple Music metadata reconciliation
+    private func stopAppleMusicMetadataSyncTimer() {
+        appleMusicMetadataSyncTimer?.invalidate()
+        appleMusicMetadataSyncTimer = nil
+    }
+
+    /// Reconcile Apple Music track info via AppleScript when MediaRemote is stale
+    private func syncAppleMusicTrackInfo() {
+        guard isAppleMusicSource else {
+            stopAppleMusicMetadataSyncTimer()
+            return
+        }
+
+        guard AppleMusicController.shared.isAppleMusicRunning else { return }
+
+        AppleMusicController.shared.fetchCurrentTrackInfo { [weak self] title, artist, album, duration, position in
+            guard let self = self else { return }
+            guard self.isAppleMusicSource else { return }
+            guard let title = title, let artist = artist else { return }
+
+            let resolvedAlbum = album ?? ""
+            let didChange = title != self.songTitle || artist != self.artistName || resolvedAlbum != self.albumName
+
+            if didChange {
+                self.metadataDebounceTimer?.invalidate()
+                self.pendingMetadataUpdate = nil
+
+                self.songTitle = title
+                self.artistName = artist
+                self.albumName = resolvedAlbum
+
+                if let duration = duration, duration > 0 {
+                    self.songDuration = duration
+                }
+                if let position = position {
+                    self.elapsedTime = position
+                    self.timestampDate = Date()
+                }
+
+                self.bundleIdentifier = AppleMusicController.appleMusicBundleId
+                self.lastAppliedMetadataSignature = "\(title)||\(artist)||\(AppleMusicController.appleMusicBundleId)"
+
+                AppleMusicController.shared.onTrackChange()
+            }
+        }
     }
     
     // MARK: - Load MediaRemote for Commands

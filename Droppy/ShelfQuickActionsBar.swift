@@ -18,12 +18,14 @@ struct ShelfQuickActionsBar: View {
     
     private let buttonSize: CGFloat = 32
     private let spacing: CGFloat = 12
+    private var isQuickshareEnabled: Bool { !ExtensionType.quickshare.isRemoved }
     
     @State private var isBarAreaTargeted = false  // Track when drag is over the bar area (between buttons)
     
     /// Computed width of bar area: 4 buttons + 3 gaps
     private var barWidth: CGFloat {
-        (buttonSize * 4) + (spacing * 3) + 16  // Extra padding for safety
+        let actionCount = isQuickshareEnabled ? 4 : 3
+        return (buttonSize * CGFloat(actionCount)) + (spacing * CGFloat(actionCount - 1)) + 16
     }
     
     var body: some View {
@@ -61,11 +63,13 @@ struct ShelfQuickActionsBar: View {
                         insertion: .scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.itemInsertion.delay(0.06)),
                         removal: .scale(scale: 0.5).combined(with: .opacity).animation(.easeOut(duration: 0.15))
                     ))
-                ShelfQuickActionButton(actionType: .quickshare, useTransparent: useTransparent, shareAction: quickShareTo0x0)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.itemInsertion.delay(0.09)),
-                        removal: .scale(scale: 0.5).combined(with: .opacity).animation(.easeOut(duration: 0.15))
-                    ))
+                if isQuickshareEnabled {
+                    ShelfQuickActionButton(actionType: .quickshare, useTransparent: useTransparent, shareAction: quickShareTo0x0)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.itemInsertion.delay(0.09)),
+                            removal: .scale(scale: 0.5).combined(with: .opacity).animation(.easeOut(duration: 0.15))
+                        ))
+                }
             }
         }
         .animation(DroppyAnimation.state, value: items.count)
@@ -174,4 +178,3 @@ struct ShelfQuickActionButton: View {
         }
     }
 }
-

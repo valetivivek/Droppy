@@ -38,24 +38,8 @@ enum NotchLayoutConstants {
     
     // MARK: - Physical Notch Dimensions
     
-    /// Physical notch width - dynamically calculated from auxiliary screen areas
-    /// Falls back to 180pt if detection fails
-    static func physicalNotchWidth(for screen: NSScreen?) -> CGFloat {
-        guard let screen = screen ?? NSScreen.builtInWithNotch ?? NSScreen.main,
-              let leftArea = screen.auxiliaryTopLeftArea,
-              let rightArea = screen.auxiliaryTopRightArea else {
-            return 180  // Fallback to standard width
-        }
-        // Notch width = gap between right edge of left area and left edge of right area
-        // This is more accurate than (screen.width - leftWidth - rightWidth)
-        let notchWidth = rightArea.minX - leftArea.maxX
-        return max(notchWidth, 180)  // Never go below 180pt
-    }
-    
-    /// Legacy constant for compatibility - uses main screen
-    static var physicalNotchWidth: CGFloat {
-        physicalNotchWidth(for: nil)
-    }
+    /// Physical notch width (Apple's standard design)
+    static let physicalNotchWidth: CGFloat = 180
     
     // MARK: - Floating Button Spacing
     
@@ -72,11 +56,7 @@ enum NotchLayoutConstants {
     
     /// Standard MacBook Pro notch height (menu bar safe area height)
     /// This is consistent across all notch MacBooks at their default resolution
-    /// User can adjust via physicalNotchHeightOffset preference (-10 to +10)
-    static var physicalNotchHeight: CGFloat {
-        let offset = UserDefaults.standard.double(forKey: AppPreferenceKey.physicalNotchHeightOffset)
-        return 37 + offset  // Base: 37pt, Range: 27pt to 47pt
-    }
+    static let physicalNotchHeight: CGFloat = 37
     
     /// Get the physical notch height for a given screen
     /// Returns physicalNotchHeight as fallback when screen is unavailable

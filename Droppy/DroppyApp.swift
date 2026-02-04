@@ -92,7 +92,7 @@ struct DroppyMenuContent: View {
         
         Divider()
         
-        if showQuickshareInMenuBar {
+        if showQuickshareInMenuBar && !ExtensionType.quickshare.isRemoved {
             Menu {
                 QuickshareMenuContent()
             } label: {

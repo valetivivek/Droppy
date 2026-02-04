@@ -36,7 +36,6 @@ enum AppPreferenceKey {
     static let hidePhysicalNotch = "hidePhysicalNotch"  // Draw black bar to hide the notch cutout
     static let hidePhysicalNotchOnExternals = "hidePhysicalNotchOnExternals"  // Sub-option: also apply to external displays
     static let dynamicIslandHeightOffset = "dynamicIslandHeightOffset"  // Height adjustment for Dynamic Island (-10 to +10)
-    static let physicalNotchHeightOffset = "physicalNotchHeightOffset"  // Height adjustment for Physical Notch (-10 to +10)
     
     // MARK: - Media Player
     static let showMediaPlayer = "showMediaPlayer"
@@ -171,7 +170,6 @@ enum PreferenceDefault {
     static let hidePhysicalNotch = false     // Draw black bar to hide the notch cutout
     static let hidePhysicalNotchOnExternals = false  // Sub-option: also apply to external displays
     static let dynamicIslandHeightOffset: Double = 0  // No height adjustment by default
-    static let physicalNotchHeightOffset: Double = 0  // No height adjustment by default
     
     // MARK: - Media Player
     static let showMediaPlayer = true

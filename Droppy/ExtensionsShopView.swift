@@ -111,20 +111,22 @@ struct ExtensionsShopView: View {
             }
             
             // Full-width hero: Quickshare (NEW)
-            FeaturedExtensionCardWide(
-                title: "Droppy Quickshare",
-                subtitle: "Share files instantly",
-                iconURL: "https://getdroppy.app/assets/icons/quickshare.jpg",
-                screenshotURL: "https://getdroppy.app/assets/images/quickshare-screenshot.png",
-                accentColor: .cyan,
-                isInstalled: true,  // Core extension, always installed
-                features: ["Instant upload", "Auto-copy link", "Track expiry"],
-                isNew: true
-            ) {
-                QuickshareInfoView(
-                    installCount: extensionCounts["quickshare"],
-                    rating: extensionRatings["quickshare"]
-                )
+            if !ExtensionType.quickshare.isRemoved {
+                FeaturedExtensionCardWide(
+                    title: "Droppy Quickshare",
+                    subtitle: "Share files instantly",
+                    iconURL: "https://getdroppy.app/assets/icons/quickshare.jpg",
+                    screenshotURL: "https://getdroppy.app/assets/images/quickshare-screenshot.png",
+                    accentColor: .cyan,
+                    isInstalled: true,
+                    features: ["Instant upload", "Auto-copy link", "Track expiry"],
+                    isNew: true
+                ) {
+                    QuickshareInfoView(
+                        installCount: extensionCounts["quickshare"],
+                        rating: extensionRatings["quickshare"]
+                    )
+                }
             }
             
             // Row 2: Notify me! + High Alert
@@ -436,7 +438,7 @@ struct ExtensionsShopView: View {
                 title: "Droppy Quickshare",
                 subtitle: "Share files via 0x0.st",
                 category: .productivity,
-                isInstalled: true, // Always installed (core)
+                isInstalled: !ExtensionType.quickshare.isRemoved,
                 analyticsKey: "quickshare",
                 extensionType: .quickshare
             ) {

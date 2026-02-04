@@ -464,10 +464,12 @@ final class FloatingBasketWindowController: NSObject {
         
         let mouseLocation = NSEvent.mouseLocation
         let currentFrame = panel.frame
-        
-        // Add a small margin for comfortable hover detection around the peek sliver
-        let hoverFrame = currentFrame.insetBy(dx: -10, dy: -10)
-        let isMouseOverBasket = hoverFrame.contains(mouseLocation)
+
+        // Only reveal when the cursor is actually inside the visible sliver
+        // This prevents early reveal from near-edge proximity
+        let visibleFrame = panel.screen?.visibleFrame ?? .zero
+        let sliverFrame = currentFrame.intersection(visibleFrame)
+        let isMouseOverBasket = !sliverFrame.isNull && sliverFrame.contains(mouseLocation)
         
         if isMouseOverBasket {
             // Mouse hovered over peek sliver - reveal
@@ -508,57 +510,43 @@ final class FloatingBasketWindowController: NSObject {
         guard !DroppyState.shared.isFileOperationInProgress else { return }
         
         guard let screen = NSScreen.main else { return }
-        guard let contentView = panel.contentView else { return }
-        
-        // Enable layer backing
-        contentView.wantsLayer = true
-        guard let layer = contentView.layer else { return }
-        
         // Store current position for restoration
         fullSizeFrame = panel.frame
         
-        // Calculate peek position based on edge - vertically centered
+        // Calculate peek position based on edge - preserve current axis to avoid jumps
         var peekFrame = panel.frame
         let basketWidth = panel.frame.width
         let basketHeight = panel.frame.height
-        let verticalCenter = screen.frame.minY + (screen.frame.height - basketHeight) / 2
-        
-        // Calculate transform for Stage Manager-style tilt
-        var transform = CATransform3DIdentity
-        transform.m34 = -1.0 / 800.0 // Perspective
-        let angle: CGFloat = 0.18 // ~10 degrees, subtle
+        let visibleFrame = screen.visibleFrame
+
+        func clampedOriginY(_ proposed: CGFloat) -> CGFloat {
+            min(max(proposed, visibleFrame.minY), visibleFrame.maxY - basketHeight)
+        }
+
+        func clampedOriginX(_ proposed: CGFloat) -> CGFloat {
+            min(max(proposed, visibleFrame.minX), visibleFrame.maxX - basketWidth)
+        }
         
         switch autoHideEdge {
         case "left":
-            peekFrame.origin.x = screen.frame.minX - basketWidth + peekSize
-            peekFrame.origin.y = verticalCenter
-            transform = CATransform3DRotate(transform, angle, 0, 1, 0)
+            peekFrame.origin.x = visibleFrame.minX - basketWidth + peekSize
+            peekFrame.origin.y = clampedOriginY(peekFrame.origin.y)
         case "right":
-            peekFrame.origin.x = screen.frame.maxX - peekSize
-            peekFrame.origin.y = verticalCenter
-            transform = CATransform3DRotate(transform, -angle, 0, 1, 0)
+            peekFrame.origin.x = visibleFrame.maxX - peekSize
+            peekFrame.origin.y = clampedOriginY(peekFrame.origin.y)
         case "bottom":
-            peekFrame.origin.y = screen.frame.minY - basketHeight + peekSize
-            transform = CATransform3DRotate(transform, angle, 1, 0, 0)
+            peekFrame.origin.y = visibleFrame.minY - basketHeight + peekSize
+            peekFrame.origin.x = clampedOriginX(peekFrame.origin.x)
         default:
-            peekFrame.origin.x = screen.frame.maxX - peekSize
-            peekFrame.origin.y = verticalCenter
-            transform = CATransform3DRotate(transform, -angle, 0, 1, 0)
+            peekFrame.origin.x = visibleFrame.maxX - peekSize
+            peekFrame.origin.y = clampedOriginY(peekFrame.origin.y)
         }
-        
-        // Scale down slightly
-        transform = CATransform3DScale(transform, 0.92, 0.92, 1.0)
         
         isInPeekMode = true
         isPeekAnimating = true
         
         // CRITICAL: Start global monitoring to detect hover over the peek sliver
         startMouseTrackingMonitor()
-        
-        // Ensure layer is optimized for animation
-        layer.drawsAsynchronously = true
-        layer.shouldRasterize = true
-        layer.rasterizationScale = NSScreen.main?.backingScaleFactor ?? 2.0
         
         // Apple-style spring curve (aggressive ease-out with slight overshoot feel)
         let springCurve = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1.0)
@@ -570,10 +558,7 @@ final class FloatingBasketWindowController: NSObject {
             context.allowsImplicitAnimation = true
             
             panel.animator().setFrame(peekFrame, display: true)
-            layer.transform = transform
         } completionHandler: { [weak self] in
-            // Reset rasterization after animation to save memory
-            layer.shouldRasterize = false
             self?.isPeekAnimating = false
         }
     }
@@ -582,18 +567,12 @@ final class FloatingBasketWindowController: NSObject {
     func revealFromEdge() {
         guard let panel = basketWindow, isInPeekMode, !isPeekAnimating else { return }
         guard fullSizeFrame.width > 0 else { return }
-        guard let contentView = panel.contentView, let layer = contentView.layer else { return }
-        
+
         isInPeekMode = false
         isPeekAnimating = true
         
         // CRITICAL: Stop global monitoring - rely on BasketDragContainer efficiently
         stopMouseTrackingMonitor()
-        
-        // Pre-warm layer for immediate response
-        layer.drawsAsynchronously = true
-        layer.shouldRasterize = true
-        layer.rasterizationScale = NSScreen.main?.backingScaleFactor ?? 2.0
         
         // Very snappy curve for instant feel
         let revealCurve = CAMediaTimingFunction(controlPoints: 0.0, 0.0, 0.2, 1.0)
@@ -605,9 +584,7 @@ final class FloatingBasketWindowController: NSObject {
             context.allowsImplicitAnimation = true
             
             panel.animator().setFrame(fullSizeFrame, display: true)
-            layer.transform = CATransform3DIdentity
         } completionHandler: { [weak self] in
-            layer.shouldRasterize = false
             self?.isPeekAnimating = false
         }
     }
@@ -635,4 +612,3 @@ final class FloatingBasketWindowController: NSObject {
         }
     }
 }
-

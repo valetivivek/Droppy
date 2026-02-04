@@ -23,6 +23,10 @@ class GlobalHotKey {
     private var hidManager: IOHIDManager?
     private var modifierState: UInt = 0
     public var isInputMonitoringActive: Bool = false
+
+    // Trigger debounce to avoid double-calls (Carbon + IOHID)
+    private var lastTriggerTime: CFAbsoluteTime = 0
+    private let triggerCooldown: CFAbsoluteTime = 0.2
     
     // Manual Modifier Tracking (Bypasses CGEventSource during Secure Input)
     private var pressedModifiers: Set<UInt32> = []
@@ -178,8 +182,7 @@ class GlobalHotKey {
                 // Check Match
                 if vk == targetKeyCode {
                     if checkModifiers() {
-                        print("⌨️ GlobalHotKey: 🟢 Shortcut Triggered via IOHIDManager")
-                        DispatchQueue.main.async { self.callback?() }
+                        fireCallback()
                     }
                     // Else: silent mismatch
                 }
@@ -229,6 +232,13 @@ class GlobalHotKey {
             hidManager = nil
         }
     }
+
+    fileprivate func fireCallback() {
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - lastTriggerTime > triggerCooldown else { return }
+        lastTriggerTime = now
+        DispatchQueue.main.async { self.callback?() }
+    }
 }
 
 // C Callbacks
@@ -241,8 +251,7 @@ private func GlobalHotKeyHandler(handler: EventHandlerCallRef?, event: EventRef?
     let status = GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
     
     if status == noErr && hotKeyID.signature == instance.hotKeyID.signature && hotKeyID.id == instance.hotKeyID.id {
-        print("⌨️ GlobalHotKey: Trigger via Carbon")
-        DispatchQueue.main.async { instance.callback?() }
+        instance.fireCallback()
         return noErr
     }
     return OSStatus(eventNotHandledErr)

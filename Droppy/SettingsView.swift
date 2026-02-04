@@ -33,7 +33,6 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKey.externalDisplayUseDynamicIsland) private var externalDisplayUseDynamicIsland = PreferenceDefault.externalDisplayUseDynamicIsland
     @AppStorage(AppPreferenceKey.showIdleNotchOnExternalDisplays) private var showIdleNotchOnExternalDisplays = PreferenceDefault.showIdleNotchOnExternalDisplays
     @AppStorage(AppPreferenceKey.dynamicIslandHeightOffset) private var dynamicIslandHeightOffset = PreferenceDefault.dynamicIslandHeightOffset
-    @AppStorage(AppPreferenceKey.physicalNotchHeightOffset) private var physicalNotchHeightOffset = PreferenceDefault.physicalNotchHeightOffset
     
     // HUD and Media Player settings
     @AppStorage(AppPreferenceKey.enableHUDReplacement) private var enableHUDReplacement = PreferenceDefault.enableHUDReplacement
@@ -498,55 +497,6 @@ struct SettingsView: View {
                             }
                             .animation(DroppyAnimation.smoothContent, value: externalDisplayUseDynamicIsland)
                         }
-                        
-                        // Notch Height Slider (only visible when Notch mode is selected)
-                        if !externalDisplayUseDynamicIsland {
-                            Divider()
-                                .padding(.vertical, 4)
-                            
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("Notch Height")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Spacer()
-                                    Text(physicalNotchHeightOffset == 0 ? "Standard" : (physicalNotchHeightOffset < 0 ? "Compact" : "Tall"))
-                                        .font(.caption)
-                                        .foregroundStyle(.blue)
-                                }
-                                
-                                HStack(spacing: 8) {
-                                    Image(systemName: "minus")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                        .frame(width: 12)
-                                    
-                                    Slider(
-                                        value: $physicalNotchHeightOffset,
-                                        in: -10...10,
-                                        step: 2
-                                    )
-                                    .tint(.blue)
-                                    .onChange(of: physicalNotchHeightOffset) { oldValue, newValue in
-                                        // Haptic feedback + sound for premium slider feel
-                                        let isEndpoint = newValue == -10 || newValue == 10
-                                        if isEndpoint {
-                                            HapticFeedback.sliderEndpoint()
-                                        } else {
-                                            HapticFeedback.sliderTick()
-                                        }
-                                        // Post notification to trigger immediate window update
-                                        NotificationCenter.default.post(name: NSNotification.Name("PhysicalNotchHeightChanged"), object: nil)
-                                    }
-                                    
-                                    Image(systemName: "plus")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                        .frame(width: 12)
-                                }
-                            }
-                            .animation(DroppyAnimation.smoothContent, value: externalDisplayUseDynamicIsland)
-                        }
                     }
                     
                     Toggle(isOn: $showIdleNotchOnExternalDisplays) {
@@ -792,61 +742,6 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Behavior")
-                }
-            }
-            
-            // MARK: Notch Height (Physical Notch Only)
-            if hasPhysicalNotch {
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Notch Height")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text(physicalNotchHeightOffset == 0 ? "Standard" : (physicalNotchHeightOffset < 0 ? "Compact" : "Tall"))
-                                .font(.caption)
-                                .foregroundStyle(.blue)
-                        }
-                        
-                        Text("Adjust if media player content doesn't align with your notch")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                        
-                        HStack(spacing: 8) {
-                            Image(systemName: "minus")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .frame(width: 12)
-                            
-                            Slider(
-                                value: $physicalNotchHeightOffset,
-                                in: -10...10,
-                                step: 2
-                            )
-                            .tint(.blue)
-                            .onChange(of: physicalNotchHeightOffset) { oldValue, newValue in
-                                // Haptic feedback + sound for premium slider feel
-                                let isEndpoint = newValue == -10 || newValue == 10
-                                if isEndpoint {
-                                    HapticFeedback.sliderEndpoint()
-                                } else {
-                                    HapticFeedback.sliderTick()
-                                }
-                                // Post notification to trigger immediate window update
-                                NotificationCenter.default.post(name: NSNotification.Name("PhysicalNotchHeightChanged"), object: nil)
-                            }
-                            
-                            Image(systemName: "plus")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .frame(width: 12)
-                        }
-                    }
-                } header: {
-                    Text("Notch Height")
-                } footer: {
-                    Text("Fine-tune vertical positioning for content below the notch")
                 }
             }
         }
@@ -2178,7 +2073,11 @@ struct SettingsView: View {
 
     
     private var quickshareSettings: some View {
-        QuickshareSettingsContent()
+        Group {
+            if !ExtensionType.quickshare.isRemoved {
+                QuickshareSettingsContent()
+            }
+        }
     }
     
     private var appearanceSettings: some View {

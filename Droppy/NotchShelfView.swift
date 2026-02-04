@@ -44,7 +44,6 @@ struct NotchShelfView: View {
     @AppStorage(AppPreferenceKey.showDropIndicator) private var showDropIndicator = PreferenceDefault.showDropIndicator  // Legacy, not migrated
     @AppStorage(AppPreferenceKey.useDynamicIslandStyle) private var useDynamicIslandStyle = PreferenceDefault.useDynamicIslandStyle
     @AppStorage(AppPreferenceKey.dynamicIslandHeightOffset) private var dynamicIslandHeightOffset = PreferenceDefault.dynamicIslandHeightOffset
-    @AppStorage(AppPreferenceKey.physicalNotchHeightOffset) private var physicalNotchHeightOffset = PreferenceDefault.physicalNotchHeightOffset
     @AppStorage(AppPreferenceKey.useDynamicIslandTransparent) private var useDynamicIslandTransparent = PreferenceDefault.useDynamicIslandTransparent
     @AppStorage(AppPreferenceKey.enableAutoClean) private var enableAutoClean = PreferenceDefault.enableAutoClean
     @AppStorage(AppPreferenceKey.enableRightClickHide) private var enableRightClickHide = PreferenceDefault.enableRightClickHide
@@ -154,9 +153,7 @@ struct NotchShelfView: View {
             // This is more accurate than (screen.width - leftWidth - rightWidth)
             // which can have sub-pixel rounding errors on different display configurations
             let notchGap = rightArea.minX - leftArea.maxX
-            let width = max(notchGap, NotchLayoutConstants.physicalNotchWidth)
-            print("📐 NotchShelfView.notchWidth: notchGap=\(notchGap), returning width=\(width)")
-            return width
+            return max(notchGap, NotchLayoutConstants.physicalNotchWidth)
         }
         
         // Fallback for screens without notch data
@@ -168,22 +165,19 @@ struct NotchShelfView: View {
         // Dynamic Island uses SSOT fixed size + user height offset
         // Reference dynamicIslandHeightOffset to trigger SwiftUI update when slider changes
         if isDynamicIslandMode { _ = dynamicIslandHeightOffset; return NotchLayoutConstants.dynamicIslandHeight }
-        
-        // Reference physicalNotchHeightOffset to trigger SwiftUI update when slider changes
-        _ = physicalNotchHeightOffset
 
         // Use target screen or fallback to built-in
         // CRITICAL: Return physical notch height when screen is unavailable for stable positioning
         guard let screen = targetScreen ?? NSScreen.builtInWithNotch ?? NSScreen.main else { return NotchLayoutConstants.physicalNotchHeight }
         
         // CRITICAL: For screens with a physical notch (detected via auxiliary areas),
-        // use safeAreaInsets when available, otherwise fall back to SSOT constant (which includes user offset)
+        // use safeAreaInsets when available, otherwise fall back to fixed constant
         // This ensures stable positioning on lock screen when safeAreaInsets may be 0
         let hasPhysicalNotch = screen.auxiliaryTopLeftArea != nil && screen.auxiliaryTopRightArea != nil
         
         if hasPhysicalNotch {
-            // Use SSOT constant which includes user adjustment offset
-            return NotchLayoutConstants.physicalNotchHeight
+            let topInset = screen.safeAreaInsets.top
+            return topInset > 0 ? topInset : NotchLayoutConstants.physicalNotchHeight
         }
         
         // For external displays in notch mode: constrain to menu bar height
@@ -191,9 +185,7 @@ struct NotchShelfView: View {
         let menuBarHeight = screen.frame.maxY - screen.visibleFrame.maxY
         // Use 24pt as default if menu bar is auto-hidden, but never exceed actual menu bar
         let maxHeight = menuBarHeight > 0 ? menuBarHeight : 24
-        // Apply user height offset to external notch-style displays too
-        let offset = UserDefaults.standard.double(forKey: AppPreferenceKey.physicalNotchHeightOffset)
-        return min(32 + offset, maxHeight)
+        return min(32, maxHeight)
     }
     
     /// Whether we're in Dynamic Island mode (no physical notch + setting enabled, or force test)
@@ -2460,50 +2452,45 @@ struct NotchShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         
-        // FIXED: Shape now fills the FULL WIDTH at the top edge to cover the entire physical notch
-        // The curved wings start BELOW the top line, not at the corners
-        
-        // === TOP EDGE (full width) ===
+        // === TOP LEFT WING ===
+        // Start at top-left corner (screen edge)
         path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
         
-        // === TOP RIGHT WING ===
-        // Curve from top-right corner down and inward
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + topCornerRadius))
+        // Curve inward from screen edge to notch body
         path.addQuadCurve(
-            to: CGPoint(x: rect.maxX - topCornerRadius, y: rect.minY + topCornerRadius * 2),
-            control: CGPoint(x: rect.maxX, y: rect.minY + topCornerRadius * 2)
-        )
-        
-        // === RIGHT EDGE ===
-        path.addLine(to: CGPoint(x: rect.maxX - topCornerRadius, y: rect.maxY - bottomRadius))
-        
-        // === BOTTOM RIGHT CORNER ===
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX - topCornerRadius - bottomRadius, y: rect.maxY),
-            control: CGPoint(x: rect.maxX - topCornerRadius, y: rect.maxY)
-        )
-        
-        // === BOTTOM EDGE ===
-        path.addLine(to: CGPoint(x: rect.minX + topCornerRadius + bottomRadius, y: rect.maxY))
-        
-        // === BOTTOM LEFT CORNER ===
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX + topCornerRadius, y: rect.maxY - bottomRadius),
-            control: CGPoint(x: rect.minX + topCornerRadius, y: rect.maxY)
+            to: CGPoint(x: rect.minX + topCornerRadius, y: rect.minY + topCornerRadius),
+            control: CGPoint(x: rect.minX + topCornerRadius, y: rect.minY)
         )
         
         // === LEFT EDGE ===
-        path.addLine(to: CGPoint(x: rect.minX + topCornerRadius, y: rect.minY + topCornerRadius * 2))
+        path.addLine(to: CGPoint(x: rect.minX + topCornerRadius, y: rect.maxY - bottomRadius))
         
-        // === TOP LEFT WING ===
-        // Curve from the wing back up to the top-left corner
+        // === BOTTOM LEFT CORNER ===
         path.addQuadCurve(
-            to: CGPoint(x: rect.minX, y: rect.minY + topCornerRadius),
-            control: CGPoint(x: rect.minX, y: rect.minY + topCornerRadius * 2)
+            to: CGPoint(x: rect.minX + topCornerRadius + bottomRadius, y: rect.maxY),
+            control: CGPoint(x: rect.minX + topCornerRadius, y: rect.maxY)
         )
         
-        // === CLOSE ===
+        // === BOTTOM EDGE ===
+        path.addLine(to: CGPoint(x: rect.maxX - topCornerRadius - bottomRadius, y: rect.maxY))
+        
+        // === BOTTOM RIGHT CORNER ===
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX - topCornerRadius, y: rect.maxY - bottomRadius),
+            control: CGPoint(x: rect.maxX - topCornerRadius, y: rect.maxY)
+        )
+        
+        // === RIGHT EDGE ===
+        path.addLine(to: CGPoint(x: rect.maxX - topCornerRadius, y: rect.minY + topCornerRadius))
+        
+        // === TOP RIGHT WING ===
+        // Curve outward from notch body to screen edge
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.minY),
+            control: CGPoint(x: rect.maxX - topCornerRadius, y: rect.minY)
+        )
+        
+        // === TOP EDGE (closing) ===
         path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
         
         path.closeSubpath()

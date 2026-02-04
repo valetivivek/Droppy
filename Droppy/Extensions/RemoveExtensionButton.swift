@@ -93,7 +93,7 @@ struct DisableExtensionButton: View {
         case .terminalNotch:
             return "This will disable the terminal extension. You can enable it again later."
         case .quickshare:
-            return "Droppy Quickshare is a core extension and cannot be disabled."
+            return "This will disable Quickshare and hide it from menus and quick actions. You can enable it again later."
         case .notificationHUD:
             return "This will stop notification forwarding to your notch. You can enable it again later."
         case .caffeine:
