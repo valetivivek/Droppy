@@ -2415,12 +2415,13 @@ class NotchWindow: NSPanel {
 
         // Window should accept mouse events when:
         // - Shelf is expanded AND shelf is enabled (need to interact with items)
-        // - User is hovering over notch AND shelf is enabled (need click to open)
         // - Drop is actively targeted on the notch AND shelf is enabled
         // - User is dragging files AND they are OVER a valid drop zone AND shelf is enabled
         // - NotificationHUD is visible (need click to open source app) - ADDED v10.x
+        // NOTE: isHovering is intentionally NOT included - hovering just shows the visual effect,
+        // but the window should NOT block clicks to underlying apps (e.g., browser tabs) - Issue #150
         // When shelf is disabled, the window passes through ALL mouse events (except for interactive HUDs).
-        let shouldAcceptEvents = (enableNotchShelf && (isExpanded || isHovering || isDropTargeted || isDragOverValidZone)) || isNotificationHUDActive
+        let shouldAcceptEvents = (enableNotchShelf && (isExpanded || isDropTargeted || isDragOverValidZone)) || isNotificationHUDActive
 
         // DEBUG: Log notification HUD state affecting mouse events
         if isNotificationHUDActive {

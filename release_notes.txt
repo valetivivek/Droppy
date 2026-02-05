@@ -32,3 +32,4 @@
 - Fixed NotificationHUD crashes from concurrent database access (#152, #156)
 - Fixed shortcuts flashing and disappearing due to double-trigger race condition (#149, #153)
 - Fixed multi-item clipboard paste not copying all selected items (#154)
+- Fixed notch/Dynamic Island blocking browser tabs and other UI in fullscreen (#150)
