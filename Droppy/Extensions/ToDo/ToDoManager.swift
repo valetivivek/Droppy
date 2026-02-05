@@ -120,13 +120,8 @@ final class ToDoManager {
             isCompleted: false
         )
         
-        // Add to top (lowest sort order)
-        let minSortOrder = items.compactMap { $0.sortOrder }.min() ?? 0
-        var newItemWithOrder = newItem
-        newItemWithOrder.sortOrder = minSortOrder - 1
-        
         withAnimation(.smooth) {
-            items.insert(newItemWithOrder, at: 0)
+            items.insert(newItem, at: 0)
         }
         
         saveItems()
@@ -283,12 +278,7 @@ final class ToDoManager {
                 return ($0.completedAt ?? Date()) > ($1.completedAt ?? Date())
             }
             
-            // If both are incomplete, check for manual sort order
-            if let order1 = $0.sortOrder, let order2 = $1.sortOrder {
-                if order1 != order2 {
-                    return order1 < order2
-                }
-            }
+
             
             // Fallback to Priority (High -> Medium -> Normal)
             if $0.priority != $1.priority {
