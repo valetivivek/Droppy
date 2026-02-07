@@ -174,27 +174,20 @@ struct ToDoInfoView: View {
             featureRow(icon: "timer", text: "Auto-cleanup of completed tasks")
             featureRow(icon: "keyboard", text: "Keyboard shortcuts for power users")
 
-            // Store screenshot (hosted)
+            // Screenshot (same rendering style as standard extension info views)
             if let screenshotURL = ToDoExtension.screenshotURL {
                 CachedAsyncImage(url: screenshotURL) { image in
                     image
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .aspectRatio(contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
+                                .strokeBorder(AdaptiveColors.subtleBorderAuto, lineWidth: 1)
+                        )
                 } placeholder: {
-                    RoundedRectangle(cornerRadius: DroppyRadius.lx, style: .continuous)
-                        .fill(Color.white.opacity(0.05))
-                        .overlay {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        }
+                    EmptyView()
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 240)
-                .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.lx, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: DroppyRadius.lx, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
                 .padding(.top, 8)
             }
         }
