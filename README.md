@@ -32,11 +32,11 @@
 </div>
 
 
-## Core Features
+<h2 align="left">Core Features</h2>
 
-### File Shelf
+<h3 align="center">File Shelf</h3>
 
-<p><img src="docs/assets/images/feature-shelf.png" width="500" alt="File Shelf" /></p>
+<p align="center"><img src="docs/assets/images/feature-shelf.png" width="500" alt="File Shelf" /></p>
 
 - Drop files, folders, images, and URLs onto the notch — pick them up in any app
 - Create folders, pin favorites, or watch a directory so its contents appear automatically
@@ -47,9 +47,9 @@
 
 ---
 
-### Floating Basket
+<h3 align="center">Floating Basket</h3>
 
-<p><img src="docs/assets/images/feature-basket.png" width="500" alt="Floating Basket" /></p>
+<p align="center"><img src="docs/assets/images/feature-basket.png" width="500" alt="Floating Basket" /></p>
 
 - Jiggle your mouse while dragging to spawn a floating basket anywhere on screen
 - Multiple color-coded baskets for organizing different workflows
@@ -60,9 +60,9 @@
 
 ---
 
-### Clipboard Manager
+<h3 align="center">Clipboard Manager</h3>
 
-<p><img src="docs/assets/images/feature-clipboard.png" width="500" alt="Clipboard Manager" /></p>
+<p align="center"><img src="docs/assets/images/feature-clipboard.png" width="500" alt="Clipboard Manager" /></p>
 
 - Saves every text, image, file, link, and color you copy — persistent across restarts
 - Full PDF and Office document viewer, plus inline video playback
@@ -73,9 +73,9 @@
 
 ---
 
-### Beautiful HUDs
+<h3 align="center">Beautiful HUDs</h3>
 
-<p><img src="docs/assets/images/feature-huds.png" width="500" alt="Beautiful HUDs" /></p>
+<p align="center"><img src="docs/assets/images/feature-huds.png" width="500" alt="Beautiful HUDs" /></p>
 
 - Replaces macOS system overlays with beautifully animated HUDs in your notch
 - Volume, brightness, and keyboard backlight — including full external monitor support
