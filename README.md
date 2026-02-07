@@ -65,8 +65,11 @@
 <p align="center"><img src="docs/assets/images/feature-clipboard.png" width="500" alt="Clipboard Manager" /></p>
 
 - Saves every text, image, file, link, and color you copy — persistent across restarts
-- Custom tags, favorites, source app filtering, and full-text search
-- Rich previews for images, videos, and documents
+- Full PDF and Office document viewer, plus inline video playback
+- Custom tags with deep customization — filter, rename, color-code, and organize
+- Flag, favorite, or star entries for quick access
+- Push clipboard entries directly to the shelf or basket
+- Source app filtering and full-text search across your entire history
 
 ---
 
