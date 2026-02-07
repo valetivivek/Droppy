@@ -1,6 +1,67 @@
 import SwiftUI
 
-// MARK: - License Card (unified full-width design)
+// MARK: - Shared card chrome (the "physical card" frame)
+
+private struct LicenseCardChrome<Content: View>: View {
+    let isActivated: Bool
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            // Card surface
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(white: 0.105))
+
+            // Outer border
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.09), lineWidth: 1)
+
+            // Inner decorative frame (certificate look)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.04), lineWidth: 0.5)
+                .padding(5)
+
+            // Watermark seal (subtle, bottom-right)
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 80, weight: .thin))
+                .foregroundStyle(Color.white.opacity(0.025))
+                .offset(x: -12, y: -6)
+
+            // Content
+            VStack(alignment: .leading, spacing: 0) {
+                content()
+            }
+            .padding(18)
+        }
+        .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+    }
+}
+
+// MARK: - Info row helper
+
+private struct LicenseInfoRow: View {
+    let label: String
+    let value: String
+    var mono: Bool = false
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .semibold))
+                .tracking(0.8)
+                .foregroundStyle(.secondary.opacity(0.7))
+                .frame(width: 64, alignment: .leading)
+
+            Text(value)
+                .font(.system(size: 12, weight: .medium, design: mono ? .monospaced : .default))
+                .foregroundStyle(.primary.opacity(0.85))
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+    }
+}
+
+// MARK: - License Identity Card (activated, used in settings)
 
 struct LicenseIdentityCard: View {
     let title: String
@@ -33,68 +94,57 @@ struct LicenseIdentityCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Accent bar
-            Rectangle()
-                .fill(Color.green)
-                .frame(height: 3)
+        LicenseCardChrome(isActivated: true) {
+            // Header
+            HStack(alignment: .center) {
+                Text("DROPPY")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(3)
+                    .foregroundStyle(.secondary)
 
-            // Card content
-            VStack(alignment: .leading, spacing: 14) {
-                // Header row
-                HStack(alignment: .center) {
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 16))
+                Text("·")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.tertiary)
+
+                Text("LICENSE")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(3)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                // Status
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 5, height: 5)
+                    Text("Active")
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.green)
-
-                    Text(title)
-                        .font(.system(size: 13, weight: .semibold))
-
-                    Spacer()
-
-                    Text(subtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-
-                // Info grid
-                VStack(alignment: .leading, spacing: 8) {
-                    infoRow(label: "Email", value: nonEmpty(email) ?? "Not provided")
-
-                    if let keyHint = nonEmpty(keyHint) {
-                        infoRow(label: "Key", value: keyHint, mono: true)
-                    }
-
-                    if let verifiedAt {
-                        infoRow(
-                            label: "Verified",
-                            value: verifiedAt.formatted(date: .abbreviated, time: .shortened)
-                        )
-                    }
                 }
             }
-            .padding(16)
-        }
-        .background(Color.white.opacity(0.04))
-        .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
-    }
 
-    private func infoRow(label: String, value: String, mono: Bool = false) -> some View {
-        HStack(spacing: 0) {
-            Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 56, alignment: .leading)
+            // Divider
+            Rectangle()
+                .fill(Color.white.opacity(0.06))
+                .frame(height: 0.5)
+                .padding(.vertical, 10)
 
-            Text(value)
-                .font(.system(size: 12, weight: .medium, design: mono ? .monospaced : .default))
-                .foregroundStyle(.primary.opacity(0.9))
-                .lineLimit(1)
-                .truncationMode(.middle)
+            // Info rows
+            VStack(alignment: .leading, spacing: 7) {
+                LicenseInfoRow(label: "Email", value: nonEmpty(email) ?? "Not provided")
+
+                if let keyHint = nonEmpty(keyHint) {
+                    LicenseInfoRow(label: "Key", value: keyHint, mono: true)
+                }
+
+                if let verifiedAt {
+                    LicenseInfoRow(
+                        label: "Verified",
+                        value: verifiedAt.formatted(date: .abbreviated, time: .shortened)
+                    )
+                }
+            }
         }
     }
 
@@ -105,7 +155,7 @@ struct LicenseIdentityCard: View {
     }
 }
 
-// MARK: - Live Preview Card (same look, updates in real-time during activation)
+// MARK: - Live Preview Card (pre-activation, updates in real-time)
 
 struct LicenseLivePreviewCard: View {
     let email: String
@@ -115,61 +165,50 @@ struct LicenseLivePreviewCard: View {
     var enableInteractiveEffects: Bool = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Accent bar
-            Rectangle()
-                .fill(isActivated ? Color.green : Color.orange)
-                .frame(height: 3)
+        LicenseCardChrome(isActivated: isActivated) {
+            // Header
+            HStack(alignment: .center) {
+                Text("DROPPY")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(3)
+                    .foregroundStyle(.secondary)
 
-            // Card content
-            VStack(alignment: .leading, spacing: 14) {
-                // Header
-                HStack(alignment: .center) {
-                    Image(systemName: isActivated ? "checkmark.seal.fill" : "key.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(isActivated ? .green : .orange)
+                Text("·")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.tertiary)
 
-                    Text("Droppy License")
-                        .font(.system(size: 13, weight: .semibold))
+                Text("LICENSE")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(3)
+                    .foregroundStyle(.secondary)
 
-                    Spacer()
+                Spacer()
 
+                // Status
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(isActivated ? Color.green : Color.orange)
+                        .frame(width: 5, height: 5)
                     Text(isActivated ? "Active" : "Pending")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(isActivated ? .green : .orange)
-                }
-
-                // Info
-                VStack(alignment: .leading, spacing: 8) {
-                    infoRow(label: "Key", value: keyDisplay, mono: true)
-
-                    if let email = nonEmpty(email) {
-                        infoRow(label: "Email", value: email)
-                    }
                 }
             }
-            .padding(16)
-        }
-        .background(Color.white.opacity(0.04))
-        .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
-    }
 
-    private func infoRow(label: String, value: String, mono: Bool = false) -> some View {
-        HStack(spacing: 0) {
-            Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 56, alignment: .leading)
+            // Divider
+            Rectangle()
+                .fill(Color.white.opacity(0.06))
+                .frame(height: 0.5)
+                .padding(.vertical, 10)
 
-            Text(value)
-                .font(.system(size: 12, weight: .medium, design: mono ? .monospaced : .default))
-                .foregroundStyle(.primary.opacity(0.9))
-                .lineLimit(1)
-                .truncationMode(.middle)
+            // Info rows
+            VStack(alignment: .leading, spacing: 7) {
+                LicenseInfoRow(label: "Key", value: keyDisplay, mono: true)
+
+                if let email = nonEmpty(email) {
+                    LicenseInfoRow(label: "Email", value: email)
+                }
+            }
         }
     }
 
