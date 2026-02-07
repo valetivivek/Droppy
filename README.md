@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/iordv/Droppy/releases/latest"><img src="https://img.shields.io/badge/Download-macOS-blue?style=for-the-badge&logo=apple" alt="Download for macOS" /></a>
+  <a href="https://github.com/iordv/Droppy/releases/latest"><img src="assets/download-macos.png" alt="Download for macOS" width="200" /></a>
 </p>
 
 <p align="center">
@@ -64,7 +64,7 @@ Modular extensions add even more power. **Install only what you need.**
 | <img src="https://getdroppy.app/assets/icons/ai-bg.jpg" width="24"> | [**Background Removal**](https://getdroppy.app/extensions.html) | Remove image backgrounds with AI — one click |
 | <img src="https://getdroppy.app/assets/icons/menubarmanager.png" width="24"> | [**Menu Bar Manager**](https://getdroppy.app/extensions.html) | Hide & organize menu bar icons with hover reveal |
 | <img src="https://getdroppy.app/assets/icons/reminders.png" width="24"> | [**Reminders**](https://getdroppy.app/extensions.html) | Capture tasks in natural language & sync with Apple Reminders |
-| <img src="https://getdroppy.app/assets/icons/snap-camera-v2.png" width="24"> | [**Snap! Camera**](https://getdroppy.app/extensions.html) | Floating camera button with full live preview in your notch |
+| <img src="https://getdroppy.app/assets/icons/snap-camera-v2.png" width="24"> | [**Notchface**](https://getdroppy.app/extensions.html) | Floating camera button with full live preview in your notch |
 
 ## FAQ
 
