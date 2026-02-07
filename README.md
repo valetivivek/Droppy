@@ -18,7 +18,7 @@
   <a href="https://github.com/iordv/Droppy/releases/latest"><img src="https://img.shields.io/github/v/release/iordv/Droppy?style=flat-square&label=Version" /></a>
   <a href="https://github.com/iordv/Droppy/stargazers"><img src="https://img.shields.io/github/stars/iordv/Droppy?style=flat-square" /></a>
   <a href="https://github.com/iordv/Droppy/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=flat-square" /></a>
-  <a href="https://discord.gg/uxqynmJb"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
+  <a href="https://discord.gg/uvA6PUj4"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
 </p>
 
 ---
@@ -64,6 +64,7 @@ Modular extensions add even more power. **Install only what you need.**
 | <img src="https://getdroppy.app/assets/icons/voice-transcribe.jpg" width="24"> | [**Voice Transcribe**](https://getdroppy.app/extensions.html) | Transcribe audio to text using on-device AI |
 | <img src="https://getdroppy.app/assets/icons/ai-bg.jpg" width="24"> | [**Background Removal**](https://getdroppy.app/extensions.html) | Remove image backgrounds with AI — one click |
 | <img src="https://getdroppy.app/assets/icons/menubarmanager.png" width="24"> | [**Menu Bar Manager**](https://getdroppy.app/extensions.html) | Hide & organize menu bar icons with hover reveal |
+| <img src="https://getdroppy.app/assets/icons/reminders.png" width="24"> | [**Reminders**](https://getdroppy.app/extensions.html) | Capture tasks in natural language & sync with Apple Reminders |
 
 ## FAQ
 
