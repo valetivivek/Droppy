@@ -183,6 +183,20 @@
             margin-bottom: 32px;
         }
 
+        .hero-capabilities {
+            display: inline-block;
+            max-width: 540px;
+            padding: 12px 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--muted);
+            margin-top: 24px;
+            text-align: center;
+        }
+
         .hero-badge .dot {
             width: 6px;
             height: 6px;
@@ -875,6 +889,10 @@
         <h1 class="reveal" style="transition-delay: 0.2s"><span>Everything your Mac<br>should already do.</span></h1>
         <p class="reveal" style="transition-delay: 0.3s">Droppy transforms your notch into a powerful productivity hub.
             Drag, drop, manage, and control — all from one place.</p>
+        <div class="hero-capabilities reveal" style="transition-delay: 0.4s">
+            Includes a full-fledged menu bar manager, reminders that sync with Apple's, window snapping, voice
+            transcribing, screenshotting + editing, full external monitor brightness/volume controls and more.
+        </div>
         <div class="scroll-indicator">
             <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path d="M19 14l-7 7m0 0l-7-7m7 7V3" />
@@ -897,22 +915,25 @@
                     <div class="feature-bullet reveal" style="--i:0">
                         <div class="icon">📂</div>
                         <div>
-                            <h4>Drag & Drop Anywhere</h4>
-                            <p>Drop files, folders, images, or links onto the notch. Pick them up later.</p>
+                            <h4>Drag & Drop Anything</h4>
+                            <p>Files, folders, images, URLs, text — drop it all onto the notch. Pick it up in any app.
+                            </p>
                         </div>
                     </div>
                     <div class="feature-bullet reveal" style="--i:1">
                         <div class="icon">📌</div>
                         <div>
-                            <h4>Favorites & Folders</h4>
-                            <p>Pin frequently used files. Create folders right on the shelf.</p>
+                            <h4>Folders, Favorites & Tracked Folders</h4>
+                            <p>Create folders, pin files, or watch a directory — its contents appear on the shelf
+                                automatically.</p>
                         </div>
                     </div>
                     <div class="feature-bullet reveal" style="--i:2">
-                        <div class="icon">🔍</div>
+                        <div class="icon">⚡</div>
                         <div>
-                            <h4>Quick Look Preview</h4>
-                            <p>Hover to peek at any file. Rich thumbnails for images, PDFs, videos, and more.</p>
+                            <h4>Full File Management</h4>
+                            <p>Right-click for Copy, Move, Share, AirDrop, ZIP, Rename, Quick Look, OCR, and more — all
+                                from the notch.</p>
                         </div>
                     </div>
                 </div>
@@ -941,21 +962,24 @@
                         <div class="icon">🫧</div>
                         <div>
                             <h4>Spawn with a Jiggle</h4>
-                            <p>Shake your mouse while dragging and the basket appears instantly.</p>
+                            <p>Shake your mouse while dragging and a floating basket appears instantly — anywhere on
+                                screen.</p>
                         </div>
                     </div>
                     <div class="feature-bullet reveal" style="--i:1">
                         <div class="icon">🎨</div>
                         <div>
-                            <h4>Multiple Baskets</h4>
-                            <p>Spawn multiple color-coded baskets to organize different workflows.</p>
+                            <h4>Multiple Color-Coded Baskets</h4>
+                            <p>Spawn multiple baskets with unique colors to organize different workflows simultaneously.
+                            </p>
                         </div>
                     </div>
                     <div class="feature-bullet reveal" style="--i:2">
                         <div class="icon">⚡</div>
                         <div>
-                            <h4>Batch Operations</h4>
-                            <p>Select multiple items and drag them all at once into any app.</p>
+                            <h4>Batch Drag & Auto-Hide</h4>
+                            <p>Select multiple items and drag them all at once. Baskets auto-hide when empty or idle.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -984,21 +1008,24 @@
                         <div class="icon">📋</div>
                         <div>
                             <h4>Persistent History</h4>
-                            <p>Your clipboard history persists across app restarts. Never lose a copy again.</p>
+                            <p>Every text, image, file, link, and color you copy — saved across restarts. Never lose a
+                                copy again.</p>
                         </div>
                     </div>
                     <div class="feature-bullet reveal" style="--i:1">
                         <div class="icon">🏷️</div>
                         <div>
-                            <h4>Tags & Search</h4>
-                            <p>Tag clipboard items for quick retrieval. Full-text search across everything.</p>
+                            <h4>Tags, Favorites & Search</h4>
+                            <p>Organize with custom tags, star favorites, and full-text search. Filter by source app.
+                            </p>
                         </div>
                     </div>
                     <div class="feature-bullet reveal" style="--i:2">
-                        <div class="icon">📎</div>
+                        <div class="icon">⚡</div>
                         <div>
-                            <h4>Rich Content</h4>
-                            <p>Supports text, images, files, links, and colors with rich previews.</p>
+                            <h4>Quick Actions</h4>
+                            <p>Paste, copy, flag, tag, or delete — with rich previews for images, videos, and documents.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -1026,22 +1053,25 @@
                     <div class="feature-bullet reveal" style="--i:0">
                         <div class="icon">🔊</div>
                         <div>
-                            <h4>Volume & Brightness</h4>
-                            <p>Sleek animated HUDs with smooth transitions and haptic-like feel.</p>
+                            <h4>Volume, Brightness & External Monitors</h4>
+                            <p>Sleek animated HUDs — including full brightness and volume control for external displays.
+                            </p>
                         </div>
                     </div>
                     <div class="feature-bullet reveal" style="--i:1">
                         <div class="icon">🎵</div>
                         <div>
-                            <h4>Now Playing</h4>
-                            <p>Media controls with album art, progress bar, and playback controls in the notch.</p>
+                            <h4>Now Playing with Album Art</h4>
+                            <p>Beautiful media controls with album art, progress scrubbing, visualizer, and lyrics —
+                                Spotify & Apple Music.</p>
                         </div>
                     </div>
                     <div class="feature-bullet reveal" style="--i:2">
                         <div class="icon">🎧</div>
                         <div>
-                            <h4>AirPods & Battery</h4>
-                            <p>See AirPods connection status, battery level, and charging state — beautifully.</p>
+                            <h4>AirPods, Battery & Keyboard</h4>
+                            <p>AirPods connection, battery levels, charging state, and keyboard brightness — all in
+                                premium HUDs.</p>
                         </div>
                     </div>
                 </div>
