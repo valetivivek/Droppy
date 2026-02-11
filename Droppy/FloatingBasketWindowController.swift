@@ -295,6 +295,12 @@ final class FloatingBasketWindowController: NSObject {
     
     /// Local mouse tracking monitor for when basket window is focused
     private var localMouseTrackingMonitor: Any?
+
+    /// Global monitor for outside-click deselection.
+    private var outsideClickMonitor: Any?
+
+    /// Local monitor for outside-click deselection while app is active.
+    private var localOutsideClickMonitor: Any?
     
     /// Stored full-size basket position for restoration
     private var fullSizeFrame: NSRect = .zero
@@ -312,6 +318,12 @@ final class FloatingBasketWindowController: NSObject {
     /// True while user is drag-selecting items inside the basket.
     /// Prevents accidental auto-hide when the drag temporarily leaves the basket bounds.
     private var isBasketSelectionDragActive: Bool = false
+
+    /// Clears notch hover/drop targeting when basket is revealed.
+    private func resetNotchInteractionState() {
+        DroppyState.shared.isMouseHovering = false
+        DroppyState.shared.isDropTargeted = false
+    }
     
     /// Creates a new basket controller with the specified accent color
     init(accentColor: BasketAccentColor) {
@@ -573,6 +585,7 @@ final class FloatingBasketWindowController: NSObject {
     func showBasket(at position: NSPoint) {
         guard !isShowingOrHiding else { return }
         DragMonitor.shared.stopIdleJiggleMonitoring()
+        resetNotchInteractionState()
         
         let windowWidth: CGFloat = 500
         let windowHeight: CGFloat = 600
@@ -603,6 +616,7 @@ final class FloatingBasketWindowController: NSObject {
     func showBasket(atLastPosition: Bool = false) {
         guard !isShowingOrHiding else { return }
         DragMonitor.shared.stopIdleJiggleMonitoring()
+        resetNotchInteractionState()
         
         // Defensive check: reuse existing hidden window IF it belongs to this controller
         // (Do NOT steal windows from other basket instances - multi-basket support)
@@ -708,10 +722,6 @@ final class FloatingBasketWindowController: NSObject {
         
         panel.contentView = dragContainer
         
-        // Reset notch hover
-        DroppyState.shared.isMouseHovering = false
-        DroppyState.shared.isDropTargeted = false
-        
         // Set visible FIRST to kick off view rendering
         DroppyState.shared.isBasketVisible = true
         
@@ -752,75 +762,57 @@ final class FloatingBasketWindowController: NSObject {
                   !(self?.basketState.items.isEmpty ?? true) else {
                 return event
             }
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             
             // Spacebar triggers Quick Look (but never while renaming or typing)
             if event.keyCode == 49 {
-                let shouldBlockQuickLook = (self?.basketState.isRenaming ?? false) ||
-                    DroppyState.shared.isRenaming ||
-                    (self?.isTextInputResponderActive() ?? false)
-                guard !shouldBlockQuickLook else {
+                guard let self, !self.shouldBlockBasketKeyboardShortcuts() else {
                     return event
                 }
-                let selectedItems = self?.basketState.items.filter { self?.basketState.selectedItems.contains($0.id) == true } ?? []
-                let urls: [URL]
-                if selectedItems.isEmpty {
-                    urls = self?.basketState.items.first.map { [$0.url] } ?? []
-                } else {
-                    urls = selectedItems.map(\.url)
-                }
-                if !urls.isEmpty {
-                    QuickLookHelper.shared.preview(urls: urls, from: self?.basketWindow)
-                }
+                self.previewSelectedOrFirstItem()
                 return nil // Consume the event
             }
             
             // Cmd+A selects all basket items
-            if event.keyCode == 0, event.modifierFlags.contains(.command) {
-                let shouldBlockSelectAll = (self?.basketState.isRenaming ?? false) ||
-                    DroppyState.shared.isRenaming ||
-                    (self?.isTextInputResponderActive() ?? false)
-                guard !shouldBlockSelectAll else {
+            if event.keyCode == 0, modifiers.contains(.command) {
+                guard let self, !self.shouldBlockBasketKeyboardShortcuts() else {
                     return event
                 }
-                self?.basketState.selectedItems = Set(self?.basketState.items.map(\.id) ?? [])
+                self.selectAllBasketItems()
                 return nil // Consume the event
             }
             
             return event
         }
         
-        // Global monitor - catches events when basket is visible but not key window
-        // This ensures spacebar works even when clicking on items briefly loses focus
+        // Global monitor - catches events when basket is visible but not key window.
+        // This keeps shortcuts reliable when focus briefly leaves the non-activating panel.
         globalKeyboardMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard self?.basketWindow?.isVisible == true,
                   !(self?.basketState.items.isEmpty ?? true) else {
                 return
             }
             
-            // Only handle spacebar for Quick Look (not Cmd+A - that requires local focus)
+            guard let self else { return }
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+            // Spacebar quick look fallback.
             if event.keyCode == 49 {
-                let shouldBlockQuickLook = (self?.basketState.isRenaming ?? false) ||
-                    DroppyState.shared.isRenaming ||
-                    (self?.isTextInputResponderActive() ?? false)
-                guard !shouldBlockQuickLook else {
-                    return
-                }
-                // Check if mouse is over the basket window (user intent to interact with basket)
-                if let basketFrame = self?.basketWindow?.frame {
-                    let mouseLocation = NSEvent.mouseLocation
-                    let expandedFrame = basketFrame.insetBy(dx: -20, dy: -20) // Small margin
-                    if expandedFrame.contains(mouseLocation) {
-                        let selectedItems = self?.basketState.items.filter { self?.basketState.selectedItems.contains($0.id) == true } ?? []
-                        let urls: [URL]
-                        if selectedItems.isEmpty {
-                            urls = self?.basketState.items.first.map { [$0.url] } ?? []
-                        } else {
-                            urls = selectedItems.map(\.url)
-                        }
-                        if !urls.isEmpty {
-                            QuickLookHelper.shared.preview(urls: urls, from: self?.basketWindow)
-                        }
-                    }
+                guard NSApp.isActive else { return }
+                guard self.isMouseNearBasketWindow() else { return }
+                guard !self.shouldBlockBasketKeyboardShortcuts() else { return }
+                self.previewSelectedOrFirstItem()
+                return
+            }
+
+            // Cmd+A select-all fallback.
+            if event.keyCode == 0, modifiers.contains(.command) {
+                // Non-activating panel focus can drop local key events.
+                // Allow global fallback when cursor is over this basket OR it is key.
+                guard self.isMouseNearBasketWindow() || self.basketWindow?.isKeyWindow == true else { return }
+                guard !self.shouldBlockBasketKeyboardShortcuts() else { return }
+                DispatchQueue.main.async { [weak self] in
+                    self?.selectAllBasketItems()
                 }
             }
         }
@@ -844,6 +836,32 @@ final class FloatingBasketWindowController: NSObject {
             return false
         }
         return textView.isEditable
+    }
+
+    private func shouldBlockBasketKeyboardShortcuts() -> Bool {
+        basketState.isRenaming || DroppyState.shared.isRenaming || isTextInputResponderActive()
+    }
+
+    private func isMouseNearBasketWindow() -> Bool {
+        guard let basketFrame = basketWindow?.frame else { return false }
+        let expandedFrame = basketFrame.insetBy(dx: -20, dy: -20)
+        return expandedFrame.contains(NSEvent.mouseLocation)
+    }
+
+    private func previewSelectedOrFirstItem() {
+        let selectedItems = basketState.items.filter { basketState.selectedItems.contains($0.id) }
+        let urls: [URL]
+        if selectedItems.isEmpty {
+            urls = basketState.items.first.map { [$0.url] } ?? []
+        } else {
+            urls = selectedItems.map(\.url)
+        }
+        guard !urls.isEmpty else { return }
+        QuickLookHelper.shared.preview(urls: urls, from: basketWindow)
+    }
+
+    private func selectAllBasketItems() {
+        basketState.selectAllBasketItems()
     }
     
     /// Hides the basket window.
@@ -948,6 +966,10 @@ final class FloatingBasketWindowController: NSObject {
         mouseTrackingMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] _ in
             self?.handleMouseMovement()
         }
+
+        // Ensure outside-click deselection stays reliable even when SwiftUI gesture
+        // propagation is inconsistent through nested scroll/item views.
+        startOutsideClickDeselectMonitor()
     }
     
     /// Stops mouse tracking monitors
@@ -961,6 +983,52 @@ final class FloatingBasketWindowController: NSObject {
             localMouseTrackingMonitor = nil
         }
         stopAutoHidePolling()
+        stopOutsideClickDeselectMonitor()
+    }
+
+    private func startOutsideClickDeselectMonitor() {
+        stopOutsideClickDeselectMonitor()
+
+        localOutsideClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            self?.handleOutsideClickDeselect(at: self?.screenPoint(for: event) ?? NSEvent.mouseLocation)
+            return event
+        }
+
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            self?.handleOutsideClickDeselect(at: NSEvent.mouseLocation)
+        }
+    }
+
+    private func stopOutsideClickDeselectMonitor() {
+        if let monitor = outsideClickMonitor {
+            NSEvent.removeMonitor(monitor)
+            outsideClickMonitor = nil
+        }
+        if let monitor = localOutsideClickMonitor {
+            NSEvent.removeMonitor(monitor)
+            localOutsideClickMonitor = nil
+        }
+    }
+
+    private func screenPoint(for event: NSEvent) -> NSPoint {
+        guard let window = event.window else { return NSEvent.mouseLocation }
+        return window.convertPoint(toScreen: event.locationInWindow)
+    }
+
+    private func handleOutsideClickDeselect(at point: NSPoint) {
+        guard let panel = basketWindow, panel.isVisible else { return }
+        guard !DragMonitor.shared.isDragging else { return }
+        guard !basketState.selectedItems.isEmpty || basketState.isRenaming else { return }
+        guard !panel.frame.contains(point) else { return }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.basketState.deselectAllBasket()
+            if self.basketState.isRenaming {
+                self.basketState.isRenaming = false
+                DroppyState.shared.endFileOperation()
+            }
+        }
     }
     
     private func startAutoHidePolling() {

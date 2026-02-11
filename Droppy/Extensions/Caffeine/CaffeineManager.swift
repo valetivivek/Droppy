@@ -69,6 +69,8 @@ final class CaffeineManager {
     
     @ObservationIgnored
     @AppStorage(AppPreferenceKey.caffeineInstalled) var isInstalled = PreferenceDefault.caffeineInstalled
+    @ObservationIgnored
+    @AppStorage(AppPreferenceKey.caffeineEnabled) var isEnabled = PreferenceDefault.caffeineEnabled
     
     private(set) var isActive: Bool = false
     private(set) var currentDuration: CaffeineDuration = .indefinite
@@ -81,6 +83,10 @@ final class CaffeineManager {
     
     private var timer: Timer?
     private var endTime: Date?
+
+    private var shouldShowHUD: Bool {
+        isInstalled && isEnabled
+    }
     
     private init() {}
     
@@ -120,7 +126,9 @@ final class CaffeineManager {
         isActive = true
         
         // Trigger notch HUD to show activation
-        HUDManager.shared.show(.highAlert)
+        if shouldShowHUD {
+            HUDManager.shared.show(.highAlert)
+        }
         
         // Handle timer
         if let totalSeconds = duration.totalSeconds {
@@ -154,7 +162,7 @@ final class CaffeineManager {
         isActive = false
         
         // Trigger notch HUD to show deactivation
-        if wasActive {
+        if wasActive && shouldShowHUD {
             HUDManager.shared.show(.highAlert)
         }
     }

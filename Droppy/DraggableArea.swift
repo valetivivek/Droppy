@@ -54,24 +54,10 @@ struct DraggableArea<Content: View>: NSViewRepresentable {
     }
     
     func updateNSView(_ nsView: DraggableAreaView<Content>, context: Context) {
-        // CRITICAL: Skip updating the hosting view content when a context menu is open
-        // Updating rootView causes SwiftUI to recreate the view, dismissing the menu
-        // Exclude Droppy's own windows (BasketPanel, ClipboardPanel, NotchWindow) which are at high levels
-        let hasActiveMenu = NSApp.windows.contains { window in
-            guard window.level.rawValue >= NSWindow.Level.popUpMenu.rawValue else { return false }
-            // Exclude our own app windows
-            let className = NSStringFromClass(type(of: window))
-            if className.contains("BasketPanel") ||
-               className.contains("ClipboardPanel") ||
-               className.contains("NotchWindow") ||
-               className.contains("NSHosting") ||
-               className.contains("Popover") ||
-               className.contains("Tooltip") {
-                return false
-            }
-            return true
-        }
-        guard !hasActiveMenu else { return }
+        // Skip content updates only while THIS draggable view is actively presenting
+        // its context menu. A global high-level-window check causes false positives
+        // (for example OCR/basket panels) and breaks hover/thumbnail updates.
+        guard !nsView.isPresentingContextMenu else { return }
         
         nsView.update(rootView: content, items: items, onTap: onTap, onDoubleClick: onDoubleClick, onRightClick: onRightClick, onDragStart: onDragStart, onDragComplete: onDragComplete, onRemoveButton: onRemoveButton, onPinButton: onPinButton)
     }
@@ -89,6 +75,8 @@ class DraggableAreaView<Content: View>: NSView, NSDraggingSource {
     
     private var hostingView: NSHostingView<Content>
     private var mouseDownEvent: NSEvent?
+    private var mouseDownModifierFlags: NSEvent.ModifierFlags = []
+    fileprivate private(set) var isPresentingContextMenu = false
     
     /// CRITICAL: Retain drag preview images for the duration of the drag session.
     /// Without this, Core Animation may try to release images that ARC has already deallocated,
@@ -162,29 +150,32 @@ class DraggableAreaView<Content: View>: NSView, NSDraggingSource {
     }
     
     override func mouseDown(with event: NSEvent) {
-        print("🖱️ mouseDown received!")
         self.mouseDownEvent = event
+        let liveModifiers = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let sessionFlags = NSEvent.ModifierFlags(
+            rawValue: NSEvent.ModifierFlags.RawValue(
+                CGEventSource.flagsState(.combinedSessionState).rawValue
+            )
+        ).intersection(.deviceIndependentFlagsMask)
+        self.mouseDownModifierFlags = event.modifierFlags
+            .union(liveModifiers)
+            .union(sessionFlags)
+            .intersection(.deviceIndependentFlagsMask)
     }
     
     override func mouseUp(with event: NSEvent) {
-        print("🖱️ mouseUp received! clickCount=\(event.clickCount)")
         // If we get here without a drag starting, treat as click
         if let mouseDown = mouseDownEvent {
             let dx = abs(event.locationInWindow.x - mouseDown.locationInWindow.x)
             let dy = abs(event.locationInWindow.y - mouseDown.locationInWindow.y)
-            print("🖱️ Distance: dx=\(dx), dy=\(dy)")
-            if dx < 5 && dy < 5 {
+            if dx < 6 && dy < 6 {
                 if event.clickCount == 2 {
-                    print("🖱️ Calling onDoubleClick")
                     onDoubleClick()
                 } else {
                     // Check if click is in a button zone
                     let clickPoint = convert(event.locationInWindow, from: nil)
                     // Increased zone size for better hit detection (covers 28x28 area)
                     let buttonZoneSize: CGFloat = 28
-                    
-                    // Debug: Print bounds and click point
-                    print("🖱️ Bounds: \(bounds), Click: \(clickPoint)")
                     
                     // X button zone: top-right corner (NSView coords: y=maxY is top)
                     let xButtonZone = NSRect(
@@ -207,28 +198,35 @@ class DraggableAreaView<Content: View>: NSView, NSDraggingSource {
                         height: buttonZoneSize
                     )
                     
-                    print("🖱️ X Zone: \(xButtonZone), Pin Zone: \(pinButtonZone)")
-                    
                     if xButtonZone.contains(clickPoint), let onRemove = onRemoveButton {
-                        print("🖱️ ✅ Calling onRemoveButton")
                         onRemove()
                     } else if pinButtonZone.contains(clickPoint), let onPin = onPinButton {
-                        print("🖱️ ✅ Calling onPinButton")
                         onPin()
                     } else {
-                        print("🖱️ Calling onTap")
-                        // Use NSEvent.modifierFlags class property for reliable detection in non-activating panels
-                        onTap(NSEvent.modifierFlags)
+                        // Include event, live, and global session flags to keep Cmd/Shift taps
+                        // reliable in non-activating panels.
+                        let sessionFlags = NSEvent.ModifierFlags(
+                            rawValue: NSEvent.ModifierFlags.RawValue(
+                                CGEventSource.flagsState(.combinedSessionState).rawValue
+                            )
+                        ).intersection(.deviceIndependentFlagsMask)
+                        let clickModifiers = mouseDownModifierFlags
+                            .union(event.modifierFlags)
+                            .union(NSEvent.modifierFlags)
+                            .union(sessionFlags)
+                            .intersection(.deviceIndependentFlagsMask)
+                        onTap(clickModifiers)
                     }
                 }
             }
-        } else {
-            print("🖱️ mouseDownEvent was nil!")
         }
         mouseDownEvent = nil
+        mouseDownModifierFlags = []
     }
     
     override func rightMouseDown(with event: NSEvent) {
+        isPresentingContextMenu = true
+        
         // Handle right click - defer state changes to avoid view recreation lag
         // The onRightClick handler should use async if it modifies state that causes view recreation
         onRightClick()
@@ -242,8 +240,9 @@ class DraggableAreaView<Content: View>: NSView, NSDraggingSource {
         
         // Menu has closed at this point - unblock interactions immediately
         // Use minimal delay just to ensure menu window is fully deallocated
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             DroppyState.shared.isInteractionBlocked = false
+            self?.isPresentingContextMenu = false
         }
     }
     
@@ -251,7 +250,7 @@ class DraggableAreaView<Content: View>: NSView, NSDraggingSource {
         guard let mouseDown = mouseDownEvent else { return }
         
         // Simple threshold check
-        let dragThreshold: CGFloat = 3.0
+        let dragThreshold: CGFloat = 6.0
         let draggedDistance = hypot(event.locationInWindow.x - mouseDown.locationInWindow.x,
                                     event.locationInWindow.y - mouseDown.locationInWindow.y)
         
@@ -270,8 +269,50 @@ class DraggableAreaView<Content: View>: NSView, NSDraggingSource {
         let maxStackDepth = 10
         let bulkDragImage: NSImage? = {
             guard isBulkDrag else { return nil }
-            let image = (DroppedItem.placeholderIcon.copy() as? NSImage) ?? DroppedItem.placeholderIcon
-            image.size = CGSize(width: 64, height: 64)
+            let frameSize = CGSize(width: 64, height: 64)
+            let baseSize = CGSize(width: 56, height: 56)
+
+            let baseImage: NSImage = {
+                guard let firstURLWriter = pasteboardItems.first(where: { $0 is NSURL }) as? NSURL,
+                      let firstURL = firstURLWriter as URL? else {
+                    let fallback = (DroppedItem.placeholderIcon.copy() as? NSImage) ?? DroppedItem.placeholderIcon
+                    fallback.isTemplate = false
+                    fallback.size = baseSize
+                    return fallback
+                }
+
+                var isDirectory: ObjCBool = false
+                if FileManager.default.fileExists(atPath: firstURL.path, isDirectory: &isDirectory), isDirectory.boolValue {
+                    let isPinnedInAnyBasket = FloatingBasketWindowController.basketsWithItems.contains { basket in
+                        basket.basketState.items.contains(where: { $0.url == firstURL && $0.isPinned })
+                    }
+                    let isPinned = DroppyState.shared.items.contains(where: { $0.url == firstURL && $0.isPinned }) ||
+                                   isPinnedInAnyBasket
+                    return ThumbnailCache.shared.renderFolderIcon(size: baseSize.width, isPinned: isPinned)
+                }
+
+                return ThumbnailCache.shared.getCachedThumbnail(for: firstURL, size: baseSize)
+                    ?? ThumbnailCache.shared.cachedIcon(forPath: firstURL.path)
+            }()
+
+            let image = NSImage(size: frameSize)
+            image.lockFocus()
+            NSColor.clear.setFill()
+            NSBezierPath(rect: NSRect(origin: .zero, size: frameSize)).fill()
+            let drawRect = NSRect(
+                x: (frameSize.width - baseSize.width) / 2,
+                y: (frameSize.height - baseSize.height) / 2,
+                width: baseSize.width,
+                height: baseSize.height
+            )
+            baseImage.draw(
+                in: drawRect,
+                from: NSRect(origin: .zero, size: baseImage.size),
+                operation: .sourceOver,
+                fraction: 1.0
+            )
+            image.unlockFocus()
+            image.isTemplate = false
             return image
         }()
         let draggingItems = pasteboardItems.enumerated().compactMap { [weak self] (index, writer) -> NSDraggingItem? in
@@ -313,6 +354,7 @@ class DraggableAreaView<Content: View>: NSView, NSDraggingSource {
             }
             
             guard let validImage = usedImage else { return nil }
+            validImage.isTemplate = false
             
             // CRITICAL: Retain the image for the drag session duration
             self.dragSessionImages.append(validImage)
@@ -343,6 +385,7 @@ class DraggableAreaView<Content: View>: NSView, NSDraggingSource {
         onDragStart?()
         beginDraggingSession(with: draggingItems, event: mouseDown, source: self)
         self.mouseDownEvent = nil
+        self.mouseDownModifierFlags = []
     }
     
     // MARK: - NSDraggingSource

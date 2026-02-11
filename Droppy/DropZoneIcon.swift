@@ -25,7 +25,7 @@ struct DropZoneIcon: View {
             .frame(width: size, height: size)
             .scaleEffect(isActive ? 1.08 : 1.0)
             .opacity(isActive ? 1.0 : (useAdaptiveForegrounds ? 0.8 : 0.5))
-            .animation(DroppyAnimation.expandOpen, value: isActive)
+            .animation(DroppyAnimation.notchState, value: isActive)
     }
     
     // MARK: - Icon Content

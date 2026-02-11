@@ -17,6 +17,7 @@ class AreaSelectionWindow: NSWindow {
     var onCancel: (() -> Void)?
     
     private var selectionView: AreaSelectionView?
+    private var deferredFocusWorkItem: DispatchWorkItem?
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -73,6 +74,9 @@ class AreaSelectionWindow: NSWindow {
     }
 
     func presentForCapture() {
+        deferredFocusWorkItem?.cancel()
+        deferredFocusWorkItem = nil
+
         NSApp.activate(ignoringOtherApps: true)
         makeKeyAndOrderFront(nil)
         orderFrontRegardless()
@@ -83,15 +87,30 @@ class AreaSelectionWindow: NSWindow {
         NSCursor.crosshair.set()
 
         // Re-apply focus/cursor on next runloop to avoid first-click activation behavior.
-        DispatchQueue.main.async { [weak self] in
+        let workItem = DispatchWorkItem { [weak self] in
             guard let self else { return }
+            guard self.isVisible else { return }
             self.makeKeyAndOrderFront(nil)
             if let selectionView = self.selectionView {
                 self.makeFirstResponder(selectionView)
                 self.invalidateCursorRects(for: selectionView)
+                NSCursor.crosshair.set()
             }
-            NSCursor.crosshair.set()
         }
+        deferredFocusWorkItem = workItem
+        DispatchQueue.main.async(execute: workItem)
+    }
+
+    override func orderOut(_ sender: Any?) {
+        deferredFocusWorkItem?.cancel()
+        deferredFocusWorkItem = nil
+        super.orderOut(sender)
+    }
+
+    override func close() {
+        deferredFocusWorkItem?.cancel()
+        deferredFocusWorkItem = nil
+        super.close()
     }
 }
 

@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct QuickshareMenuContent: View {
     // Observe QuickshareManager for recent items
@@ -80,14 +79,40 @@ struct QuickshareMenuContent: View {
     private func getClipboardURLs() -> [URL] {
         guard let items = NSPasteboard.general.pasteboardItems else { return [] }
         var urls: [URL] = []
+        var seen: Set<String> = []
         
         for item in items {
             // Check for file URLs
             if let string = item.string(forType: .fileURL), let url = URL(string: string) {
-                urls.append(url)
+                appendUnique(url, to: &urls, seen: &seen)
+            }
+
+            if let string = item.string(forType: .URL),
+               let url = parseWebURL(from: string) {
+                appendUnique(url, to: &urls, seen: &seen)
+            } else if let string = item.string(forType: .string),
+                      let url = parseWebURL(from: string) {
+                appendUnique(url, to: &urls, seen: &seen)
             }
         }
         return urls
+    }
+
+    private func appendUnique(_ url: URL, to urls: inout [URL], seen: inout Set<String>) {
+        let key = url.isFileURL ? url.standardizedFileURL.path : url.absoluteString
+        guard !key.isEmpty, !seen.contains(key) else { return }
+        seen.insert(key)
+        urls.append(url)
+    }
+
+    private func parseWebURL(from raw: String) -> URL? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            return nil
+        }
+        return url
     }
     
     private func selectAndUploadFile() {

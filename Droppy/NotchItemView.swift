@@ -218,16 +218,18 @@ struct NotchItemView: View {
         }
         
         let tapClosure: (NSEvent.ModifierFlags) -> Void = { modifiers in
-            print("📌 onTap callback triggered for item: \(item.url.lastPathComponent)")
-            if modifiers.contains(.command) {
+            if !NSApp.isActive {
+                NSApp.activate(ignoringOtherApps: true)
+            }
+            let cleanModifiers = modifiers.intersection(.deviceIndependentFlagsMask)
+            if cleanModifiers.contains(.shift) {
+                state.selectRange(to: item, additive: cleanModifiers.contains(.command))
+            } else if cleanModifiers.contains(.command) {
                 state.toggleSelection(item)
-            } else if modifiers.contains(.shift) {
-                state.selectRange(to: item)
             } else {
                 state.deselectAll()
                 state.select(item)
             }
-            print("📌 Selection now contains: \(state.selectedItems.count) items")
         }
         
         let doubleClickClosure: () -> Void = {
@@ -258,10 +260,13 @@ struct NotchItemView: View {
             hoverTask = nil
             showFolderPreview = false
             isDraggingSelf = true
+            // Shelf-origin drags must still be able to jiggle-reveal the basket.
+            DragMonitor.shared.setSuppressBasketRevealForCurrentDrag(false)
         }
         
         let dragCompleteClosure: (NSDragOperation) -> Void = { [weak state] operation in
             isDraggingSelf = false
+            DragMonitor.shared.setSuppressBasketRevealForCurrentDrag(false)
             guard let state = state else { return }
             let enableAutoClean = UserDefaults.standard.bool(forKey: "enableAutoClean")
             if enableAutoClean {
@@ -323,17 +328,6 @@ struct NotchItemView: View {
         .frame(width: 76, height: 96)
 
         let interactiveContent = baseContent
-            .background {
-                if !state.isBulkUpdating {
-                    GeometryReader { geo in
-                        Color.clear
-                            .preference(
-                                key: ItemFramePreferenceKey.self,
-                                value: [item.id: geo.frame(in: .named("shelfGrid"))]
-                            )
-                    }
-                }
-            }
             // Drop target for ANY folder - drop files INTO the folder
             // CRITICAL: Disable when this item is being dragged to prevent gesture conflict
             .dropDestination(for: URL.self) { urls, _ in
@@ -450,6 +444,7 @@ struct NotchItemView: View {
             }
             .onChange(of: item.url) { _, _ in
                 refreshContextMenuCache()
+                thumbnail = nil
             }
             .contextMenu {
             Button {
@@ -462,6 +457,12 @@ struct NotchItemView: View {
                 item.openFile()
             } label: {
                 Label("Open", systemImage: "arrow.up.forward.square")
+            }
+            
+            Button {
+                item.revealInFinder()
+            } label: {
+                Label("Show in Finder", systemImage: "folder")
             }
             
             // Move To...
@@ -786,7 +787,24 @@ struct NotchItemView: View {
         
         // Build the base view with common modifiers
         return dragWrapper
-            .task { await thumbnailTask() }
+            // Keep the representable wrapper's layout bounds identical to the visual item.
+            // This prevents marquee selection from intersecting oversized implicit cells.
+            .frame(width: 76, height: 96)
+            .background {
+                if !state.isBulkUpdating {
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: ItemFramePreferenceKey.self,
+                            value: [item.id: geo.frame(in: .named("shelfGrid"))]
+                        )
+                    }
+                }
+            }
+            .task(id: item.url) { await thumbnailTask() }
+            .task(id: state.expandedDisplayID) {
+                guard state.expandedDisplayID != nil, thumbnail == nil else { return }
+                await thumbnailTask()
+            }
             .animation(state.isBulkUpdating ? .none : DroppyAnimation.hoverBouncy, value: isHovering)
     }
 
@@ -808,6 +826,7 @@ struct NotchItemView: View {
                 await MainActor.run {
                     isExtractingText = false
                     state.endFileOperation()
+                    state.isInteractionBlocked = false
                     // Trigger poof animation for successful extraction
                     withAnimation(DroppyAnimation.state) {
                         isPoofing = true
@@ -818,6 +837,7 @@ struct NotchItemView: View {
                 await MainActor.run {
                     isExtractingText = false
                     state.endFileOperation()
+                    state.isInteractionBlocked = false
                     OCRWindowController.shared.show(with: "Error extracting text: \(error.localizedDescription)")
                 }
             }
@@ -1223,12 +1243,6 @@ struct NotchItemView: View {
             
             state.deselectAll()
             HapticFeedback.drop()
-            
-            // Auto-start renaming the new folder (like ZIP creation)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                renamingItemId = newFolderItem.id
-                state.isRenaming = true
-            }
         } catch {
             print("❌ Create folder error: \(error.localizedDescription)")
             HapticFeedback.error()
@@ -1472,13 +1486,16 @@ private struct NotchItemContent: View {
                 }
             }
             
-            // FINDER-STYLE: Label with pill selection background
-            Text(item.name)
-                .font(.system(size: 11))
-                .foregroundStyle(primaryTextColor)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(width: 64)
+            // FINDER-STYLE: Label with pill selection background and subtle scroll for long names
+            SubtleScrollingText(
+                text: item.name,
+                font: .system(size: 11),
+                foregroundStyle: AnyShapeStyle(isSelected ? .white : primaryTextColor),
+                maxWidth: 64,
+                lineLimit: 1,
+                alignment: .center,
+                externallyHovered: isHovering
+            )
                 .padding(.horizontal, 4)
                 .padding(.vertical, 2)
                 .background {

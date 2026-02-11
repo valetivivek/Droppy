@@ -20,6 +20,8 @@ final class CrashReporter {
     
     /// Timestamp when the current session started
     private var sessionStartTime: Date?
+    private var pendingCrashPromptLog: String?
+    private var didBecomeActiveObserver: NSObjectProtocol?
     
     private init() {}
     
@@ -66,9 +68,10 @@ final class CrashReporter {
             return
         }
         
-        // Prompt user after a short delay to let the app fully launch
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            self.showCrashReportPrompt(crashLog: crashLog)
+        // Prompt user after a short delay to let the app fully launch.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            guard let self else { return }
+            self.queueCrashPrompt(crashLog: crashLog)
         }
         #endif
     }
@@ -113,6 +116,40 @@ final class CrashReporter {
     }
     
     // MARK: - User Prompt
+
+    private func queueCrashPrompt(crashLog: String?) {
+        if canPresentForegroundPrompt() {
+            showCrashReportPrompt(crashLog: crashLog)
+            return
+        }
+
+        pendingCrashPromptLog = crashLog
+        installDidBecomeActiveObserverIfNeeded()
+        print("CrashReporter: Deferring crash prompt until Droppy is frontmost")
+    }
+
+    private func installDidBecomeActiveObserverIfNeeded() {
+        guard didBecomeActiveObserver == nil else { return }
+
+        didBecomeActiveObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            guard let crashLog = self.pendingCrashPromptLog else { return }
+            guard self.canPresentForegroundPrompt() else { return }
+
+            self.pendingCrashPromptLog = nil
+            self.showCrashReportPrompt(crashLog: crashLog)
+        }
+    }
+
+    private func canPresentForegroundPrompt() -> Bool {
+        guard NSApp.isActive else { return false }
+        guard let frontmost = NSWorkspace.shared.frontmostApplication else { return false }
+        return frontmost.processIdentifier == ProcessInfo.processInfo.processIdentifier
+    }
     
     private func showCrashReportPrompt(crashLog: String?) {
         Task { @MainActor in

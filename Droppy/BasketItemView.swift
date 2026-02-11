@@ -166,16 +166,18 @@ struct BasketItemView: View {
         }
         
         let tapClosure: (NSEvent.ModifierFlags) -> Void = { modifiers in
-            print("🧺 Basket onTap callback for item: \(item.url.lastPathComponent)")
-            if modifiers.contains(.command) {
+            if !NSApp.isActive {
+                NSApp.activate(ignoringOtherApps: true)
+            }
+            let cleanModifiers = modifiers.intersection(.deviceIndependentFlagsMask)
+            if cleanModifiers.contains(.shift) {
+                state.selectBasketRange(to: item, additive: cleanModifiers.contains(.command))
+            } else if cleanModifiers.contains(.command) {
                 state.toggleBasketSelection(item)
-            } else if modifiers.contains(.shift) {
-                state.selectBasketRange(to: item)
             } else {
                 state.deselectAllBasket()
                 state.selectBasket(item)
             }
-            print("🧺 Basket selection now contains: \(state.selectedBasketItems.count) items")
         }
         
         let doubleClickClosure: () -> Void = {
@@ -206,10 +208,12 @@ struct BasketItemView: View {
             hoverTask = nil
             showFolderPreview = false
             isDraggingSelf = true
+            DragMonitor.shared.setSuppressBasketRevealForCurrentDrag(true)
         }
         
         let dragCompleteClosure: (NSDragOperation) -> Void = { [weak state] operation in
             isDraggingSelf = false
+            DragMonitor.shared.setSuppressBasketRevealForCurrentDrag(false)
             guard let state = state else { return }
             let enableAutoClean = UserDefaults.standard.bool(forKey: "enableAutoClean")
             if enableAutoClean {
@@ -300,6 +304,14 @@ struct BasketItemView: View {
                                     .onAppear {
                                         // Auto-fade after 1.5 seconds
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                            // List layout uses an inline checkmark instead of `.poofEffect`,
+                                            // so apply the pending replacement here before ending the effect.
+                                            if let newItem = pendingConvertedItem {
+                                                withAnimation(DroppyAnimation.state) {
+                                                    state.replaceBasketItem(item, with: newItem)
+                                                }
+                                                pendingConvertedItem = nil
+                                            }
                                             withAnimation(DroppyAnimation.easeOut) {
                                                 isPoofing = false
                                             }
@@ -552,11 +564,12 @@ struct BasketItemView: View {
         }
         .onChange(of: item.url) { _, _ in
             refreshContextMenuCache()
+            thumbnail = nil
         }
         .contextMenu {
             contextMenuContent()
         }
-        .task {
+        .task(id: item.url) {
             // ASYNC: Load QuickLook thumbnail (if available)
             if let cached = ThumbnailCache.shared.cachedThumbnail(for: item) {
                 thumbnail = cached

@@ -71,7 +71,7 @@ struct CaffeineNotchView: View {
                     .font(.system(size: statusText == "∞" ? 22 : 11, weight: .medium, design: .monospaced))
                     .offset(y: statusText == "∞" ? -3 : 0)
                     .foregroundStyle(manager.isActive ? .orange : secondaryText(0.62))
-                    .animation(.smooth, value: statusText)
+                    .animation(DroppyAnimation.smoothContent, value: statusText)
             }
             .frame(width: 60)
             

@@ -105,11 +105,14 @@ final class LockScreenHUDWindowManager {
         if needsContentRebuild {
             let layout = HUDLayoutCalculator(screen: screen)
             let notchHeight = layout.notchHeight
+            let collapsedNotchWidth = max(1, layout.notchWidth)
 
             let lockHUDContent = LockScreenHUDWindowContent(
                 lockWidth: currentHudWidth,
+                collapsedWidth: collapsedNotchWidth,
                 notchHeight: notchHeight,
-                targetScreen: screen
+                targetScreen: screen,
+                animateEntrance: createdFreshWindow
             )
 
             let hostingView = NSHostingView(rootView: lockHUDContent)
@@ -265,22 +268,29 @@ private struct LockScreenHUDWindowContent: View {
     @ObservedObject private var lockScreenManager = LockScreenManager.shared
 
     let lockWidth: CGFloat
+    let collapsedWidth: CGFloat
     let notchHeight: CGFloat
     let targetScreen: NSScreen
+    let animateEntrance: Bool
 
     @State private var visualWidth: CGFloat
     @State private var transitionPhase = false
     @State private var transitionResetWorkItem: DispatchWorkItem?
+    @State private var hasPlayedEntranceAnimation = false
 
     init(
         lockWidth: CGFloat,
+        collapsedWidth: CGFloat,
         notchHeight: CGFloat,
-        targetScreen: NSScreen
+        targetScreen: NSScreen,
+        animateEntrance: Bool
     ) {
         self.lockWidth = lockWidth
+        self.collapsedWidth = collapsedWidth
         self.notchHeight = notchHeight
         self.targetScreen = targetScreen
-        _visualWidth = State(initialValue: lockWidth)
+        self.animateEntrance = animateEntrance
+        _visualWidth = State(initialValue: animateEntrance ? collapsedWidth : lockWidth)
     }
 
     var body: some View {
@@ -301,9 +311,17 @@ private struct LockScreenHUDWindowContent: View {
         .frame(maxWidth: .infinity, maxHeight: notchHeight, alignment: .top)
         .animation(.easeOut(duration: 0.16), value: transitionPhase)
         .onAppear {
-            // Keep a single stable lock surface size to avoid the tiny bridge-notch ghost
-            // during lock/unlock handoff.
-            visualWidth = lockWidth
+            // Match regular HUD behavior: start collapsed and grow wider on lock entry.
+            if animateEntrance && !hasPlayedEntranceAnimation {
+                hasPlayedEntranceAnimation = true
+                visualWidth = collapsedWidth
+                withAnimation(DroppyAnimation.notchState(for: targetScreen)) {
+                    visualWidth = lockWidth
+                }
+            } else {
+                // Keep a stable lock surface size to avoid tiny handoff ghosts.
+                visualWidth = lockWidth
+            }
             triggerPremiumPulse()
         }
         .onChange(of: lockScreenManager.isUnlocked) { _, isUnlocked in

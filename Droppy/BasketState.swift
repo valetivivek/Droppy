@@ -222,18 +222,51 @@ final class BasketState {
         selectedItems = [item.id]
     }
 
-    func selectBasketRange(to item: DroppedItem) {
-        guard let anchorId = lastSelectionAnchor,
-              let anchorIndex = items.firstIndex(where: { $0.id == anchorId }),
-              let targetIndex = items.firstIndex(where: { $0.id == item.id }) else {
+    func selectBasketRange(to item: DroppedItem, additive: Bool = false) {
+        let orderedItems = powerFolders + itemsList
+        let targetIndex = orderedItems.firstIndex(where: { $0.id == item.id })
+        guard let targetIndex else {
             selectBasket(item)
             return
         }
 
+        // Finder-style fallback: if explicit anchor is missing/stale, use the first
+        // currently selected item in visual order as the temporary range anchor.
+        let resolvedAnchorID: UUID? = {
+            if let anchor = lastSelectionAnchor,
+               orderedItems.contains(where: { $0.id == anchor }) {
+                return anchor
+            }
+            return orderedItems.first(where: { selectedItems.contains($0.id) })?.id
+        }()
+
+        guard let anchorID = resolvedAnchorID,
+              let anchorIndex = orderedItems.firstIndex(where: { $0.id == anchorID }) else {
+            selectBasket(item)
+            return
+        }
+
+        lastSelectionAnchor = anchorID
+
         let start = min(anchorIndex, targetIndex)
         let end = max(anchorIndex, targetIndex)
-        let rangeIds = items[start...end].map(\.id)
-        selectedItems.formUnion(rangeIds)
+        let rangeIds = orderedItems[start...end].map(\.id)
+        if additive {
+            selectedItems.formUnion(rangeIds)
+        } else {
+            selectedItems = Set(rangeIds)
+        }
+    }
+
+    /// Select all basket items with deterministic range anchor.
+    func selectAllBasketItems() {
+        let orderedItems = powerFolders + itemsList
+        selectedItems = Set(orderedItems.map(\.id))
+        if let anchor = lastSelectionAnchor,
+           orderedItems.contains(where: { $0.id == anchor }) {
+            return
+        }
+        lastSelectionAnchor = orderedItems.first?.id
     }
 
     func deselectAllBasket() {

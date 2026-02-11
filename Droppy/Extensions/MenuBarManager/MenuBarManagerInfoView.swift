@@ -17,6 +17,11 @@ struct MenuBarManagerInfoView: View {
     
     @State private var showReviewsSheet = false
     
+    private var panelHeight: CGFloat {
+        let availableHeight = NSScreen.main?.visibleFrame.height ?? 800
+        return min(760, max(520, availableHeight - 120))
+    }
+    
     /// Use ExtensionType.isRemoved as single source of truth
     private var isActive: Bool {
         !ExtensionType.menuBarManager.isRemoved && manager.isEnabled
@@ -58,8 +63,7 @@ struct MenuBarManagerInfoView: View {
             // Buttons (fixed, non-scrolling)
             buttonSection
         }
-        .frame(width: 450)
-        .fixedSize(horizontal: true, vertical: true)
+        .frame(width: 450, height: panelHeight)
         .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AdaptiveColors.panelBackgroundOpaqueStyle)
         .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.xl, style: .continuous))
         .sheet(isPresented: $showReviewsSheet) {

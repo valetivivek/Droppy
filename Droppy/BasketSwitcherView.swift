@@ -34,6 +34,10 @@ struct BasketSwitcherView: View {
     
     @State private var hoveredBasketIndex: Int? = nil
     @State private var isNewBasketHovered: Bool = false
+
+    private var visibleBaskets: [FloatingBasketWindowController] {
+        baskets.filter { !$0.basketState.items.isEmpty }
+    }
     
     var body: some View {
         ZStack {
@@ -47,7 +51,7 @@ struct BasketSwitcherView: View {
             // Basket cards row
             HStack(spacing: 20) {
                 // Existing baskets
-                ForEach(Array(baskets.enumerated()), id: \.offset) { index, basket in
+                ForEach(Array(visibleBaskets.enumerated()), id: \.offset) { index, basket in
                     BasketSwitcherCard(
                         basket: basket,
                         isHovered: hoveredBasketIndex == index,
@@ -102,6 +106,10 @@ struct BasketSelectionView: View {
     
     @State private var hoveredBasketIndex: Int? = nil
     @State private var isNewBasketHovered: Bool = false
+
+    private var visibleBaskets: [FloatingBasketWindowController] {
+        baskets.filter { !$0.basketState.items.isEmpty }
+    }
     
     var body: some View {
         ZStack {
@@ -115,7 +123,7 @@ struct BasketSelectionView: View {
             // Basket cards row
             HStack(spacing: 20) {
                 // Existing baskets
-                ForEach(Array(baskets.enumerated()), id: \.offset) { index, basket in
+                ForEach(Array(visibleBaskets.enumerated()), id: \.offset) { index, basket in
                     BasketSelectionCard(
                         basket: basket,
                         isHovered: hoveredBasketIndex == index,
@@ -181,7 +189,12 @@ struct BasketSelectionCard: View {
     var body: some View {
         VStack(spacing: 0) {
             handleIndicator
-                .padding(.bottom, 8)
+                .padding(.bottom, 6)
+
+            if !basket.basketState.items.isEmpty {
+                PeekFileCountHeader(items: basket.basketState.items, style: .plain)
+                    .padding(.top, 2)
+            }
 
             VStack(spacing: 0) {
                 if basket.basketState.items.isEmpty {
@@ -190,25 +203,10 @@ struct BasketSelectionCard: View {
                         .foregroundStyle(AdaptiveColors.secondaryTextAuto.opacity(0.82))
                 } else {
                     BasketStackPreviewView(items: basket.basketState.items)
-                        .frame(width: 100, height: 70)
+                        .frame(width: 142, height: 104, alignment: .bottom)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-
-            VStack(spacing: 4) {
-                if !basket.basketState.items.isEmpty {
-                    Text("\(basket.basketState.items.count) item\(basket.basketState.items.count == 1 ? "" : "s")")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundStyle(AdaptiveColors.primaryTextAuto.opacity(0.92))
-                }
-
-                Text("Click to open")
-                    .font(.caption2)
-                    .fontWeight(isHovered ? .semibold : .regular)
-                    .foregroundStyle(AdaptiveColors.secondaryTextAuto.opacity(isHovered ? 0.95 : 0.8))
-            }
-            .padding(.bottom, 10)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         }
         .padding(.horizontal, 10)
         .frame(width: 160, height: 180)
@@ -350,7 +348,12 @@ struct BasketSwitcherCard: View {
     var body: some View {
         VStack(spacing: 0) {
             handleIndicator
-                .padding(.bottom, 8)
+                .padding(.bottom, 6)
+
+            if !basketState.items.isEmpty {
+                PeekFileCountHeader(items: basketState.items, style: .plain)
+                    .padding(.top, 2)
+            }
 
             VStack(spacing: 4) {
                 if basketState.items.isEmpty {
@@ -362,26 +365,10 @@ struct BasketSwitcherCard: View {
                         .foregroundStyle(isDropTargeted ? basket.accentColor.color : .secondary)
                 } else {
                     BasketStackPreviewView(items: basketState.items)
-                        .scaleEffect(0.85)
-                        .frame(width: 100, height: 70)
+                        .frame(width: 142, height: 104, alignment: .bottom)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-
-            VStack(spacing: 4) {
-                if !basketState.items.isEmpty {
-                    Text("\(basketState.items.count) item\(basketState.items.count == 1 ? "" : "s")")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundStyle(AdaptiveColors.primaryTextAuto.opacity(0.92))
-                }
-
-                Text(isDropTargeted ? "Release!" : "Drop here")
-                    .font(.caption2)
-                    .fontWeight(isDropTargeted ? .semibold : .regular)
-                    .foregroundStyle(AdaptiveColors.secondaryTextAuto.opacity(isDropTargeted ? 0.95 : (isHovered ? 0.85 : 0.72)))
-            }
-            .padding(.bottom, 10)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         }
         .padding(.horizontal, 10)
         .frame(width: 160, height: 180)
@@ -409,6 +396,10 @@ struct TrackedFolderSwitcherView: View {
     let onDismiss: () -> Void
     
     @State private var hoveredBasketIndex: Int? = nil
+
+    private var visibleBaskets: [FloatingBasketWindowController] {
+        baskets.filter { !$0.basketState.items.isEmpty }
+    }
     
     /// File info for display
     private var filePreviewText: String {
@@ -455,7 +446,7 @@ struct TrackedFolderSwitcherView: View {
                 
                 // Basket cards row
                 HStack(spacing: 20) {
-                    ForEach(Array(baskets.enumerated()), id: \.offset) { index, basket in
+                    ForEach(Array(visibleBaskets.enumerated()), id: \.offset) { index, basket in
                         TrackedFolderBasketCard(
                             basket: basket,
                             isHovered: hoveredBasketIndex == index,
@@ -517,7 +508,12 @@ private struct TrackedFolderBasketCard: View {
         Button(action: onSelect) {
             VStack(spacing: 0) {
                 handleIndicator
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 6)
+
+                if !basketState.items.isEmpty {
+                    PeekFileCountHeader(items: basketState.items, style: .plain)
+                        .padding(.top, 2)
+                }
                 
                 VStack(spacing: 4) {
                     if basketState.items.isEmpty {
@@ -529,25 +525,10 @@ private struct TrackedFolderBasketCard: View {
                             .foregroundStyle(.secondary)
                     } else {
                         BasketStackPreviewView(items: basketState.items)
-                            .scaleEffect(0.85)
-                            .frame(width: 100, height: 70)
+                            .frame(width: 142, height: 104, alignment: .bottom)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                
-                VStack(spacing: 4) {
-                    if !basketState.items.isEmpty {
-                        Text("\(basketState.items.count) item\(basketState.items.count == 1 ? "" : "s")")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundStyle(AdaptiveColors.primaryTextAuto.opacity(0.92))
-                    }
-
-                    Text("Tap to add here")
-                        .font(.caption2)
-                        .foregroundStyle(AdaptiveColors.secondaryTextAuto.opacity(isHovered ? 0.84 : 0.72))
-                }
-                .padding(.bottom, 10)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
             .padding(.horizontal, 10)
             .frame(width: 160, height: 180)
@@ -666,9 +647,16 @@ final class BasketSwitcherWindowController {
         }
         
         // Collect all basket controllers (shared + spawned), including hidden and empty baskets.
-        // Defensive fallback: if list is unexpectedly empty, still show the switcher with shared basket.
+        // If this is the untouched initial state (only shared basket and it's empty),
+        // hide that placeholder card and show only "New Basket".
         let allBaskets = FloatingBasketWindowController.allBaskets
-        let selectionBaskets = allBaskets.isEmpty ? [FloatingBasketWindowController.shared] : allBaskets
+        let selectionBaskets = allBaskets.filter { basket in
+            let isInitialEmptySharedOnly =
+                allBaskets.count == 1 &&
+                basket === FloatingBasketWindowController.shared &&
+                basket.basketState.items.isEmpty
+            return !isInitialEmptySharedOnly
+        }
 
         // Always show the switcher UI for this shortcut, even with one basket.
         // This keeps behavior aligned with the "Basket Switcher" naming and UX expectation.
@@ -824,8 +812,6 @@ final class BasketSwitcherWindowController {
     ///   - baskets: The baskets to display
     ///   - onSelectBasket: Callback when a basket is clicked
     func showForSelection(baskets: [FloatingBasketWindowController], onSelectBasket: @escaping (FloatingBasketWindowController) -> Void) {
-        guard !baskets.isEmpty else { return }
-        
         // Dismiss existing
         hide()
         

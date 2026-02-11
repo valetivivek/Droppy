@@ -72,5 +72,7 @@
 	<string>Droppy needs Calendar access to show upcoming events in your task overview.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Droppy needs full Calendar access to keep upcoming events synced in your task overview.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>Droppy may request write-only Calendar access for compatibility with Apple permission flows.</string>
 </dict>
 </plist>

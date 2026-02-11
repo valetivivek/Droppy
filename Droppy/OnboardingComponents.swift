@@ -185,6 +185,11 @@ struct OnboardingParticle: Identifiable {
 
 final class OnboardingWindowController: NSObject, NSWindowDelegate {
     static let shared = OnboardingWindowController()
+
+    enum ActivationMode {
+        case forceForeground
+        case onlyIfAlreadyActive
+    }
     
     private var window: NSWindow?
     
@@ -192,12 +197,14 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         super.init()
     }
     
-    func show() {
+    func show(activationMode: ActivationMode = .forceForeground) {
+        guard shouldPresentWindow(for: activationMode) else { return }
+
         // If window exists and is visible, just bring to front
         if let existingWindow = window {
             if existingWindow.isVisible {
                 existingWindow.makeKeyAndOrderFront(nil)
-                NSApp.activate(ignoringOtherApps: true)
+                activateIfAllowed(for: activationMode)
                 return
             } else {
                 // Window exists but not visible - clear it
@@ -261,7 +268,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         // Show window - use deferred makeKey to avoid NotchWindow conflicts
         newWindow.orderFront(nil)
         DispatchQueue.main.async {
-            NSApp.activate(ignoringOtherApps: true)
+            self.activateIfAllowed(for: activationMode)
             newWindow.makeKeyAndOrderFront(nil)
         }
         
@@ -320,5 +327,30 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         // Clear reference when window is closed via X button
         window = nil
+    }
+
+    private func shouldPresentWindow(for activationMode: ActivationMode) -> Bool {
+        switch activationMode {
+        case .forceForeground:
+            return true
+        case .onlyIfAlreadyActive:
+            return isDroppyFrontmostAndActive
+        }
+    }
+
+    private func activateIfAllowed(for activationMode: ActivationMode) {
+        switch activationMode {
+        case .forceForeground:
+            NSApp.activate(ignoringOtherApps: true)
+        case .onlyIfAlreadyActive:
+            guard isDroppyFrontmostAndActive else { return }
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
+    private var isDroppyFrontmostAndActive: Bool {
+        guard NSApp.isActive else { return false }
+        guard let frontmost = NSWorkspace.shared.frontmostApplication else { return false }
+        return frontmost.processIdentifier == ProcessInfo.processInfo.processIdentifier
     }
 }

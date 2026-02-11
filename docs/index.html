@@ -435,49 +435,49 @@
             color: var(--secondary);
         }
 
-        .headline .accent {
-            position: relative;
-            display: inline-block;
+        .headline .price-callout {
+            display: flex;
+            width: fit-content;
+            align-items: baseline;
+            gap: 0.34em;
+            margin: 14px auto 0;
+            padding: 8px 18px;
+            font-size: clamp(14px, 1.15vw, 18px);
+            font-weight: 500;
+            letter-spacing: 0.01em;
+            line-height: 1.1;
+            color: var(--secondary);
+            background: rgba(23, 23, 23, 0.95);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            white-space: nowrap;
         }
 
+        .headline .price-underline {
+            position: relative;
+            color: var(--primary);
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .headline .price-underline::after,
         .headline .accent::after {
             content: '';
             position: absolute;
-            left: 0;
-            bottom: 2px;
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(90deg, var(--primary) 0%, var(--primary) 100%);
-            transform: scaleX(0);
-            transform-origin: left;
-            animation: scribble 0.8s ease-out 1s forwards;
-            border-radius: 2px;
+            left: -0.02em;
+            right: -0.02em;
+            bottom: -0.22em;
+            height: 0.16em;
+            border-radius: 999px;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.98) 50%, rgba(147, 197, 253, 0.35) 100%);
         }
 
-        @keyframes scribble {
-            0% {
-                transform: scaleX(0) translateY(0);
-            }
-
-            20% {
-                transform: scaleX(0.3) translateY(1px);
-            }
-
-            40% {
-                transform: scaleX(0.5) translateY(-1px);
-            }
-
-            60% {
-                transform: scaleX(0.7) translateY(1px);
-            }
-
-            80% {
-                transform: scaleX(0.9) translateY(-0.5px);
-            }
-
-            100% {
-                transform: scaleX(1) translateY(0);
-            }
+        .headline .accent {
+            position: relative;
+            display: inline-block;
         }
 
         .video-box {
@@ -1259,7 +1259,9 @@
                     <img src="assets/images/droppy-icon-dark.png" alt="Droppy" class="logo">
                     <p class="headline"><span class="dim">The <span class="accent">native</span> productivity
                             layer</span>
-                        macOS is missing.</p>
+                        macOS is missing.
+                        <span class="price-callout">For only <span class="price-underline">6.99</span></span>
+                    </p>
                     <div class="video-box">
                         <video width="100%" autoplay loop muted playsinline controls>
                             <source

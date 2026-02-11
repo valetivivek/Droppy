@@ -18,8 +18,10 @@ class FilePromiseDropNSView: NSView {
     
     var onFilesReceived: (([URL]) -> Void)?
     var onTargetingChanged: ((Bool) -> Void)?
+    var onHoverChanged: ((Bool) -> Void)?
     
     private let filePromiseQueue = OperationQueue()
+    private var trackingArea: NSTrackingArea?
     
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -41,6 +43,33 @@ class FilePromiseDropNSView: NSView {
         types.append(contentsOf: NSFilePromiseReceiver.readableDraggedTypes.map { NSPasteboard.PasteboardType($0) })
         
         registerForDraggedTypes(types)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+
+        if let trackingArea {
+            removeTrackingArea(trackingArea)
+        }
+
+        let options: NSTrackingArea.Options = [
+            .mouseEnteredAndExited,
+            .activeAlways,
+            .inVisibleRect
+        ]
+        let newTrackingArea = NSTrackingArea(rect: .zero, options: options, owner: self, userInfo: nil)
+        addTrackingArea(newTrackingArea)
+        trackingArea = newTrackingArea
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        onHoverChanged?(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        onHoverChanged?(false)
     }
     
     // MARK: - NSDraggingDestination
@@ -131,23 +160,37 @@ class FilePromiseDropNSView: NSView {
     }
 }
 
+private final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
+}
+
 // MARK: - SwiftUI Representable
 
 /// SwiftUI wrapper for FilePromiseDropNSView
 struct FilePromiseDropTarget<Content: View>: NSViewRepresentable {
     let content: Content
     let onFilesReceived: ([URL]) -> Void
+    let onHoverChanged: ((Bool) -> Void)?
     @Binding var isTargeted: Bool
     
-    init(isTargeted: Binding<Bool>, onFilesReceived: @escaping ([URL]) -> Void, @ViewBuilder content: () -> Content) {
+    init(
+        isTargeted: Binding<Bool>,
+        onFilesReceived: @escaping ([URL]) -> Void,
+        onHoverChanged: ((Bool) -> Void)? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
         self._isTargeted = isTargeted
         self.onFilesReceived = onFilesReceived
+        self.onHoverChanged = onHoverChanged
         self.content = content()
     }
     
     func makeNSView(context: Context) -> NSView {
         let dropView = FilePromiseDropNSView()
         dropView.onFilesReceived = onFilesReceived
+        dropView.onHoverChanged = onHoverChanged
         dropView.onTargetingChanged = { targeted in
             DispatchQueue.main.async {
                 self.isTargeted = targeted
@@ -155,7 +198,7 @@ struct FilePromiseDropTarget<Content: View>: NSViewRepresentable {
         }
         
         // Embed SwiftUI content
-        let hostingView = NSHostingView(rootView: content)
+        let hostingView = PassthroughHostingView(rootView: content)
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         dropView.addSubview(hostingView)
         

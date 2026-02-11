@@ -89,19 +89,13 @@ final class BackgroundRemovalManager: ObservableObject {
         let tempDir = FileManager.default.temporaryDirectory
         let outputURL = tempDir.appendingPathComponent(UUID().uuidString + "_nobg.png")
         
-        // Find Python3
-        let pythonPaths = ["/usr/bin/python3", "/usr/local/bin/python3", "/opt/homebrew/bin/python3"]
-        var pythonPath: String?
-        for path in pythonPaths {
-            if FileManager.default.fileExists(atPath: path) {
-                pythonPath = path
-                break
-            }
-        }
-        
-        guard let python = pythonPath else {
+        // Use the same Python environment that has transparent-background installed.
+        guard let python = Self.findPythonWithTransparentBackground() else {
             throw BackgroundRemovalError.pythonNotInstalled
         }
+        
+        let escapedInputPath = Self.escapePythonPath(imageURL.path)
+        let escapedOutputPath = Self.escapePythonPath(outputURL.path)
         
         // Run transparent-background command
         let process = Process()
@@ -115,10 +109,10 @@ final class BackgroundRemovalManager: ObservableObject {
             import gc
             
             try:
-                img = Image.open('\(imageURL.path)').convert('RGB')
+                img = Image.open('\(escapedInputPath)').convert('RGB')
                 remover = Remover(mode='base')
                 result = remover.process(img, type='rgba')
-                result.save('\(outputURL.path)', 'PNG')
+                result.save('\(escapedOutputPath)', 'PNG')
                 
                 # Explicit memory cleanup - critical for large models
                 del remover
@@ -164,6 +158,62 @@ final class BackgroundRemovalManager: ObservableObject {
         
         return outputData
     }
+    
+    nonisolated private static func escapePythonPath(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+    }
+    
+    nonisolated private static func findPythonWithTransparentBackground() -> String? {
+        let pythonPaths = candidatePythonPaths()
+        for path in pythonPaths {
+            if isTransparentBackgroundInstalled(at: path) {
+                return path
+            }
+        }
+        return nil
+    }
+    
+    nonisolated private static func candidatePythonPaths() -> [String] {
+        var paths: [String] = []
+        
+        if let cachedPath = UserDefaults.standard.string(forKey: "aiBackgroundRemovalPythonPath") {
+            paths.append(cachedPath)
+        }
+        
+        paths.append(contentsOf: [
+            "/opt/homebrew/bin/python3",
+            "/usr/local/bin/python3",
+            "/Library/Frameworks/Python.framework/Versions/Current/bin/python3",
+            "/usr/bin/python3"
+        ])
+        
+        var seen: Set<String> = []
+        var unique: [String] = []
+        for path in paths {
+            guard FileManager.default.fileExists(atPath: path) else { continue }
+            if seen.insert(path).inserted {
+                unique.append(path)
+            }
+        }
+        
+        return unique
+    }
+    
+    nonisolated private static func isTransparentBackgroundInstalled(at pythonPath: String) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: pythonPath)
+        process.arguments = ["-c", "import transparent_background"]
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
 }
 
 // MARK: - Errors
@@ -179,7 +229,7 @@ enum BackgroundRemovalError: LocalizedError {
         case .failedToLoadImage:
             return "Failed to load image"
         case .pythonNotInstalled:
-            return "Python or transparent-background not installed. Run: pip3 install transparent-background"
+            return "AI package missing. Open Extensions > AI Background Removal and run Install."
         case .pythonScriptFailed(let message):
             return "Background removal failed: \(message)"
         case .extensionDisabled:

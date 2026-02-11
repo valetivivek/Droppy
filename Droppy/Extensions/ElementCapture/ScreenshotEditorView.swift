@@ -957,7 +957,8 @@ struct ScreenshotEditorView: View {
             return nil
         }
         
-        bitmap.size = originalImage.size
+        // Keep point-size metadata aligned with the actual rendered pixel buffer.
+        bitmap.size = renderSize
         
         guard let context = NSGraphicsContext(bitmapImageRep: bitmap) else {
             return nil
@@ -977,9 +978,18 @@ struct ScreenshotEditorView: View {
             originalImage.draw(in: renderRect, from: .zero, operation: .copy, fraction: 1.0)
         }
         
+        // Freeze the exact rendered base image for blur sampling so annotation sampling
+        // always uses the same coordinate space as the export bitmap.
+        let sourceImageForSampling: NSImage? = {
+            guard let snapshotRep = bitmap.copy() as? NSBitmapImageRep else { return nil }
+            let snapshot = NSImage(size: renderSize)
+            snapshot.addRepresentation(snapshotRep)
+            return snapshot
+        }()
+        
         // Draw annotations on top in the same pixel coordinate space.
         for annotation in annotations {
-            drawAnnotation(annotation, in: renderSize)
+            drawAnnotation(annotation, in: renderSize, sourceImage: sourceImageForSampling)
         }
         
         NSGraphicsContext.restoreGraphicsState()
@@ -987,6 +997,62 @@ struct ScreenshotEditorView: View {
     }
     
     private func resolvedSourceImage() -> (cgImage: CGImage?, size: NSSize) {
+        let expectedAspect: CGFloat? = {
+            guard originalImage.size.width > 0, originalImage.size.height > 0 else { return nil }
+            return originalImage.size.width / originalImage.size.height
+        }()
+        
+        typealias Candidate = (cgImage: CGImage?, width: Int, height: Int, aspectDelta: CGFloat)
+        var candidates: [Candidate] = []
+        
+        for representation in originalImage.representations {
+            let width: Int
+            let height: Int
+            let cgImage: CGImage?
+            
+            if let bitmapRep = representation as? NSBitmapImageRep {
+                width = max(bitmapRep.pixelsWide, Int(bitmapRep.size.width.rounded(.up)))
+                height = max(bitmapRep.pixelsHigh, Int(bitmapRep.size.height.rounded(.up)))
+                cgImage = bitmapRep.cgImage
+            } else if let ciRep = representation as? NSCIImageRep {
+                width = max(representation.pixelsWide, Int(representation.size.width.rounded(.up)))
+                height = max(representation.pixelsHigh, Int(representation.size.height.rounded(.up)))
+                cgImage = CIContext().createCGImage(ciRep.ciImage, from: ciRep.ciImage.extent)
+            } else {
+                width = max(representation.pixelsWide, Int(representation.size.width.rounded(.up)))
+                height = max(representation.pixelsHigh, Int(representation.size.height.rounded(.up)))
+                cgImage = nil
+            }
+            
+            guard width > 0, height > 0 else { continue }
+            
+            let aspect = CGFloat(width) / CGFloat(height)
+            let aspectDelta: CGFloat = {
+                guard let expectedAspect, expectedAspect > 0 else { return 0 }
+                return abs(aspect - expectedAspect) / expectedAspect
+            }()
+            
+            candidates.append((cgImage: cgImage, width: width, height: height, aspectDelta: aspectDelta))
+        }
+        
+        let isLessPreferred: (Candidate, Candidate) -> Bool = { lhs, rhs in
+            let lhsArea = Int64(lhs.width) * Int64(lhs.height)
+            let rhsArea = Int64(rhs.width) * Int64(rhs.height)
+            if lhsArea == rhsArea {
+                return lhs.aspectDelta > rhs.aspectDelta
+            }
+            return lhsArea < rhsArea
+        }
+        
+        let bestAspectMatch = candidates
+            .filter { $0.aspectDelta <= 0.03 } // Ignore cached reps with obviously wrong aspect.
+            .max(by: isLessPreferred)
+        let bestAnyAspect = candidates.max(by: isLessPreferred)
+        
+        if let candidate = bestAspectMatch ?? bestAnyAspect {
+            return (candidate.cgImage, NSSize(width: candidate.width, height: candidate.height))
+        }
+
         if let cgImage = originalImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             return (cgImage, NSSize(width: cgImage.width, height: cgImage.height))
         }
@@ -997,10 +1063,14 @@ struct ScreenshotEditorView: View {
             return (nil, NSSize(width: bitmapRep.pixelsWide, height: bitmapRep.pixelsHigh))
         }
         
-        return (nil, originalImage.size)
+        let fallbackSize = NSSize(
+            width: max(1, originalImage.size.width.rounded(.up)),
+            height: max(1, originalImage.size.height.rounded(.up))
+        )
+        return (nil, fallbackSize)
     }
     
-    private func drawAnnotation(_ annotation: Annotation, in size: NSSize) {
+    private func drawAnnotation(_ annotation: Annotation, in size: NSSize, sourceImage: NSImage?) {
         guard !annotation.points.isEmpty else { return }
         
         let nsColor = NSColor(annotation.color)
@@ -1072,6 +1142,7 @@ struct ScreenshotEditorView: View {
             // rect is already in image coordinates (rectFromPoints scales normalized to size)
             let rect = rectFromPoints(annotation.points[0], annotation.points.last ?? annotation.points[0], in: size)
             guard rect.width > 4 && rect.height > 4 else { return }
+            let blurSourceImage = sourceImage ?? originalImage
             
             // Use annotation's blur strength (lower = stronger pixelation)
             let pixelSize = Int(annotation.blurStrength)
@@ -1079,10 +1150,12 @@ struct ScreenshotEditorView: View {
             let tinyImage = NSImage(size: tinySize)
             tinyImage.lockFocus()
             NSGraphicsContext.current?.imageInterpolation = .none
-            originalImage.draw(in: NSRect(origin: .zero, size: tinySize),
-                              from: rect,  // rect is already in image coordinates
-                              operation: .copy,
-                              fraction: 1.0)
+            blurSourceImage.draw(
+                in: NSRect(origin: .zero, size: tinySize),
+                from: rect,  // rect is already in image coordinates
+                operation: .copy,
+                fraction: 1.0
+            )
             tinyImage.unlockFocus()
             
             // Draw the tiny image scaled back up (creates pixelation)

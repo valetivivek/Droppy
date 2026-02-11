@@ -57,6 +57,7 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKey.caffeineMode) private var caffeineModeRaw = PreferenceDefault.caffeineMode
     @AppStorage(AppPreferenceKey.cameraInstalled) private var isCameraInstalled = PreferenceDefault.cameraInstalled
     @AppStorage(AppPreferenceKey.cameraEnabled) private var enableCamera = PreferenceDefault.cameraEnabled
+    @AppStorage(AppPreferenceKey.cameraPreferredDeviceID) private var cameraPreferredDeviceID = PreferenceDefault.cameraPreferredDeviceID
     @AppStorage(AppPreferenceKey.enableLockScreenMediaWidget) private var enableLockScreenMediaWidget = PreferenceDefault.enableLockScreenMediaWidget
     @AppStorage(AppPreferenceKey.showMediaPlayer) private var showMediaPlayer = PreferenceDefault.showMediaPlayer
     @AppStorage(AppPreferenceKey.enableMouseSwipeMediaSwitch) private var enableMouseSwipeMediaSwitch = PreferenceDefault.enableMouseSwipeMediaSwitch
@@ -73,8 +74,8 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKey.autoCollapseDelay) private var autoCollapseDelay = PreferenceDefault.autoCollapseDelay
     @AppStorage(AppPreferenceKey.autoCollapseShelf) private var autoCollapseShelf = PreferenceDefault.autoCollapseShelf
     @AppStorage(AppPreferenceKey.autoExpandShelf) private var autoExpandShelf = PreferenceDefault.autoExpandShelf
+    @AppStorage(AppPreferenceKey.autoExpandOnMainMac) private var autoExpandOnMainMac = PreferenceDefault.autoExpandOnMainMac
     @AppStorage(AppPreferenceKey.autoExpandOnExternalDisplays) private var autoExpandOnExternalDisplays = PreferenceDefault.autoExpandOnExternalDisplays
-    @AppStorage(AppPreferenceKey.preventAutoExpandInMenuBar) private var preventAutoExpandInMenuBar = PreferenceDefault.preventAutoExpandInMenuBar
     @AppStorage(AppPreferenceKey.autoExpandDelay) private var autoExpandDelay = PreferenceDefault.autoExpandDelay
     @AppStorage(AppPreferenceKey.autoOpenMediaHUDOnShelfExpand) private var autoOpenMediaHUDOnShelfExpand = PreferenceDefault.autoOpenMediaHUDOnShelfExpand
     @AppStorage(AppPreferenceKey.autoHideOnFullscreen) private var autoHideOnFullscreen = PreferenceDefault.autoHideOnFullscreen
@@ -108,6 +109,7 @@ struct SettingsView: View {
     
     /// Extension to open from deep link (e.g., droppy://extension/ai-bg)
     @State private var deepLinkedExtension: ExtensionType?
+    @ObservedObject private var cameraManager = CameraManager.shared
     
     /// Detects if the BUILT-IN display has a physical notch
     /// Uses builtInWithNotch or isBuiltIn check - NOT main screen (which could be external)
@@ -245,6 +247,48 @@ struct SettingsView: View {
         case .both:
             return "Both"
         }
+    }
+
+    private var normalizedCameraPreferredDeviceID: String? {
+        let trimmed = cameraPreferredDeviceID.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private var isCameraPreferredDeviceMissing: Bool {
+        guard let selectedID = normalizedCameraPreferredDeviceID else { return false }
+        return !cameraManager.availableCameraDevices.contains(where: { $0.id == selectedID })
+    }
+
+    private func selectNotchfaceCamera(_ deviceID: String?) {
+        let normalized = deviceID?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        cameraPreferredDeviceID = normalized
+        cameraManager.setPreferredDeviceID(normalized.isEmpty ? nil : normalized)
+    }
+
+    private func cameraSourceTileLabel(for displayName: String) -> String {
+        if displayName.localizedCaseInsensitiveContains("iphone") {
+            return "iPhone"
+        }
+        if displayName.localizedCaseInsensitiveContains("facetime") {
+            return "FaceTime"
+        }
+
+        let cleaned = displayName
+            .replacingOccurrences(of: "Camera", with: "")
+            .replacingOccurrences(of: "camera", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if cleaned.count > 12 {
+            return String(cleaned.prefix(11)) + "…"
+        }
+        return cleaned.isEmpty ? "Camera" : cleaned
+    }
+
+    private var selectedNotchfaceCameraDisplayName: String {
+        guard let selectedID = normalizedCameraPreferredDeviceID else {
+            return "Auto (best available)"
+        }
+        return cameraManager.availableCameraDevices.first(where: { $0.id == selectedID })?.displayName ?? "Auto (best available)"
     }
     
     @ViewBuilder
@@ -1071,16 +1115,16 @@ struct SettingsView: View {
                             subtitle: "Fine-tune hover behavior for menu bar and external displays"
                         ) {
                             SettingsSegmentButtonWithContent(
-                                label: "Menu Bar Guard",
-                                isSelected: preventAutoExpandInMenuBar,
+                                label: "Main Mac Hover",
+                                isSelected: autoExpandOnMainMac,
                                 tileWidth: 128,
-                                action: { preventAutoExpandInMenuBar.toggle() }
+                                action: { autoExpandOnMainMac.toggle() }
                             ) {
-                                Image(systemName: "menubar.rectangle")
+                                Image(systemName: "laptopcomputer")
                                     .font(.system(size: 18, weight: .medium))
-                                    .foregroundStyle(preventAutoExpandInMenuBar ? Color.blue : AdaptiveColors.overlayAuto(0.5))
+                                    .foregroundStyle(autoExpandOnMainMac ? Color.blue : AdaptiveColors.overlayAuto(0.5))
                             }
-                            
+
                             SettingsSegmentButtonWithContent(
                                 label: "External Hover",
                                 isSelected: autoExpandOnExternalDisplays,
@@ -2572,6 +2616,68 @@ struct SettingsView: View {
                             }
                         }
                     }
+
+                    if enableCamera {
+                        HStack(alignment: .top, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 8) {
+                                    Text("Camera Source")
+                                    Button {
+                                        cameraManager.refreshAvailableDevices()
+                                    } label: {
+                                        Image(systemName: "arrow.clockwise")
+                                    }
+                                    .buttonStyle(DroppyCircleButtonStyle(size: 24))
+                                    .help("Refresh connected cameras")
+                                }
+
+                                Text("Choose which connected camera Notchface should use.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            HStack(alignment: .center, spacing: 8) {
+                                SettingsSegmentButton(
+                                    icon: "camera.metering.center.weighted",
+                                    label: "Auto",
+                                    isSelected: normalizedCameraPreferredDeviceID == nil,
+                                    tileWidth: 86
+                                ) {
+                                    selectNotchfaceCamera(nil)
+                                }
+
+                                ForEach(cameraManager.availableCameraDevices) { device in
+                                    SettingsSegmentButton(
+                                        icon: device.icon,
+                                        label: cameraSourceTileLabel(for: device.displayName),
+                                        isSelected: normalizedCameraPreferredDeviceID == device.id,
+                                        tileWidth: 86
+                                    ) {
+                                        selectNotchfaceCamera(device.id)
+                                    }
+                                }
+                            }
+                            .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .onAppear {
+                            cameraManager.refreshAvailableDevices()
+                        }
+
+                        if cameraManager.availableCameraDevices.isEmpty {
+                            Text("No connected cameras detected. Grant camera permission and connect a camera.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else if isCameraPreferredDeviceMissing {
+                            Text("Previously selected camera is not connected. Auto mode is being used.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Selected: \(selectedNotchfaceCameraDisplayName)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 } else {
                     Button {
                         NotificationCenter.default.post(
@@ -2720,7 +2826,7 @@ struct SettingsView: View {
                                 NSWorkspace.shared.open(URL(fileURLWithPath: workflowPath))
                             }
                         case .finder, .finderServices:
-                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings")!)
+                            _ = openFinderServicesSettings()
                         case .spotify:
                             SpotifyAuthManager.shared.startAuthentication()
                         case .appleMusic:

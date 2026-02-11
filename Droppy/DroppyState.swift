@@ -475,21 +475,22 @@ final class DroppyState {
         }
         
         if !regularItems.isEmpty {
-            // PERFORMANCE: Single animation block for all items
-                if isBulk {
-                    // For bulk: no animation, just append immediately
+            if isBulk {
+                // Keep bulk updates lightweight (no per-item transitions), but still animate
+                // container/layout growth so large drops don't visually "snap".
+                withAnimation(DroppyAnimation.itemInsertion) {
                     shelfItems.append(contentsOf: regularItems)
-                    triggerAutoExpand()
-                    
-                    // Clear bulk flag after a brief delay to allow UI to settle
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                        self?.isBulkAdding = false
-                        self?.isBulkUpdating = false
-                    }
-                } else {
-                    // For small adds: use animation
-                    withAnimation(DroppyAnimation.state) {
-                        shelfItems.append(contentsOf: regularItems)
+                }
+                triggerAutoExpand()
+
+                // Clear bulk flag after the insertion animation settles.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) { [weak self] in
+                    self?.isBulkAdding = false
+                    self?.isBulkUpdating = false
+                }
+            } else {
+                withAnimation(DroppyAnimation.state) {
+                    shelfItems.append(contentsOf: regularItems)
                 }
                 triggerAutoExpand()
             }
@@ -885,37 +886,50 @@ final class DroppyState {
     }
     
     /// Selects a range from the last anchor to this item (Shift+Click)
-    func selectRange(to item: DroppedItem) {
-        // If no anchor or anchor not in current items, treated as single select
-        guard let anchorId = lastSelectionAnchor,
-              let anchorIndex = items.firstIndex(where: { $0.id == anchorId }),
-              let targetIndex = items.firstIndex(where: { $0.id == item.id }) else {
+    /// - Parameter additive: when true (Cmd+Shift), unions with existing selection.
+    func selectRange(to item: DroppedItem, additive: Bool = false) {
+        let orderedItems = shelfPowerFolders + shelfItems
+        let targetIndex = orderedItems.firstIndex(where: { $0.id == item.id })
+        guard let targetIndex else {
             select(item)
             return
         }
+
+        // Finder-style fallback: if the explicit anchor is missing/stale, use the first
+        // currently selected item in visual order as the temporary range anchor.
+        let resolvedAnchorID: UUID? = {
+            if let anchor = lastSelectionAnchor,
+               orderedItems.contains(where: { $0.id == anchor }) {
+                return anchor
+            }
+            return orderedItems.first(where: { selectedItems.contains($0.id) })?.id
+        }()
+
+        guard let anchorID = resolvedAnchorID,
+              let anchorIndex = orderedItems.firstIndex(where: { $0.id == anchorID }) else {
+            select(item)
+            return
+        }
+
+        lastSelectionAnchor = anchorID
         
         let start = min(anchorIndex, targetIndex)
         let end = max(anchorIndex, targetIndex)
         
-        let rangeIds = items[start...end].map { $0.id }
-        
-        // Add range to existing selection (standard macOS behavior depends, but additive is common for Shift)
-        // Actually standard macOS behavior for Shift+Click in Finder:
-        // - If previous click was single select: extends selection from anchor to target
-        // - If previous was Cmd select: extends from anchor to target, preserving others? 
-        // Simplest effective behavior: Union the range with existing selection
-        selectedItems.formUnion(rangeIds)
-        
-        // NOTE: We do NOT update lastSelectionAnchor on Shift+Click usually, 
-        // allowing successive Shift+Clicks to modify the range from original anchor.
-        // But for simplicity here, let's keep the anchor as is or update it?
-        // Finder behavior: Click A (anchor=A). Shift-Click C (selects A-C). Shift-Click D (selects A-D).
-        // So anchor should remains A! So we do NOT update lastSelectionAnchor.
+        let rangeIds = orderedItems[start...end].map { $0.id }
+        if additive {
+            selectedItems.formUnion(rangeIds)
+        } else {
+            selectedItems = Set(rangeIds)
+        }
     }
     
     /// Selects all items
     func selectAll() {
         selectedItems = Set(items.map { $0.id })
+        if lastSelectionAnchor == nil {
+            lastSelectionAnchor = shelfPowerFolders.first?.id ?? shelfItems.first?.id
+        }
     }
     
     /// Deselects all items

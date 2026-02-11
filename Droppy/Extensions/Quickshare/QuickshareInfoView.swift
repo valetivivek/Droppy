@@ -10,6 +10,7 @@ import SwiftUI
 struct QuickshareInfoView: View {
     @AppStorage(AppPreferenceKey.showQuickshareInMenuBar) private var showInMenuBar = PreferenceDefault.showQuickshareInMenuBar
     @AppStorage(AppPreferenceKey.showQuickshareInSidebar) private var showInSidebar = PreferenceDefault.showQuickshareInSidebar
+    @AppStorage(AppPreferenceKey.quickshareRequireUploadConfirmation) private var requireUploadConfirmation = PreferenceDefault.quickshareRequireUploadConfirmation
     @AppStorage(AppPreferenceKey.useTransparentBackground) private var useTransparentBackground = PreferenceDefault.useTransparentBackground
     @Environment(\.dismiss) private var dismiss
     
@@ -205,6 +206,18 @@ struct QuickshareInfoView: View {
                     title: "Show in Settings Sidebar",
                     subtitle: "Quick access to file management from Settings",
                     binding: $showInSidebar
+                )
+                .padding(.horizontal, DroppySpacing.lg)
+
+                Divider()
+                    .padding(.horizontal, DroppySpacing.lg)
+                    .padding(.vertical, DroppySpacing.md)
+
+                quickshareToggleRow(
+                    icon: "checkmark.shield",
+                    title: "Require Upload Confirmation",
+                    subtitle: "Ask before uploading files to Quickshare",
+                    binding: $requireUploadConfirmation
                 )
                 .padding(.horizontal, DroppySpacing.lg)
                 .padding(.bottom, DroppySpacing.lg)

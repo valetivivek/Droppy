@@ -11,6 +11,585 @@ import AudioToolbox
 import Combine
 import CoreAudio
 import Foundation
+import IOKit
+import IOKit.graphics
+import IOKit.i2c
+
+private typealias VolumeIOAVServiceRef = CFTypeRef
+
+@_silgen_name("IOAVServiceCreateWithService")
+private func VolumeIOAVServiceCreateWithService(
+    _ allocator: CFAllocator?,
+    _ service: io_service_t
+) -> Unmanaged<CFTypeRef>?
+
+@_silgen_name("IOAVServiceReadI2C")
+private func VolumeIOAVServiceReadI2C(
+    _ service: VolumeIOAVServiceRef,
+    _ chipAddress: UInt32,
+    _ offset: UInt32,
+    _ outputBuffer: UnsafeMutableRawPointer?,
+    _ outputBufferSize: UInt32
+) -> IOReturn
+
+@_silgen_name("IOAVServiceWriteI2C")
+private func VolumeIOAVServiceWriteI2C(
+    _ service: VolumeIOAVServiceRef,
+    _ chipAddress: UInt32,
+    _ dataAddress: UInt32,
+    _ inputBuffer: UnsafeMutableRawPointer?,
+    _ inputBufferSize: UInt32
+) -> IOReturn
+
+@_silgen_name("CGSServiceForDisplayNumber")
+private func VolumeCGSServiceForDisplayNumber(
+    _ display: CGDirectDisplayID,
+    _ service: UnsafeMutablePointer<io_service_t>
+)
+
+private enum VolumeDisplayIOServiceResolver {
+    static func servicePort(for displayID: CGDirectDisplayID) -> io_service_t? {
+        guard displayID != 0 else { return nil }
+        
+        var cgsService: io_service_t = 0
+        VolumeCGSServiceForDisplayNumber(displayID, &cgsService)
+        if cgsService != 0 {
+            return cgsService
+        }
+        
+        return servicePortUsingDisplayPropertiesMatching(displayID: displayID)
+    }
+    
+    private static func servicePortUsingDisplayPropertiesMatching(displayID: CGDirectDisplayID) -> io_service_t? {
+        let vendorID = CGDisplayVendorNumber(displayID)
+        let productID = CGDisplayModelNumber(displayID)
+        let serialNumber = CGDisplaySerialNumber(displayID)
+        let unitNumber = CGDisplayUnitNumber(displayID)
+        
+        var iterator: io_iterator_t = 0
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IODisplayConnect"), &iterator) == kIOReturnSuccess else {
+            return nil
+        }
+        defer { IOObjectRelease(iterator) }
+        
+        while true {
+            let service = IOIteratorNext(iterator)
+            guard service != 0 else { break }
+            
+            if matches(
+                service: service,
+                vendorID: vendorID,
+                productID: productID,
+                serialNumber: serialNumber,
+                unitNumber: unitNumber
+            ) {
+                return service
+            }
+            
+            IOObjectRelease(service)
+        }
+        
+        return nil
+    }
+    
+    private static func matches(
+        service: io_service_t,
+        vendorID: UInt32,
+        productID: UInt32,
+        serialNumber: UInt32,
+        unitNumber: UInt32
+    ) -> Bool {
+        let dict = IODisplayCreateInfoDictionary(service, IOOptionBits(kIODisplayOnlyPreferredName)).takeRetainedValue() as NSDictionary
+        
+        let readUInt32: (CFString) -> UInt32 = { key in
+            if let value = dict[key] as? NSNumber {
+                return value.uint32Value
+            }
+            if let value = dict[key as String] as? NSNumber {
+                return value.uint32Value
+            }
+            return 0
+        }
+        
+        guard readUInt32(kDisplayVendorID as CFString) == vendorID else { return false }
+        guard readUInt32(kDisplayProductID as CFString) == productID else { return false }
+        
+        let serviceSerial = readUInt32(kDisplaySerialNumber as CFString)
+        if serialNumber != 0 && serviceSerial != 0 && serviceSerial != serialNumber {
+            return false
+        }
+        
+        if let location = dict[kIODisplayLocationKey] as? NSString ?? dict[kIODisplayLocationKey as String] as? NSString {
+            let regex = try? NSRegularExpression(pattern: "@([0-9]+)[^@]+$", options: [])
+            if let regex,
+               let match = regex.firstMatch(in: location as String, options: [], range: NSRange(location: 0, length: location.length)),
+               let range = Range(match.range(at: 1), in: location as String) {
+                let locationUnit = UInt32((location as String)[range]) ?? 0
+                if locationUnit != unitNumber {
+                    return false
+                }
+            }
+        }
+        
+        return true
+    }
+}
+
+private protocol ExternalVolumeTransport: AnyObject {
+    func isSupported() -> Bool
+    func readNormalizedVolume() -> Float32?
+    func writeNormalizedVolume(_ value: Float32) -> Bool
+}
+
+private final class ExternalDisplayDDCVolumeController: NSObject {
+    static let shared = ExternalDisplayDDCVolumeController()
+    
+    private var transports: [CGDirectDisplayID: ExternalVolumeTransport] = [:]
+    private let lock = NSLock()
+    
+    private override init() {
+        super.init()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleScreenParametersChanged),
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    func canControl(displayID: CGDirectDisplayID) -> Bool {
+        hasTransport(displayID: displayID)
+    }
+    
+    func hasTransport(displayID: CGDirectDisplayID) -> Bool {
+        transport(for: displayID) != nil
+    }
+    
+    func volume(displayID: CGDirectDisplayID) -> Float32? {
+        guard let transport = transport(for: displayID) else { return nil }
+        return transport.readNormalizedVolume()
+    }
+    
+    func setVolume(_ value: Float32, displayID: CGDirectDisplayID) -> Bool {
+        guard let transport = transport(for: displayID) else { return false }
+        return transport.writeNormalizedVolume(max(0, min(1, value)))
+    }
+    
+    @objc private func handleScreenParametersChanged() {
+        let activeDisplayIDs = Set(NSScreen.screens.map { $0.displayID })
+        lock.lock()
+        transports = transports.filter { activeDisplayIDs.contains($0.key) }
+        lock.unlock()
+    }
+    
+    private func transport(for displayID: CGDirectDisplayID) -> ExternalVolumeTransport? {
+        guard displayID != 0 else { return nil }
+        guard CGDisplayIsBuiltin(displayID) == 0 else { return nil }
+        
+        lock.lock()
+        if let existing = transports[displayID] {
+            lock.unlock()
+            return existing
+        }
+        lock.unlock()
+        
+        guard let discovered = discoverTransport(for: displayID) else {
+            return nil
+        }
+        
+        lock.lock()
+        transports[displayID] = discovered
+        lock.unlock()
+        return discovered
+    }
+    
+    private func discoverTransport(for displayID: CGDirectDisplayID) -> ExternalVolumeTransport? {
+        let framebuffer = VolumeDisplayIOServiceResolver.servicePort(for: displayID) ?? 0
+        
+        if framebuffer != 0 {
+            let i2cTransport = IntelI2CDDCCVolumeTransport(framebuffer: framebuffer)
+            if i2cTransport.isSupported() {
+                return i2cTransport
+            }
+        }
+        
+        if let avTransport = Arm64AVDDCCVolumeTransport(displayID: displayID),
+           avTransport.isSupported() {
+            return avTransport
+        }
+        
+        return nil
+    }
+}
+
+private final class IntelI2CDDCCVolumeTransport: ExternalVolumeTransport {
+    private static let vcpVolume: UInt8 = 0x62
+    private static let writeAddress: UInt32 = 0x6E
+    private static let readAddress: UInt32 = 0x6F
+    private static let replySubAddress: UInt8 = 0x51
+    private static let readRetries = 3
+    private static let writeCycles = 2
+    private static let writeSleep: useconds_t = 10000
+    
+    private let framebuffer: io_service_t
+    private var cachedMaxValue: UInt16 = 100
+    private var lastKnownCurrentValue: UInt16 = 100
+    
+    init(framebuffer: io_service_t) {
+        self.framebuffer = framebuffer
+    }
+    
+    func isSupported() -> Bool {
+        readVolumeRaw() != nil
+    }
+    
+    func readNormalizedVolume() -> Float32? {
+        if let values = readVolumeRaw() {
+            cachedMaxValue = max(1, values.max)
+            lastKnownCurrentValue = min(values.current, cachedMaxValue)
+            return normalize(lastKnownCurrentValue, maximum: cachedMaxValue)
+        }
+        
+        if cachedMaxValue > 0 {
+            return normalize(lastKnownCurrentValue, maximum: cachedMaxValue)
+        }
+        
+        return nil
+    }
+    
+    func writeNormalizedVolume(_ value: Float32) -> Bool {
+        let clamped = max(0, min(1, value))
+        
+        if let values = readVolumeRaw() {
+            cachedMaxValue = max(1, values.max)
+            lastKnownCurrentValue = min(values.current, cachedMaxValue)
+        }
+        
+        let target = UInt16(round(Float(cachedMaxValue) * Float(clamped)))
+        let didWrite = writeVolumeRaw(target, maxValue: cachedMaxValue)
+        if didWrite {
+            lastKnownCurrentValue = target
+        }
+        return didWrite
+    }
+    
+    private func normalize(_ current: UInt16, maximum: UInt16) -> Float32 {
+        guard maximum > 0 else { return 0 }
+        return Swift.max(0, Swift.min(1, Float32(current) / Float32(maximum)))
+    }
+    
+    private func readVolumeRaw() -> (current: UInt16, max: UInt16)? {
+        var requestData: [UInt8] = [0x51, 0x82, 0x01, Self.vcpVolume, 0]
+        requestData[4] = checksum(seed: UInt8(Self.writeAddress), data: requestData, upTo: 3)
+        
+        for transactionType in [IOOptionBits(kIOI2CDDCciReplyTransactionType), IOOptionBits(kIOI2CSimpleTransactionType)] {
+            for _ in 0..<Self.readRetries {
+                usleep(Self.writeSleep)
+                
+                var replyData = Array<UInt8>(repeating: 0, count: 11)
+                var request = IOI2CRequest()
+                request.commFlags = 0
+                request.sendAddress = Self.writeAddress
+                request.sendTransactionType = IOOptionBits(kIOI2CSimpleTransactionType)
+                request.sendBuffer = withUnsafeMutablePointer(to: &requestData[0]) { vm_address_t(bitPattern: $0) }
+                request.sendBytes = UInt32(requestData.count)
+                request.minReplyDelay = 10
+                request.replyAddress = Self.readAddress
+                request.replySubAddress = Self.replySubAddress
+                request.replyTransactionType = transactionType
+                request.replyBytes = UInt32(replyData.count)
+                request.replyBuffer = withUnsafeMutablePointer(to: &replyData[0]) { vm_address_t(bitPattern: $0) }
+                
+                guard Self.send(request: &request, framebuffer: framebuffer) else { continue }
+                guard validate(reply: replyData) else { continue }
+                
+                let maxValue = (UInt16(replyData[6]) << 8) | UInt16(replyData[7])
+                let currentValue = (UInt16(replyData[8]) << 8) | UInt16(replyData[9])
+                guard maxValue > 0 else { continue }
+                return (current: currentValue, max: maxValue)
+            }
+        }
+        
+        return nil
+    }
+    
+    private func writeVolumeRaw(_ current: UInt16, maxValue: UInt16) -> Bool {
+        let value = min(current, maxValue)
+        var data: [UInt8] = [
+            0x51,
+            0x84,
+            0x03,
+            Self.vcpVolume,
+            UInt8(value >> 8),
+            UInt8(value & 0xFF),
+            0
+        ]
+        data[6] = checksum(seed: UInt8(Self.writeAddress), data: data, upTo: 5)
+        
+        var wroteOnce = false
+        for _ in 0..<Self.writeCycles {
+            usleep(Self.writeSleep)
+            
+            var request = IOI2CRequest()
+            request.commFlags = 0
+            request.sendAddress = Self.writeAddress
+            request.sendTransactionType = IOOptionBits(kIOI2CSimpleTransactionType)
+            request.sendBuffer = withUnsafeMutablePointer(to: &data[0]) { vm_address_t(bitPattern: $0) }
+            request.sendBytes = UInt32(data.count)
+            request.replyTransactionType = IOOptionBits(kIOI2CNoTransactionType)
+            request.replyBytes = 0
+            
+            if Self.send(request: &request, framebuffer: framebuffer) {
+                wroteOnce = true
+            }
+        }
+        
+        return wroteOnce
+    }
+    
+    private func validate(reply: [UInt8]) -> Bool {
+        guard reply.count >= 11 else { return false }
+        guard reply[2] == 0x02 else { return false }
+        guard reply[3] == 0x00 else { return false }
+        
+        var calculatedChecksum: UInt8 = 0x50
+        for i in 0..<10 {
+            calculatedChecksum ^= reply[i]
+        }
+        return calculatedChecksum == reply[10]
+    }
+    
+    private func checksum(seed: UInt8, data: [UInt8], upTo: Int) -> UInt8 {
+        guard !data.isEmpty else { return seed }
+        var value = seed
+        for index in 0...upTo {
+            value ^= data[index]
+        }
+        return value
+    }
+    
+    private static func send(request: inout IOI2CRequest, framebuffer: io_service_t) -> Bool {
+        var busCount: IOItemCount = 0
+        guard IOFBGetI2CInterfaceCount(framebuffer, &busCount) == kIOReturnSuccess else { return false }
+        
+        for bus in 0..<busCount {
+            var interface: io_service_t = 0
+            guard IOFBCopyI2CInterfaceForBus(framebuffer, IOOptionBits(bus), &interface) == kIOReturnSuccess else {
+                continue
+            }
+            defer { IOObjectRelease(interface) }
+            
+            var connect: IOI2CConnectRef?
+            guard IOI2CInterfaceOpen(interface, 0, &connect) == kIOReturnSuccess,
+                  let openedConnect = connect else {
+                continue
+            }
+            defer { _ = IOI2CInterfaceClose(openedConnect, 0) }
+            
+            guard IOI2CSendRequest(openedConnect, 0, &request) == kIOReturnSuccess else { continue }
+            guard request.result == kIOReturnSuccess else { continue }
+            return true
+        }
+        
+        return false
+    }
+}
+
+private final class Arm64AVDDCCVolumeTransport: ExternalVolumeTransport {
+    private static let ddcChipAddress: UInt8 = 0x37
+    private static let ddcDataAddress: UInt8 = 0x51
+    private static let volumeVCP: UInt8 = 0x62
+    private static let readReplyLength = 11
+    private static let writeSleep: useconds_t = 10000
+    private static let readSleep: useconds_t = 50000
+    private static let retrySleep: useconds_t = 20000
+    private static let retries = 4
+    private static let writeCycles = 2
+    
+    private let service: VolumeIOAVServiceRef
+    private var cachedMaxValue: UInt16 = 100
+    private var lastKnownCurrentValue: UInt16 = 100
+    
+    init?(displayID: CGDirectDisplayID) {
+        guard let service = Self.createService(displayID: displayID) else { return nil }
+        self.service = service
+    }
+    
+    func isSupported() -> Bool {
+        readVolumeRaw() != nil
+    }
+    
+    func readNormalizedVolume() -> Float32? {
+        if let values = readVolumeRaw() {
+            cachedMaxValue = max(1, values.max)
+            lastKnownCurrentValue = min(values.current, cachedMaxValue)
+            return normalize(lastKnownCurrentValue, maximum: cachedMaxValue)
+        }
+        
+        if cachedMaxValue > 0 {
+            return normalize(lastKnownCurrentValue, maximum: cachedMaxValue)
+        }
+        
+        return nil
+    }
+    
+    func writeNormalizedVolume(_ value: Float32) -> Bool {
+        let clamped = max(0, min(1, value))
+        
+        if let values = readVolumeRaw() {
+            cachedMaxValue = max(1, values.max)
+            lastKnownCurrentValue = min(values.current, cachedMaxValue)
+        }
+        
+        let target = UInt16(round(Float(cachedMaxValue) * Float(clamped)))
+        let didWrite = writeVolumeRaw(target, maxValue: cachedMaxValue)
+        if didWrite {
+            lastKnownCurrentValue = target
+        }
+        return didWrite
+    }
+    
+    private func normalize(_ current: UInt16, maximum: UInt16) -> Float32 {
+        guard maximum > 0 else { return 0 }
+        return Swift.max(0, Swift.min(1, Float32(current) / Float32(maximum)))
+    }
+    
+    private func readVolumeRaw() -> (current: UInt16, max: UInt16)? {
+        var reply = Array<UInt8>(repeating: 0, count: Self.readReplyLength)
+        
+        for _ in 0..<Self.retries {
+            var readCommandPacket = Self.makePacket(sendData: [Self.volumeVCP])
+            let writeResult = readCommandPacket.withUnsafeMutableBytes { bytes -> IOReturn in
+                VolumeIOAVServiceWriteI2C(
+                    service,
+                    UInt32(Self.ddcChipAddress),
+                    UInt32(Self.ddcDataAddress),
+                    bytes.baseAddress,
+                    UInt32(bytes.count)
+                )
+            }
+            guard writeResult == kIOReturnSuccess else {
+                usleep(Self.retrySleep)
+                continue
+            }
+            
+            usleep(Self.readSleep)
+            let readResult = reply.withUnsafeMutableBytes { bytes -> IOReturn in
+                VolumeIOAVServiceReadI2C(
+                    service,
+                    UInt32(Self.ddcChipAddress),
+                    0,
+                    bytes.baseAddress,
+                    UInt32(bytes.count)
+                )
+            }
+            guard readResult == kIOReturnSuccess else {
+                usleep(Self.retrySleep)
+                continue
+            }
+            guard validate(reply: reply) else {
+                usleep(Self.retrySleep)
+                continue
+            }
+            
+            let maxValue = (UInt16(reply[6]) << 8) | UInt16(reply[7])
+            let currentValue = (UInt16(reply[8]) << 8) | UInt16(reply[9])
+            guard maxValue > 0 else {
+                usleep(Self.retrySleep)
+                continue
+            }
+            
+            return (current: currentValue, max: maxValue)
+        }
+        
+        return nil
+    }
+    
+    private func writeVolumeRaw(_ current: UInt16, maxValue: UInt16) -> Bool {
+        let value = min(current, maxValue)
+        let payload: [UInt8] = [Self.volumeVCP, UInt8(value >> 8), UInt8(value & 0xFF)]
+        
+        for _ in 0..<Self.retries {
+            var wroteAny = false
+            for _ in 0..<Self.writeCycles {
+                usleep(Self.writeSleep)
+                var packet = Self.makePacket(sendData: payload)
+                let result = packet.withUnsafeMutableBytes { bytes -> IOReturn in
+                    VolumeIOAVServiceWriteI2C(
+                        service,
+                        UInt32(Self.ddcChipAddress),
+                        UInt32(Self.ddcDataAddress),
+                        bytes.baseAddress,
+                        UInt32(bytes.count)
+                    )
+                }
+                if result == kIOReturnSuccess {
+                    wroteAny = true
+                }
+            }
+            
+            if wroteAny {
+                return true
+            }
+            
+            usleep(Self.retrySleep)
+        }
+        
+        return false
+    }
+    
+    private static func makePacket(sendData: [UInt8]) -> [UInt8] {
+        var packet: [UInt8] = [UInt8(0x80 | (sendData.count + 1)), UInt8(sendData.count)]
+        packet.append(contentsOf: sendData)
+        packet.append(0)
+        
+        let seed: UInt8 = sendData.count == 1
+            ? (ddcChipAddress << 1)
+            : ((ddcChipAddress << 1) ^ ddcDataAddress)
+        packet[packet.count - 1] = checksum(seed: seed, data: packet, upTo: packet.count - 2)
+        return packet
+    }
+    
+    private static func checksum(seed: UInt8, data: [UInt8], upTo: Int) -> UInt8 {
+        guard !data.isEmpty else { return seed }
+        var value = seed
+        for i in 0...upTo {
+            value ^= data[i]
+        }
+        return value
+    }
+    
+    private func validate(reply: [UInt8]) -> Bool {
+        guard reply.count >= Self.readReplyLength else { return false }
+        guard reply[2] == 0x02 else { return false }
+        guard reply[3] == 0x00 else { return false }
+        
+        let expected = Self.checksum(seed: 0x50, data: reply, upTo: reply.count - 2)
+        return expected == reply[reply.count - 1]
+    }
+    
+    private static func createService(displayID: CGDirectDisplayID) -> VolumeIOAVServiceRef? {
+        var cgsService: io_service_t = 0
+        VolumeCGSServiceForDisplayNumber(displayID, &cgsService)
+        
+        if cgsService != 0,
+           let avService = VolumeIOAVServiceCreateWithService(kCFAllocatorDefault, cgsService)?.takeRetainedValue() {
+            return avService
+        }
+        
+        guard let framebuffer = VolumeDisplayIOServiceResolver.servicePort(for: displayID),
+              framebuffer != 0,
+              let avService = VolumeIOAVServiceCreateWithService(kCFAllocatorDefault, framebuffer)?.takeRetainedValue() else {
+            return nil
+        }
+        
+        return avService
+    }
+}
 
 /// Manages system volume using CoreAudio APIs
 /// Provides real-time volume monitoring and control with auto-hide HUD timing
@@ -37,7 +616,9 @@ final class VolumeManager: NSObject, ObservableObject {
     // MARK: - Private State
     private var didInitialFetch = false
     private var previousVolumeBeforeMute: Float32 = 0.2
+    private var previousExternalVolumeBeforeMute: [CGDirectDisplayID: Float32] = [:]
     private var softwareMuted: Bool = false
+    private let externalHardwareVolumeController = ExternalDisplayDDCVolumeController.shared
     
     // osascript debouncing - coalesce rapid volume changes to avoid delay
     private var osascriptWorkItem: DispatchWorkItem?
@@ -90,7 +671,8 @@ final class VolumeManager: NSObject, ObservableObject {
     @MainActor func increase(stepDivisor: Float = 1.0, screenHint: NSScreen? = nil) {
         let divisor = max(stepDivisor, 0.25)
         let delta = step / Float32(divisor)
-        let current = readVolumeInternal() ?? rawVolume
+        let targetDisplayID = resolveHUDTargetDisplayID(screenHint: screenHint)
+        let current = targetDisplayID.flatMap { volumeForExternalTarget(displayID: $0) } ?? readVolumeInternal() ?? rawVolume
         let target = max(0, min(1, current + delta))
         setAbsolute(target, screenHint: screenHint)
     }
@@ -99,7 +681,8 @@ final class VolumeManager: NSObject, ObservableObject {
     @MainActor func decrease(stepDivisor: Float = 1.0, screenHint: NSScreen? = nil) {
         let divisor = max(stepDivisor, 0.25)
         let delta = step / Float32(divisor)
-        let current = readVolumeInternal() ?? rawVolume
+        let targetDisplayID = resolveHUDTargetDisplayID(screenHint: screenHint)
+        let current = targetDisplayID.flatMap { volumeForExternalTarget(displayID: $0) } ?? readVolumeInternal() ?? rawVolume
         let target = max(0, min(1, current - delta))
         setAbsolute(target, screenHint: screenHint)
     }
@@ -109,6 +692,10 @@ final class VolumeManager: NSObject, ObservableObject {
         let deviceID = systemOutputDeviceID()
         let targetDisplayID = resolveHUDTargetDisplayID(screenHint: screenHint)
         refreshOutputDeviceInfo(deviceID: deviceID)
+        
+        if let targetDisplayID, toggleExternalMute(displayID: targetDisplayID) {
+            return
+        }
         
         if deviceID == kAudioObjectUnknown {
             // Software mute fallback
@@ -121,6 +708,11 @@ final class VolumeManager: NSObject, ObservableObject {
     
     /// Refresh volume from system
     func refresh() {
+        if let targetDisplayID = resolveHUDTargetDisplayID(),
+           let externalVolume = volumeForExternalTarget(displayID: targetDisplayID) {
+            publish(volume: externalVolume, muted: externalVolume <= 0.001, touchDate: false, displayID: targetDisplayID)
+            return
+        }
         fetchCurrentVolume()
     }
     
@@ -129,9 +721,29 @@ final class VolumeManager: NSObject, ObservableObject {
         let clamped = max(0, min(1, value))
         let deviceID = systemOutputDeviceID()
         refreshOutputDeviceInfo(deviceID: deviceID)
+        let targetDisplayID = resolveHUDTargetDisplayID(screenHint: screenHint)
+        
+        if let targetDisplayID,
+           shouldAttemptExternalHardwareVolume(displayID: targetDisplayID) {
+            let previousVolume = volumeForExternalTarget(displayID: targetDisplayID) ?? rawVolume
+            let wasEffectivelyMuted = previousVolume < 0.01
+            let isNowAudible = clamped >= step * 0.5
+            
+            if externalHardwareVolumeController.setVolume(clamped, displayID: targetDisplayID) {
+                if clamped > 0.001 {
+                    previousExternalVolumeBeforeMute[targetDisplayID] = clamped
+                }
+                publish(volume: clamped, muted: clamped <= 0.001, touchDate: true, displayID: targetDisplayID)
+                
+                if wasEffectivelyMuted && isNowAudible {
+                    HapticFeedback.toggle()
+                }
+                return
+            }
+        }
+        
         let currentlyMuted = isMutedInternal()
         let previousVolume = rawVolume
-        let targetDisplayID = resolveHUDTargetDisplayID(screenHint: screenHint)
         
         // Detect "unmute" transition: going from 0 (or muted) to first audible step
         let wasEffectivelyMuted = currentlyMuted || previousVolume < 0.01
@@ -697,6 +1309,43 @@ final class VolumeManager: NSObject, ObservableObject {
         }
 
         return nil
+    }
+    
+    private func shouldAttemptExternalHardwareVolume(displayID: CGDirectDisplayID) -> Bool {
+        guard displayID != 0 else { return false }
+        guard CGDisplayIsBuiltin(displayID) == 0 else { return false }
+        return externalHardwareVolumeController.hasTransport(displayID: displayID)
+    }
+    
+    private func volumeForExternalTarget(displayID: CGDirectDisplayID) -> Float32? {
+        guard shouldAttemptExternalHardwareVolume(displayID: displayID) else { return nil }
+        guard let externalVolume = externalHardwareVolumeController.volume(displayID: displayID) else { return nil }
+        return max(0, min(1, externalVolume))
+    }
+    
+    @MainActor
+    private func toggleExternalMute(displayID: CGDirectDisplayID) -> Bool {
+        guard shouldAttemptExternalHardwareVolume(displayID: displayID) else { return false }
+        guard let currentVolume = volumeForExternalTarget(displayID: displayID) else { return false }
+        
+        if currentVolume > 0.001 {
+            previousExternalVolumeBeforeMute[displayID] = currentVolume
+            if externalHardwareVolumeController.setVolume(0, displayID: displayID) {
+                publish(volume: 0, muted: true, touchDate: true, displayID: displayID)
+                return true
+            }
+            return false
+        }
+        
+        let restoreVolume = max(
+            step,
+            min(1, previousExternalVolumeBeforeMute[displayID] ?? previousVolumeBeforeMute)
+        )
+        guard externalHardwareVolumeController.setVolume(restoreVolume, displayID: displayID) else {
+            return false
+        }
+        publish(volume: restoreVolume, muted: false, touchDate: true, displayID: displayID)
+        return true
     }
     
     private func resolveHUDTargetDisplayID(screenHint: NSScreen? = nil) -> CGDirectDisplayID? {

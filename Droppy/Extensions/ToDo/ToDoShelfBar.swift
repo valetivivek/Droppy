@@ -75,7 +75,7 @@ struct ToDoShelfBar: View {
                         manager.restoreLastDeletedItem()
                     },
                     onDismiss: {
-                        withAnimation {
+                        withAnimation(DroppyAnimation.viewChange) {
                             manager.showUndoToast = false
                         }
                     },
@@ -90,7 +90,7 @@ struct ToDoShelfBar: View {
                 ToDoCleanupToast(
                     count: manager.cleanupCount,
                     onDismiss: {
-                        withAnimation(.smooth(duration: 0.25)) {
+                        withAnimation(DroppyAnimation.smooth(duration: 0.25)) {
                             manager.showCleanupToast = false
                         }
                     },
@@ -100,10 +100,10 @@ struct ToDoShelfBar: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .animation(.smooth(duration: 0.35), value: isListExpanded)
-        .animation(.smooth(duration: 0.35), value: manager.items.count)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: manager.showUndoToast)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: manager.showCleanupToast)
+        .animation(DroppyAnimation.smoothContent, value: isListExpanded)
+        .animation(DroppyAnimation.smoothContent, value: manager.items.count)
+        .animation(DroppyAnimation.transition, value: manager.showUndoToast)
+        .animation(DroppyAnimation.transition, value: manager.showCleanupToast)
         .onAppear {
             if manager.isRemindersSyncEnabled || manager.isCalendarSyncEnabled {
                 manager.syncExternalSourcesNow()
@@ -299,7 +299,7 @@ struct ToDoShelfBar: View {
             // so physical-notch layouts stay top-pinned without a one-frame top gap.
             manager.isShelfListExpanded = nextExpanded
             NotchWindowController.shared.forceRecalculateAllWindowSizes()
-            withAnimation(.smooth(duration: 0.35)) {
+            withAnimation(DroppyAnimation.smoothContent) {
                 isListExpanded = nextExpanded
             }
             // Apply once more on the next runloop tick to catch any deferred layout pass.
@@ -360,80 +360,10 @@ struct ToDoShelfBar: View {
                 // Empty state with notch clearance built-in
                 emptyState
                     .padding(.top, emptyStateTopPadding)
+            } else if useSplitTaskCalendarLayout {
+                splitTaskCalendarList
             } else {
-                ScrollView(.vertical, showsIndicators: false) {
-                    // CRITICAL FIX: Use VStack instead of LazyVStack to prevent NSGenericException layout loops during drag
-                    VStack(alignment: .leading, spacing: 1) {
-                        if !overviewTaskItems.isEmpty {
-                            ForEach(Array(overviewTaskItems.enumerated()), id: \.element.id) { index, item in
-                                TaskRow(
-                                    item: item,
-                                    manager: manager,
-                                    reminderListOptions: reminderListMenuOptions,
-                                    useAdaptiveForegrounds: useAdaptiveForegrounds
-                                )
-                                    .id("\(item.id)-\(item.isCompleted)-\(item.priority.rawValue)")
-
-                                if index < overviewTaskItems.count - 1 {
-                                    Divider()
-                                        .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.06) : Color.white.opacity(0.06))
-                                        .padding(.horizontal, 24)
-                                }
-                            }
-                        }
-
-                        if !upcomingCalendarItems.isEmpty {
-                            if !overviewTaskItems.isEmpty {
-                                Divider()
-                                    .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.08) : Color.white.opacity(0.08))
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 4)
-                            }
-
-                            HStack(spacing: 6) {
-                                Image(systemName: "calendar.badge.clock")
-                                    .font(.system(size: 10, weight: .semibold))
-                                Text("Upcoming Events")
-                                    .font(.system(size: 10, weight: .semibold))
-                                Spacer(minLength: 0)
-                            }
-                            .foregroundStyle(
-                                useAdaptiveForegrounds
-                                    ? AdaptiveColors.secondaryTextAuto.opacity(0.85)
-                                    : .white.opacity(0.72)
-                            )
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 4)
-
-                            ForEach(Array(upcomingCalendarItems.enumerated()), id: \.element.id) { index, item in
-                                TaskRow(
-                                    item: item,
-                                    manager: manager,
-                                    reminderListOptions: reminderListMenuOptions,
-                                    useAdaptiveForegrounds: useAdaptiveForegrounds
-                                )
-                                    .id("\(item.id)-\(item.isCompleted)-\(item.priority.rawValue)")
-
-                                if index < upcomingCalendarItems.count - 1 {
-                                    Divider()
-                                        .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.06) : Color.white.opacity(0.06))
-                                        .padding(.horizontal, 24)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.top, Layout.listTopPadding)
-                    .padding(.bottom, Layout.listBottomPadding)
-                    .padding(.horizontal, Layout.listHorizontalPadding)
-                }
-                .frame(height: Layout.listHeight)
-                .clipShape(Rectangle())
-                .overlay(alignment: .bottom) {
-                    if showsBottomListScrim {
-                        bottomListScrim
-                            .transition(.opacity)
-                    }
-                }
+                combinedTaskCalendarList
             }
 
             // Spacer between list and input bar
@@ -441,6 +371,172 @@ struct ToDoShelfBar: View {
                 .frame(height: manager.items.isEmpty ? Layout.emptyListBottomSpacing : Layout.listBottomSpacing)
         }
         .frame(maxWidth: .infinity, alignment: .top)
+    }
+
+    private var combinedTaskCalendarList: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            // CRITICAL FIX: Use VStack instead of LazyVStack to prevent NSGenericException layout loops during drag
+            VStack(alignment: .leading, spacing: 1) {
+                if !overviewTaskItems.isEmpty {
+                    ForEach(Array(overviewTaskItems.enumerated()), id: \.element.id) { index, item in
+                        TaskRow(
+                            item: item,
+                            manager: manager,
+                            reminderListOptions: reminderListMenuOptions,
+                            useAdaptiveForegrounds: useAdaptiveForegrounds
+                        )
+                            .id("\(item.id)-\(item.isCompleted)-\(item.priority.rawValue)")
+
+                        if index < overviewTaskItems.count - 1 {
+                            Divider()
+                                .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.06) : Color.white.opacity(0.06))
+                                .padding(.horizontal, 24)
+                        }
+                    }
+                }
+
+                if !upcomingCalendarItems.isEmpty {
+                    if !overviewTaskItems.isEmpty {
+                        Divider()
+                            .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.08) : Color.white.opacity(0.08))
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 4)
+                    }
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("Upcoming Events")
+                            .font(.system(size: 10, weight: .semibold))
+                        Spacer(minLength: 0)
+                    }
+                    .foregroundStyle(
+                        useAdaptiveForegrounds
+                            ? AdaptiveColors.secondaryTextAuto.opacity(0.85)
+                            : .white.opacity(0.72)
+                    )
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 4)
+
+                    ForEach(Array(upcomingCalendarItems.enumerated()), id: \.element.id) { index, item in
+                        TaskRow(
+                            item: item,
+                            manager: manager,
+                            reminderListOptions: reminderListMenuOptions,
+                            useAdaptiveForegrounds: useAdaptiveForegrounds
+                        )
+                            .id("\(item.id)-\(item.isCompleted)-\(item.priority.rawValue)")
+
+                        if index < upcomingCalendarItems.count - 1 {
+                            Divider()
+                                .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.06) : Color.white.opacity(0.06))
+                                .padding(.horizontal, 24)
+                        }
+                    }
+                }
+            }
+            .padding(.top, Layout.listTopPadding)
+            .padding(.bottom, Layout.listBottomPadding)
+            .padding(.horizontal, Layout.listHorizontalPadding)
+        }
+        .frame(height: Layout.listHeight)
+        .clipShape(Rectangle())
+        .overlay(alignment: .bottom) {
+            if showsBottomListScrim {
+                bottomListScrim
+                    .transition(.opacity)
+            }
+        }
+    }
+
+    private var splitTaskCalendarList: some View {
+        HStack(spacing: 0) {
+            splitListColumn(
+                title: "Tasks",
+                systemImage: "checklist",
+                items: overviewTaskItems,
+                emptyText: String(localized: "no_tasks_yet")
+            )
+
+            Divider()
+                .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.12) : Color.white.opacity(0.12))
+                .frame(maxHeight: .infinity)
+                .padding(.vertical, 8)
+
+            splitListColumn(
+                title: "Upcoming Events",
+                systemImage: "calendar.badge.clock",
+                items: upcomingCalendarItems,
+                emptyText: "No upcoming events"
+            )
+        }
+        .frame(height: Layout.listHeight)
+        .clipShape(Rectangle())
+    }
+
+    private func splitListColumn(
+        title: String,
+        systemImage: String,
+        items: [ToDoItem],
+        emptyText: String
+    ) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 10, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold))
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(
+                useAdaptiveForegrounds
+                    ? AdaptiveColors.secondaryTextAuto.opacity(0.85)
+                    : .white.opacity(0.72)
+            )
+            .padding(.horizontal, 18)
+            .padding(.top, 8)
+            .padding(.bottom, 6)
+
+            Divider()
+                .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.08) : Color.white.opacity(0.08))
+                .padding(.horizontal, 14)
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 1) {
+                    if items.isEmpty {
+                        Text(emptyText)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(
+                                useAdaptiveForegrounds
+                                    ? AdaptiveColors.secondaryTextAuto.opacity(0.65)
+                                    : .white.opacity(0.4)
+                            )
+                            .padding(.horizontal, 18)
+                            .padding(.top, 14)
+                    } else {
+                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                            TaskRow(
+                                item: item,
+                                manager: manager,
+                                reminderListOptions: reminderListMenuOptions,
+                                useAdaptiveForegrounds: useAdaptiveForegrounds
+                            )
+                            .id("\(item.id)-\(item.isCompleted)-\(item.priority.rawValue)")
+
+                            if index < items.count - 1 {
+                                Divider()
+                                    .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.06) : Color.white.opacity(0.06))
+                                    .padding(.horizontal, 20)
+                            }
+                        }
+                    }
+                }
+                .padding(.top, 6)
+                .padding(.bottom, Layout.listBottomPadding)
+                .padding(.horizontal, Layout.listHorizontalPadding)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var emptyState: some View {
@@ -1134,6 +1230,7 @@ private struct TaskRow: View {
     let reminderListOptions: [ToDoReminderListOption]
     let useAdaptiveForegrounds: Bool
     @State private var isHovering = false
+    @State private var isShowingInfoPopover = false
     @State private var isEditing = false
     @State private var editText = ""
     @State private var editDueDate: Date?
@@ -1242,6 +1339,8 @@ private struct TaskRow: View {
                         Image(systemName: "bell.fill")
                     }
                     Text(formattedDueDateText(dueDate))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(
@@ -1301,17 +1400,44 @@ private struct TaskRow: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(
                     isCalendarEvent
-                        ? calendarEventTint.opacity(isHovering ? 0.16 : 0.1)
+                        ? calendarEventTint.opacity(isHovering ? 0.065 : 0.035)
                         : (isHovering
                             ? (useAdaptiveForegrounds ? AdaptiveColors.hoverBackgroundAuto.opacity(0.65) : Color.white.opacity(0.12))
                             : Color.clear)
                 )
+                .overlay {
+                    if isCalendarEvent {
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(calendarEventTint.opacity(isHovering ? 0.14 : 0.08), lineWidth: 0.8)
+                    }
+                }
         )
         .onHover { hovering in
             if hovering { HapticFeedback.hover() }
             isHovering = hovering
         }
+        .onTapGesture(count: 2) {
+            if isCalendarEvent {
+                HapticFeedback.tap()
+                isEditing = false
+                isShowingInfoPopover = true
+            } else {
+                HapticFeedback.tap()
+                hideInfoPopover()
+                editText = item.title
+                editDueDate = item.dueDate
+                isEditing = true
+            }
+        }
         .animation(DroppyAnimation.hoverQuick, value: isHovering)
+        .popover(
+            isPresented: $isShowingInfoPopover,
+            attachmentAnchor: .rect(.bounds),
+            arrowEdge: .top
+        ) {
+            hoverInfoPopoverContent
+                .allowsHitTesting(false)
+        }
         .popover(isPresented: $isEditing) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(String(localized: "action.edit"))
@@ -1370,6 +1496,9 @@ private struct TaskRow: View {
             .frame(width: 260)
         }
         .onChange(of: isEditing) { _, presented in
+            if presented {
+                hideInfoPopover()
+            }
             manager.isInteractingWithPopover = presented
         }
         .onDisappear {
@@ -1492,6 +1621,81 @@ private struct TaskRow: View {
         return "Apple Reminders list"
     }
 
+    private var hoverInfoPopoverContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: isCalendarEvent ? "calendar.badge.clock" : "checklist")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isCalendarEvent ? calendarEventTint : (useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto : .white.opacity(0.9)))
+                Text(isCalendarEvent ? "Event Details" : "Task Details")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.primaryTextAuto : .white.opacity(0.95))
+                Spacer(minLength: 0)
+            }
+
+            Divider()
+                .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.12) : Color.white.opacity(0.12))
+
+            Text(item.title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.primaryTextAuto : .white.opacity(0.95))
+                .fixedSize(horizontal: false, vertical: true)
+
+            infoDetailRow(icon: "square.stack.3d.up", label: "Source", value: sourceDetailsLabel)
+
+            if let listTitle = item.externalListTitle, !listTitle.isEmpty {
+                infoDetailRow(icon: "list.bullet", label: "List", value: listTitle)
+            }
+
+            if let dueDate = item.dueDate {
+                infoDetailRow(icon: "clock", label: "Due", value: formattedFullDueDateText(dueDate))
+            }
+
+            if !isCalendarEvent {
+                infoDetailRow(icon: "flag", label: "Priority", value: item.priority.rawValue.capitalized)
+                infoDetailRow(icon: item.isCompleted ? "checkmark.circle.fill" : "circle", label: "Status", value: item.isCompleted ? "Completed" : "Pending")
+            } else {
+                infoDetailRow(icon: "lock.fill", label: "Access", value: "Read-only")
+            }
+        }
+        .padding(12)
+        .frame(width: 300)
+    }
+
+    @ViewBuilder
+    private func infoDetailRow(icon: String, label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.8) : .white.opacity(0.6))
+                .frame(width: 12)
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.85) : .white.opacity(0.68))
+                .frame(width: 46, alignment: .leading)
+            Text(value)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.primaryTextAuto.opacity(0.95) : .white.opacity(0.92))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var sourceDetailsLabel: String {
+        switch item.externalSource {
+        case .calendar:
+            return "Apple Calendar"
+        case .reminders:
+            return "Apple Reminders"
+        case .none:
+            return "Local Task"
+        }
+    }
+
+    private func hideInfoPopover() {
+        isShowingInfoPopover = false
+    }
+
     private func colorFromHex(_ hex: String?) -> Color? {
         guard let hex else { return nil }
         let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "#", with: "")
@@ -1522,6 +1726,18 @@ private struct TaskRow: View {
         return formatter.string(from: date)
     }
 
+    private func formattedFullDueDateText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.timeZone = TimeZone.current
+        if dueDateHasTime(date) {
+            formatter.setLocalizedDateFormatFromTemplate("EEE d MMM yyyy jm")
+        } else {
+            formatter.setLocalizedDateFormatFromTemplate("EEE d MMM yyyy")
+        }
+        return formatter.string(from: date)
+    }
+
     private var isCalendarEvent: Bool {
         item.externalSource == .calendar
     }
@@ -1532,6 +1748,10 @@ private struct TaskRow: View {
 }
 
 private extension ToDoShelfBar {
+    var useSplitTaskCalendarLayout: Bool {
+        manager.isRemindersSyncEnabled && manager.isCalendarSyncEnabled
+    }
+
     var showsBottomListScrim: Bool {
         isListExpanded && manager.sortedItems.count > 4
     }

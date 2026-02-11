@@ -13,6 +13,7 @@ import SwiftUI
 struct QuickshareSettingsContent: View {
     @AppStorage(AppPreferenceKey.showQuickshareInMenuBar) private var showInMenuBar = PreferenceDefault.showQuickshareInMenuBar
     @AppStorage(AppPreferenceKey.showQuickshareInSidebar) private var showInSidebar = PreferenceDefault.showQuickshareInSidebar
+    @AppStorage(AppPreferenceKey.quickshareRequireUploadConfirmation) private var requireUploadConfirmation = PreferenceDefault.quickshareRequireUploadConfirmation
     
     @Bindable private var manager = QuickshareManager.shared
     
@@ -39,6 +40,17 @@ struct QuickshareSettingsContent: View {
                     VStack(alignment: .leading) {
                         Text("Show in Settings Sidebar")
                         Text("Quick access to file management from Settings")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .tint(.teal)
+
+                // Confirmation toggle
+                Toggle(isOn: $requireUploadConfirmation) {
+                    VStack(alignment: .leading) {
+                        Text("Require Upload Confirmation")
+                        Text("Ask before uploading files to Quickshare")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

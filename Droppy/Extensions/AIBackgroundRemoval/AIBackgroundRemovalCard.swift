@@ -9,7 +9,8 @@ import SwiftUI
 
 struct AIBackgroundRemovalCard: View {
     @State private var showInfoSheet = false
-    private var isInstalled: Bool { AIInstallManager.shared.isInstalled }
+    @ObservedObject private var manager = AIInstallManager.shared
+    private var isInstalled: Bool { manager.isInstalled }
     var installCount: Int?
     var rating: AnalyticsService.ExtensionRating?
     
@@ -88,7 +89,6 @@ struct AIBackgroundRemovalCard: View {
             
             // Status row based on install state
             HStack {
-                let manager = AIInstallManager.shared
                 if manager.isInstalled {
                     HStack(spacing: 4) {
                         Circle()

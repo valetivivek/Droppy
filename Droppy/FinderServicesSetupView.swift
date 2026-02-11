@@ -9,6 +9,27 @@
 import SwiftUI
 import AppKit
 
+@discardableResult
+func openFinderServicesSettings() -> Bool {
+    // Try direct Services/Keyboard links first, then broader Keyboard pane fallbacks.
+    let candidates = [
+        "x-apple.systempreferences:com.apple.preference.keyboard?Services",
+        "x-apple.systempreferences:com.apple.preference.keyboard?Shortcuts",
+        "x-apple.systempreferences:com.apple.Keyboard-Settings.extension",
+        "x-apple.systempreferences:com.apple.Keyboard-Settings",
+        "x-apple.systempreferences:com.apple.preference.keyboard"
+    ]
+    
+    for candidate in candidates {
+        guard let url = URL(string: candidate) else { continue }
+        if NSWorkspace.shared.open(url) {
+            return true
+        }
+    }
+    
+    return false
+}
+
 // MARK: - Finder Services Setup View
 
 struct FinderServicesSetupView: View {
@@ -33,7 +54,7 @@ struct FinderServicesSetupView: View {
             // Action Buttons - matching AIInstallView
             buttonSection
         }
-        .frame(width: 340)  // Same width as AIInstallView
+        .frame(width: 380)
         .fixedSize(horizontal: false, vertical: true)
         .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AdaptiveColors.panelBackgroundOpaqueStyle)
         .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous))
@@ -58,7 +79,7 @@ struct FinderServicesSetupView: View {
                 .font(.title2.bold())
                 .foregroundStyle(.primary)
             
-            Text("One-time setup in System Settings")
+            Text("Quick one-time setup")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -69,17 +90,34 @@ struct FinderServicesSetupView: View {
     // MARK: - Steps
     
     private var stepsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            stepRow(number: 1, text: "Click \"Open Settings\" below")
-            stepRow(number: 2, text: "Enable \"Add to Droppy Shelf\"")
-            stepRow(number: 3, text: "Enable \"Add to Droppy Basket\"")
+        VStack(alignment: .leading, spacing: 10) {
+            stepRow(
+                number: 1,
+                text: "Click \"Open Settings\" below.",
+                detail: "This opens Keyboard settings for the Services shortcuts list."
+            )
+            stepRow(
+                number: 2,
+                text: "Open the Services list in System Settings.",
+                detail: "If needed: Keyboard > Keyboard Shortcuts > Services."
+            )
+            stepRow(
+                number: 3,
+                text: "Enable \"Add to Droppy Shelf\" and \"Add to Droppy Basket\".",
+                detail: "Look under File and Folder Services."
+            )
+            stepRow(
+                number: 4,
+                text: "In Finder: right-click selected file(s) > Services.",
+                detail: "You should now see both Droppy actions."
+            )
         }
         .padding(.horizontal, 24)
-        .padding(.bottom, 20)
+        .padding(.bottom, 16)
     }
     
-    private func stepRow(number: Int, text: String) -> some View {
-        HStack(spacing: 12) {
+    private func stepRow(number: Int, text: String, detail: String?) -> some View {
+        HStack(alignment: .top, spacing: 12) {
             Text("\(number)")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(.primary)
@@ -87,10 +125,30 @@ struct FinderServicesSetupView: View {
                 .background(Color.blue.opacity(0.6))
                 .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.sm, style: .continuous))
             
-            Text(text)
-                .font(.callout)
-                .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(text)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineSpacing(2)
+                
+                if let detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: DroppyRadius.ms, style: .continuous)
+                .fill(Color.primary.opacity(useTransparentBackground ? 0.08 : 0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DroppyRadius.ms, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
     }
     
     // MARK: - Buttons
@@ -115,21 +173,18 @@ struct FinderServicesSetupView: View {
                 }
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: hasOpenedSettings ? "checkmark" : "gear")
-                    Text(hasOpenedSettings ? "Opened" : "Open Settings")
+                    Image(systemName: hasOpenedSettings ? "arrow.clockwise" : "gear")
+                    Text(hasOpenedSettings ? "Open Again" : "Open Settings")
                 }
             }
-            .buttonStyle(DroppyAccentButtonStyle(color: hasOpenedSettings ? .green : .blue, size: .small))
+            .buttonStyle(DroppyAccentButtonStyle(color: .blue, size: .small))
         }
         .padding(DroppySpacing.lg)
         .animation(DroppyAnimation.transition, value: hasOpenedSettings)
     }
     
     private func openServicesSettings() {
-        // Opens System Settings > Extensions > Services directly
-        if let url = URL(string: "x-apple.systempreferences:com.apple.ExtensionsPreferences?Services") {
-            NSWorkspace.shared.open(url)
-        }
+        _ = openFinderServicesSettings()
     }
 }
 
@@ -157,7 +212,7 @@ struct FinderServicesSetupSheetView: View {
             // Action Buttons - matching AIInstallView
             buttonSection
         }
-        .frame(width: 340)  // Same width as AIInstallView
+        .frame(width: 380)
         .fixedSize(horizontal: false, vertical: true)
         .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AdaptiveColors.panelBackgroundOpaqueStyle)
         .clipped()  // Same as AIInstallView
@@ -181,7 +236,7 @@ struct FinderServicesSetupSheetView: View {
                 .font(.title2.bold())
                 .foregroundStyle(.primary)
             
-            Text("One-time setup in System Settings")
+            Text("Quick one-time setup")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -192,17 +247,34 @@ struct FinderServicesSetupSheetView: View {
     // MARK: - Steps
     
     private var stepsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            stepRow(number: 1, text: "Click \"Open Settings\" below")
-            stepRow(number: 2, text: "Enable \"Add to Droppy Shelf\"")
-            stepRow(number: 3, text: "Enable \"Add to Droppy Basket\"")
+        VStack(alignment: .leading, spacing: 10) {
+            stepRow(
+                number: 1,
+                text: "Click \"Open Settings\" below.",
+                detail: "This opens Keyboard settings for the Services shortcuts list."
+            )
+            stepRow(
+                number: 2,
+                text: "Open the Services list in System Settings.",
+                detail: "If needed: Keyboard > Keyboard Shortcuts > Services."
+            )
+            stepRow(
+                number: 3,
+                text: "Enable \"Add to Droppy Shelf\" and \"Add to Droppy Basket\".",
+                detail: "Look under File and Folder Services."
+            )
+            stepRow(
+                number: 4,
+                text: "In Finder: right-click selected file(s) > Services.",
+                detail: "You should now see both Droppy actions."
+            )
         }
         .padding(.horizontal, 24)
-        .padding(.bottom, 20)
+        .padding(.bottom, 16)
     }
     
-    private func stepRow(number: Int, text: String) -> some View {
-        HStack(spacing: 12) {
+    private func stepRow(number: Int, text: String, detail: String?) -> some View {
+        HStack(alignment: .top, spacing: 12) {
             Text("\(number)")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(.primary)
@@ -210,10 +282,30 @@ struct FinderServicesSetupSheetView: View {
                 .background(Color.blue.opacity(0.6))
                 .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.sm, style: .continuous))
             
-            Text(text)
-                .font(.callout)
-                .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(text)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineSpacing(2)
+                
+                if let detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: DroppyRadius.ms, style: .continuous)
+                .fill(Color.primary.opacity(useTransparentBackground ? 0.08 : 0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DroppyRadius.ms, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
     }
     
     // MARK: - Buttons
@@ -238,21 +330,18 @@ struct FinderServicesSetupSheetView: View {
                 }
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: hasOpenedSettings ? "checkmark" : "gear")
-                    Text(hasOpenedSettings ? "Opened" : "Open Settings")
+                    Image(systemName: hasOpenedSettings ? "arrow.clockwise" : "gear")
+                    Text(hasOpenedSettings ? "Open Again" : "Open Settings")
                 }
             }
-            .buttonStyle(DroppyAccentButtonStyle(color: hasOpenedSettings ? .green : .blue, size: .small))
+            .buttonStyle(DroppyAccentButtonStyle(color: .blue, size: .small))
         }
         .padding(DroppySpacing.lg)
         .animation(DroppyAnimation.transition, value: hasOpenedSettings)
     }
     
     private func openServicesSettings() {
-        // Opens System Settings > Extensions > Services directly
-        if let url = URL(string: "x-apple.systempreferences:com.apple.ExtensionsPreferences?Services") {
-            NSWorkspace.shared.open(url)
-        }
+        _ = openFinderServicesSettings()
     }
 }
 
@@ -287,7 +376,7 @@ final class FinderServicesSetupWindowController: NSObject, NSWindowDelegate {
             
             // Create the window - exact same style as sheet presentation
             let newWindow = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 340, height: 320),
+                contentRect: NSRect(x: 0, y: 0, width: 380, height: 420),
                 styleMask: [.fullSizeContentView],
                 backing: .buffered,
                 defer: false

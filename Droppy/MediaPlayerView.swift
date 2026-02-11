@@ -214,6 +214,10 @@ struct MediaPlayerView: View {
     @State private var isAlbumArtHovering: Bool = false
     @State private var albumArtFlipAngle: Double = 0  // For track change flip animation
     @State private var albumArtPauseScale: CGFloat = 1.0  // For pause/play scale animation
+    @State private var musyHUDLogTimer: Timer?
+    @State private var lastMusyDragLogAt: Date = .distantPast
+    private let musyDebugEnabled = false
+    private let musyDebugPrefix = "MUSYMUSY"
     
     // MARK: - Observed Managers for Fast HUD Updates
     @ObservedObject private var volumeManager = VolumeManager.shared
@@ -245,7 +249,13 @@ struct MediaPlayerView: View {
     @State private var inlineHUDBatteryCharging: Bool = false
     @State private var inlineHUDSymbolOverride: String? = nil
     @State private var inlineHUDHideWorkItem: DispatchWorkItem?
-    
+
+    /// Keep media-player open/close and inline HUD toggles on the same curve
+    /// used by notch hide/re-show for synchronized motion.
+    private var unifiedOpenCloseAnimation: Animation {
+        DroppyAnimation.notchState
+    }
+
     /// Dominant color from album art for visualizer
     /// PERFORMANCE: Uses cached value from MusicManager (computed once per track change)
     private var visualizerColor: Color {
@@ -282,9 +292,10 @@ struct MediaPlayerView: View {
     
     /// Progress as fraction (0.0 - 1.0)
     private func progress(at date: Date) -> CGFloat {
-        guard musicManager.songDuration > 0 else { return 0 }
+        let duration = musicManager.displayDurationForUI
+        guard duration > 0 else { return 0 }
         let pos = isDragging ? dragValue : estimatedPosition(at: date)
-        return CGFloat(min(1, max(0, pos / musicManager.songDuration)))
+        return CGFloat(min(1, max(0, pos / duration)))
     }
     
     /// Formatted elapsed time (mm:ss)
@@ -293,13 +304,15 @@ struct MediaPlayerView: View {
         return timeString(from: seconds)
     }
     
-    /// Formatted remaining/total time
-    private func remainingTimeString() -> String {
-        return timeString(from: musicManager.songDuration)
+    /// Formatted end/total time in the expanded player.
+    private func endTimeString() -> String {
+        let duration = musicManager.displayDurationForUI
+        guard duration > 0 else { return "--:--" }
+        return timeString(from: duration)
     }
     
-    private func timeString(from seconds: Double) -> String {
-        let totalSeconds = Int(max(0, seconds))
+    private func timeString(from seconds: Double, rounding: FloatingPointRoundingRule = .down) -> String {
+        let totalSeconds = Int(max(0, seconds).rounded(rounding))
         let hours = totalSeconds / 3600
         let minutes = (totalSeconds % 3600) / 60
         let secs = totalSeconds % 60
@@ -310,90 +323,102 @@ struct MediaPlayerView: View {
             return String(format: "%d:%02d", minutes, secs)
         }
     }
+
+    private func musyLog(_ message: @autoclosure () -> String) {
+        guard musyDebugEnabled else { return }
+        print("\(musyDebugPrefix) HUD \(Date().timeIntervalSince1970) \(message())")
+    }
+
+    private func startMusyHUDLogTimer() {
+        guard musyDebugEnabled else { return }
+        stopMusyHUDLogTimer()
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            let now = Date()
+            let shownElapsed = isDragging ? dragValue : estimatedPosition(at: now)
+            let shownDuration = musicManager.displayDurationForUI
+            let progressFraction = shownDuration > 0 ? max(0, min(1, shownElapsed / shownDuration)) : 0
+            let managerTs = musicManager.timestampDate
+            let managerTsAge = managerTs > .distantPast ? now.timeIntervalSince(managerTs) : -1
+            musyLog(
+                "render title='\(musicManager.songTitle.prefix(45))' bundle=\(musicManager.bundleIdentifier ?? "nil") sourceAccepted=\(musicManager.currentAcceptedBundleIdentifier ?? "nil") isPlaying=\(musicManager.isPlaying) dragging=\(isDragging) shownElapsed=\(String(format: "%.3f", shownElapsed)) managerElapsed=\(String(format: "%.3f", musicManager.elapsedTime)) shownDuration=\(String(format: "%.3f", shownDuration)) managerDuration=\(String(format: "%.3f", musicManager.songDuration)) rate=\(String(format: "%.3f", musicManager.playbackRate)) managerTs=\(managerTs.timeIntervalSince1970) managerTsAge=\(String(format: "%.3f", managerTsAge)) progress=\(String(format: "%.4f", progressFraction))"
+            )
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        musyHUDLogTimer = timer
+        musyLog("timer.start")
+    }
+
+    private func stopMusyHUDLogTimer() {
+        musyHUDLogTimer?.invalidate()
+        musyHUDLogTimer = nil
+        musyLog("timer.stop")
+    }
     // Edge padding - reduced to push content closer to edges
     private let edgePadding: CGFloat = 12
     // Album art size - VStack must match this height for perfect symmetry
     private let albumArtSize: CGFloat = 100
     
     var body: some View {
+        let stage1 = applyUniversalHUDObservers(to: AnyView(timelineRootContent))
+        let stage2 = applyMusyStateObservers(to: stage1)
+        let stage3 = applyMediaAnimations(to: stage2)
+        return applyInteractions(to: stage3)
+    }
+
+    private var timelineRootContent: some View {
         TimelineView(.animation(minimumInterval: 0.1, paused: !musicManager.isPlaying && !isDragging)) { context in
             let currentDate = context.date
-            
-            // MARK: - Horizontal Layout: Big Album Art Left | Controls Right
-            // ALIGNMENT STANDARD (v21.68): .top alignment ensures title aligns with top of album art
-            // Controls are pushed to bottom via the VStack's internal layout
+
             HStack(alignment: .top, spacing: 16) {
-                // MARK: - Left: Large Album Art (100x100) with glow
-                // PREMIUM: When showAlbumArt is false, morphing is handled externally
                 if showAlbumArt {
                     albumArtViewLarge
                 } else {
-                    // PREMIUM MORPH: External morphing - keep layout with invisible spacer
                     Color.clear.frame(width: albumArtSize, height: albumArtSize)
                 }
-                
-                // MARK: - Right: Stacked Controls
-                // ALIGNMENT STANDARD (v21.68): Three content groups with equal spacing between them
-                // Group 1: Title + Artist (top-aligned with album art)
-                // Group 2: Progress bar (vertically centered)
-                // Group 3: Controls (bottom-aligned with album art)
+
                 VStack(alignment: .leading, spacing: 0) {
-                    // GROUP 1: Title + Artist (TOP)
                     VStack(alignment: .leading, spacing: 2) {
                         titleRowView
                         artistRowView
                     }
-                    
+
                     Spacer(minLength: 4)
-                    
-                    // GROUP 2: Progress Bar (CENTER)
+
                     HStack(spacing: 8) {
                         Text(elapsedTimeString(at: currentDate))
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(secondaryText(0.62))
                             .monospacedDigit()
-                            .frame(width: 40, alignment: .leading)
-                        
+                            .frame(minWidth: 40, alignment: .leading)
+
                         progressSliderView(at: currentDate)
-                        
-                        Text(remainingTimeString())
+
+                        Text(endTimeString())
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(secondaryText(0.62))
                             .monospacedDigit()
-                            .frame(width: 40, alignment: .trailing)
+                            .frame(minWidth: 40, alignment: .trailing)
                     }
-                    
+
                     Spacer(minLength: 4)
-                    
-                    // GROUP 3: Controls (BOTTOM - aligned with album art bottom)
+
                     controlsRowCompact
                 }
-                // Controls bottom-aligned with album art bottom edge
                 .frame(maxWidth: .infinity, minHeight: albumArtSize, maxHeight: albumArtSize)
-                // PREMIUM: Scale+blur+opacity appear animation (matches notchTransition pattern)
                 .scaleEffect(contentAppeared ? 1.0 : 0.8, anchor: .top)
                 .blur(radius: contentAppeared ? 0 : 8)
                 .opacity(contentAppeared ? 1.0 : 0)
-                .animation(DroppyAnimation.smoothContent, value: contentAppeared)
+                .animation(unifiedOpenCloseAnimation, value: contentAppeared)
                 .onAppear {
-                    // Immediate animation start - syncs with container notchTransition
                     contentAppeared = true
                 }
                 .onDisappear {
                     contentAppeared = false
                 }
             }
-            // Use SSOT for consistent padding across all expanded views
-            // contentEdgeInsets provides correct padding for each mode:
-            // - Built-in notch: notchHeight top, 30pt left/right, 20pt bottom
-            // - External notch style: 20pt top/bottom, 30pt left/right
-            // - Pure Island mode: 30pt on all 4 edges
             .padding(NotchLayoutConstants.contentEdgeInsets(notchHeight: notchHeight, isExternalWithNotchStyle: isExternalWithNotchStyle))
-            // MARK: - Premium Ambient Glow (from bottom-left corner to top-right)
-            // AFTER padding so it anchors at actual container corner
             .background(alignment: .bottomLeading) {
                 if musicManager.albumArt.size.width > 0 {
-                    // Large blurred ellipse anchored at bottom-left corner of container
                     Ellipse()
                         .fill(
                             RadialGradient(
@@ -409,117 +434,151 @@ struct MediaPlayerView: View {
                         )
                         .frame(width: 350, height: 280)
                         .blur(radius: 60)
-                        // Position: center of ellipse at bottom-left corner
                         .offset(x: -80, y: 60)
-                        .drawingGroup() // GPU compositing for performance
-                        .animation(.easeInOut(duration: 0.8), value: musicManager.visualizerColor)
+                        .drawingGroup()
+                        .animation(DroppyAnimation.smooth(duration: 0.8), value: musicManager.visualizerColor)
                 }
             }
         }
-        // MARK: - Universal Inline HUD Observers
-        // Uses local @ObservedObject references for snappy updates
-        .onChange(of: volumeManager.lastChangeAt) { _, _ in
-            guard enableHUDReplacement else { return }
-            // When muted, pass 0 so bar drains and percentage shows 0
-            let volumeValue = volumeManager.isMuted ? 0.0 : CGFloat(volumeManager.rawVolume)
-            triggerInlineHUD(.volume, value: volumeValue, muted: volumeManager.isMuted)
-        }
-        .onChange(of: brightnessManager.lastChangeAt) { _, _ in
-            guard enableHUDReplacement else { return }
-            triggerInlineHUD(.brightness, value: CGFloat(brightnessManager.rawBrightness))
-        }
-        .onChange(of: batteryManager.lastChangeAt) { _, _ in
-            guard enableBatteryHUD else { return }
-            triggerInlineHUD(
-                .battery,
-                value: CGFloat(batteryManager.batteryLevel) / 100.0,
-                isCharging: batteryManager.isCharging || batteryManager.isPluggedIn
-            )
-        }
-        .onChange(of: capsLockManager.lastChangeAt) { _, _ in
-            guard enableCapsLockHUD else { return }
-            triggerInlineHUD(.capsLock, value: capsLockManager.isCapsLockOn ? 1.0 : 0.0)
-        }
-        .onChange(of: airPodsManager.lastConnectionAt) { _, _ in
-            guard enableAirPodsHUD, let connectedAirPods = airPodsManager.connectedAirPods else { return }
-            triggerInlineHUD(
-                .airPods,
-                value: max(0.01, CGFloat(connectedAirPods.batteryLevel) / 100.0),
-                symbolOverride: connectedAirPods.type.symbolName
-            )
-        }
-        .onChange(of: lockScreenManager.lastChangeAt) { _, _ in
-            guard enableLockScreenHUD else { return }
-            let isLocked = !lockScreenManager.isUnlocked
-            triggerInlineHUD(.lockScreen, value: isLocked ? 1.0 : 0.0)
-        }
-        .onChange(of: dndManager.lastChangeAt) { _, _ in
-            guard enableDNDHUD else { return }
-            triggerInlineHUD(.focus, value: dndManager.isDNDActive ? 1.0 : 0.0)
-        }
-        .onChange(of: updateChecker.updateAvailable) { _, isAvailable in
-            guard enableUpdateHUD, isAvailable else { return }
-            triggerInlineHUD(.update, value: 1.0)
-        }
-        // MARK: - Album Art Flip on Track Change (directional)
-        .onChange(of: musicManager.songTitle) { _, _ in
-            // PREMIUM: Directional flip - right for forward, left for backward
-            let flipAngle: Double = switch musicManager.lastSkipDirection {
-            case .forward: 25
-            case .backward: -25
-            case .none: 25  // Default to forward
-            }
-            
-            // Quick flip out with snappy spring
-            withAnimation(DroppyAnimation.hoverBouncy) {
-                albumArtFlipAngle = flipAngle
-            }
-            // Settle back smoothly after a brief pause
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                withAnimation(DroppyAnimation.transition) {
-                    albumArtFlipAngle = 0
+    }
+
+    private func applyUniversalHUDObservers(to view: AnyView) -> AnyView {
+        AnyView(
+            view
+                .onChange(of: volumeManager.lastChangeAt) { _, _ in
+                    guard enableHUDReplacement else { return }
+                    let volumeValue = volumeManager.isMuted ? 0.0 : CGFloat(volumeManager.rawVolume)
+                    triggerInlineHUD(.volume, value: volumeValue, muted: volumeManager.isMuted)
+                }
+                .onChange(of: brightnessManager.lastChangeAt) { _, _ in
+                    guard enableHUDReplacement else { return }
+                    triggerInlineHUD(.brightness, value: CGFloat(brightnessManager.rawBrightness))
+                }
+                .onChange(of: batteryManager.lastChangeAt) { _, _ in
+                    guard enableBatteryHUD else { return }
+                    triggerInlineHUD(
+                        .battery,
+                        value: CGFloat(batteryManager.batteryLevel) / 100.0,
+                        isCharging: batteryManager.isCharging || batteryManager.isPluggedIn
+                    )
+                }
+                .onChange(of: capsLockManager.lastChangeAt) { _, _ in
+                    guard enableCapsLockHUD else { return }
+                    triggerInlineHUD(.capsLock, value: capsLockManager.isCapsLockOn ? 1.0 : 0.0)
+                }
+                .onChange(of: airPodsManager.lastConnectionAt) { _, _ in
+                    guard enableAirPodsHUD, let connectedAirPods = airPodsManager.connectedAirPods else { return }
+                    triggerInlineHUD(
+                        .airPods,
+                        value: max(0.01, CGFloat(connectedAirPods.batteryLevel) / 100.0),
+                        symbolOverride: connectedAirPods.type.symbolName
+                    )
+                }
+                .onChange(of: lockScreenManager.lastChangeAt) { _, _ in
+                    guard enableLockScreenHUD else { return }
+                    let isLocked = !lockScreenManager.isUnlocked
+                    triggerInlineHUD(.lockScreen, value: isLocked ? 1.0 : 0.0)
+                }
+                .onChange(of: dndManager.lastChangeAt) { _, _ in
+                    guard enableDNDHUD else { return }
+                    triggerInlineHUD(.focus, value: dndManager.isDNDActive ? 1.0 : 0.0)
+                }
+                .onChange(of: updateChecker.updateAvailable) { _, isAvailable in
+                    guard enableUpdateHUD, isAvailable else { return }
+                    triggerInlineHUD(.update, value: 1.0)
+                }
+        )
+    }
+
+    private func applyMusyStateObservers(to view: AnyView) -> AnyView {
+        guard musyDebugEnabled else { return view }
+
+        return AnyView(
+            view
+                .onChange(of: musicManager.bundleIdentifier) { _, value in
+                    musyLog("state.bundleChanged value=\(value ?? "nil") accepted=\(musicManager.currentAcceptedBundleIdentifier ?? "nil")")
+                }
+                .onChange(of: musicManager.songTitle) { _, value in
+                    musyLog("state.songChanged title='\(value.prefix(50))' artist='\(musicManager.artistName.prefix(40))'")
+                }
+                .onChange(of: musicManager.elapsedTime) { _, value in
+                    musyLog("state.elapsedChanged elapsed=\(String(format: "%.3f", value)) duration=\(String(format: "%.3f", musicManager.songDuration)) displayDuration=\(String(format: "%.3f", musicManager.displayDurationForUI)) rate=\(String(format: "%.3f", musicManager.playbackRate))")
+                }
+                .onChange(of: musicManager.songDuration) { _, value in
+                    musyLog("state.durationChanged duration=\(String(format: "%.3f", value)) displayDuration=\(String(format: "%.3f", musicManager.displayDurationForUI))")
+                }
+                .onChange(of: musicManager.isPlaying) { _, value in
+                    musyLog("state.isPlayingChanged value=\(value)")
+                }
+                .onChange(of: musicManager.playbackRate) { _, value in
+                    musyLog("state.rateChanged value=\(String(format: "%.3f", value))")
+                }
+                .onAppear {
+                    musyLog("view.appear title='\(musicManager.songTitle.prefix(50))' bundle=\(musicManager.bundleIdentifier ?? "nil")")
+                    startMusyHUDLogTimer()
+                }
+                .onDisappear {
+                    stopMusyHUDLogTimer()
+                    musyLog("view.disappear")
+                }
+        )
+    }
+
+    private func applyMediaAnimations(to view: AnyView) -> AnyView {
+        AnyView(
+            view
+                .onChange(of: musicManager.songTitle) { _, _ in
+                    let flipAngle: Double = switch musicManager.lastSkipDirection {
+                    case .forward: 25
+                    case .backward: -25
+                    case .none: 25
+                    }
+
+                    withAnimation(DroppyAnimation.hoverBouncy) {
+                        albumArtFlipAngle = flipAngle
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                        withAnimation(DroppyAnimation.transition) {
+                            albumArtFlipAngle = 0
+                        }
+                    }
+                }
+                .onChange(of: musicManager.isPlaying) { _, isPlaying in
+                    withAnimation(DroppyAnimation.itemInsertion) {
+                        albumArtPauseScale = isPlaying ? 1.0 : 0.95
+                    }
+                }
+        )
+    }
+
+    private func applyInteractions(to view: AnyView) -> some View {
+        view
+            .captureHorizontalScroll { scrollX in
+                withAnimation(unifiedOpenCloseAnimation) {
+                    if scrollX < 0 {
+                        musicManager.isMediaHUDForced = true
+                        musicManager.isMediaHUDHidden = false
+                    } else {
+                        musicManager.isMediaHUDForced = false
+                        musicManager.isMediaHUDHidden = true
+                    }
                 }
             }
-        }
-        // MARK: - Album Art Scale on Pause/Play
-        .onChange(of: musicManager.isPlaying) { _, isPlaying in
-            // PREMIUM: Smooth scale with damping - shrink slightly when paused
-            withAnimation(DroppyAnimation.itemInsertion) {
-                albumArtPauseScale = isPlaying ? 1.0 : 0.95
-            }
-        }
-        // MARK: - Horizontal Swipe to Toggle Media/Shelf
-        // Captures scroll wheel directly to fix swipe not working when cursor stationary
-        .captureHorizontalScroll { scrollX in
-            // Swipe LEFT (negative) = Show media, Swipe RIGHT (positive) = Show shelf
-            withAnimation(DroppyAnimation.transition) {
-                if scrollX < 0 {
-                    // Swipe LEFT -> Show MEDIA player
-                    musicManager.isMediaHUDForced = true
-                    musicManager.isMediaHUDHidden = false
-                } else {
-                    // Swipe RIGHT -> Show SHELF (hide media)
-                    musicManager.isMediaHUDForced = false
-                    musicManager.isMediaHUDHidden = true
+            .contextMenu {
+                if enableRightClickHide {
+                    Button {
+                        NotchWindowController.shared.setTemporarilyHidden(true)
+                    } label: {
+                        Label("Hide \(NotchWindowController.shared.displayModeLabel)", systemImage: "eye.slash")
+                    }
+                    Divider()
                 }
-            }
-        }
-        // Right-click context menu - conditionally show hide option
-        .contextMenu {
-            if enableRightClickHide {
                 Button {
-                    NotchWindowController.shared.setTemporarilyHidden(true)
+                    SettingsWindowController.shared.showSettings()
                 } label: {
-                    Label("Hide \(NotchWindowController.shared.displayModeLabel)", systemImage: "eye.slash")
+                    Label("Open Settings", systemImage: "gear")
                 }
-                Divider()
             }
-            Button {
-                SettingsWindowController.shared.showSettings()
-            } label: {
-                Label("Open Settings", systemImage: "gear")
-            }
-        }
     }
     
     // MARK: - Universal Inline HUD Trigger
@@ -544,7 +603,7 @@ struct MediaPlayerView: View {
         inlineHUDSymbolOverride = symbolOverride
         
         // Animate visibility on (same as regular HUD: spring 0.3, 0.7)
-        withAnimation(DroppyAnimation.state) {
+        withAnimation(unifiedOpenCloseAnimation) {
             // Already set, but this triggers the animation
         }
         
@@ -563,7 +622,7 @@ struct MediaPlayerView: View {
         
         // Hide after duration (same as regular HUD: easeOut 0.3)
         let workItem = DispatchWorkItem { [self] in
-            withAnimation(DroppyAnimation.viewChange) {
+            withAnimation(unifiedOpenCloseAnimation) {
                 inlineHUDType = nil
             }
         }
@@ -774,7 +833,7 @@ struct MediaPlayerView: View {
         .scaleEffect(contentAppeared ? 1.0 : 0.8, anchor: .top)
         .blur(radius: contentAppeared ? 0 : 8)
         .opacity(contentAppeared ? 1.0 : 0)
-        .animation(DroppyAnimation.smoothContent, value: contentAppeared)
+        .animation(unifiedOpenCloseAnimation, value: contentAppeared)
     }
     
     // MARK: - Progress Slider
@@ -837,12 +896,35 @@ struct MediaPlayerView: View {
                         withAnimation(DroppyAnimation.hoverBouncy) {
                             isDragging = true
                         }
+                        guard width > 0 else {
+                            dragValue = 0
+                            return
+                        }
+                        let duration = musicManager.displayDurationForUI
+                        guard duration > 0 else {
+                            dragValue = 0
+                            return
+                        }
                         let fraction = max(0, min(1, value.location.x / width))
-                        dragValue = Double(fraction) * musicManager.songDuration
+                        dragValue = Double(fraction) * duration
+                        let now = Date()
+                        if now.timeIntervalSince(lastMusyDragLogAt) > 0.2 {
+                            lastMusyDragLogAt = now
+                            musyLog("slider.dragChanged x=\(String(format: "%.2f", value.location.x)) width=\(String(format: "%.2f", width)) fraction=\(String(format: "%.4f", fraction)) dragValue=\(String(format: "%.3f", dragValue)) duration=\(String(format: "%.3f", musicManager.displayDurationForUI))")
+                        }
                     }
                     .onEnded { value in
+                        let duration = musicManager.displayDurationForUI
+                        guard width > 0, duration > 0 else {
+                            withAnimation(DroppyAnimation.hover) {
+                                isDragging = false
+                            }
+                            lastDragTime = Date()
+                            return
+                        }
                         let fraction = max(0, min(1, value.location.x / width))
-                        let seekTime = Double(fraction) * musicManager.songDuration
+                        let seekTime = Double(fraction) * duration
+                        musyLog("slider.dragEnded x=\(String(format: "%.2f", value.location.x)) width=\(String(format: "%.2f", width)) fraction=\(String(format: "%.4f", fraction)) seekTime=\(String(format: "%.3f", seekTime)) duration=\(String(format: "%.3f", musicManager.displayDurationForUI))")
                         musicManager.seek(to: seekTime)
                         withAnimation(DroppyAnimation.hover) {
                             isDragging = false

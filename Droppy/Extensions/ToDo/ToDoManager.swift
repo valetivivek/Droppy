@@ -114,11 +114,18 @@ final class ToDoManager {
     
     private let fileName = "todo_items.json"
     private let eventStore = EKEventStore()
+    private var calendarAccessConfirmedInSession = false
+    private var remindersAccessConfirmedInSession = false
     private var cleanupTimer: Timer?
     private var externalSyncTimer: Timer?
     private var eventStoreObserver: NSObjectProtocol?
     private var eventStoreSyncDebounceWorkItem: DispatchWorkItem?
     private let remindersSelectedListsKey = AppPreferenceKey.todoSyncRemindersListIDs
+
+    private enum PermissionRequestSource {
+        case userInteraction
+        case backgroundSync
+    }
     
     // MARK: - Lifecycle
     
@@ -221,26 +228,25 @@ final class ToDoManager {
     }
 
     func setRemindersSyncEnabled(_ enabled: Bool) {
-        Task {
+        Task { @MainActor in
             if enabled {
-                let granted = await requestRemindersAccess()
-                await MainActor.run {
-                    UserDefaults.standard.set(granted, forKey: AppPreferenceKey.todoSyncRemindersEnabled)
-                    if granted {
-                        self.refreshReminderListsNow()
-                        self.syncExternalSourcesNow()
-                    } else {
-                        self.availableReminderLists = []
-                        self.removeExternalItems(for: .reminders)
+                let granted = await requestRemindersAccess(source: .userInteraction)
+                UserDefaults.standard.set(granted, forKey: AppPreferenceKey.todoSyncRemindersEnabled)
+                if granted {
+                    self.refreshReminderListsNow()
+                    self.syncExternalSourcesNow()
+                } else {
+                    self.availableReminderLists = []
+                    self.removeExternalItems(for: .reminders)
+                    if shouldOpenRemindersPrivacySettings() {
                         self.openRemindersPrivacySettings()
                     }
                 }
             } else {
-                await MainActor.run {
-                    UserDefaults.standard.set(false, forKey: AppPreferenceKey.todoSyncRemindersEnabled)
-                    self.availableReminderLists = []
-                    self.removeExternalItems(for: .reminders)
-                }
+                UserDefaults.standard.set(false, forKey: AppPreferenceKey.todoSyncRemindersEnabled)
+                self.availableReminderLists = []
+                self.removeExternalItems(for: .reminders)
+                self.remindersAccessConfirmedInSession = false
             }
         }
     }
@@ -248,17 +254,20 @@ final class ToDoManager {
     func setCalendarSyncEnabled(_ enabled: Bool) {
         Task { @MainActor in
             if enabled {
-                let granted = await requestCalendarAccess()
+                let granted = await requestCalendarAccess(source: .userInteraction)
                 UserDefaults.standard.set(granted, forKey: AppPreferenceKey.todoSyncCalendarEnabled)
                 if granted {
                     self.syncExternalSourcesNow()
                 } else {
                     self.removeExternalItems(for: .calendar)
-                    openCalendarPrivacySettings()
+                    if shouldOpenCalendarPrivacySettings() {
+                        openCalendarPrivacySettings()
+                    }
                 }
             } else {
                 UserDefaults.standard.set(false, forKey: AppPreferenceKey.todoSyncCalendarEnabled)
                 self.removeExternalItems(for: .calendar)
+                self.calendarAccessConfirmedInSession = false
             }
         }
     }
@@ -368,7 +377,7 @@ final class ToDoManager {
         var calendarPayloads: [ExternalTaskPayload] = []
 
         if isRemindersSyncEnabled {
-            let granted = await requestRemindersAccess()
+            let granted = await requestRemindersAccess(source: .backgroundSync)
             if granted {
                 await refreshReminderLists()
                 reminderPayloads = await fetchReminders()
@@ -376,17 +385,19 @@ final class ToDoManager {
                 await MainActor.run {
                     UserDefaults.standard.set(false, forKey: AppPreferenceKey.todoSyncRemindersEnabled)
                     self.availableReminderLists = []
+                    self.remindersAccessConfirmedInSession = false
                 }
             }
         }
 
         if isCalendarSyncEnabled {
-            let granted = await requestCalendarAccess()
+            let granted = await requestCalendarAccess(source: .backgroundSync)
             if granted {
                 calendarPayloads = await fetchCalendarEvents()
             } else {
                 await MainActor.run {
                     UserDefaults.standard.set(false, forKey: AppPreferenceKey.todoSyncCalendarEnabled)
+                    self.calendarAccessConfirmedInSession = false
                 }
             }
         }
@@ -396,89 +407,302 @@ final class ToDoManager {
         }
     }
 
-    private func requestRemindersAccess() async -> Bool {
-        await MainActor.run {
-            // Ensure the app is frontmost so macOS can present the privacy prompt.
-            NSApp.activate(ignoringOtherApps: true)
+    @MainActor
+    private func requestRemindersAccess(source: PermissionRequestSource) async -> Bool {
+        if remindersAccessConfirmedInSession {
+            return true
         }
 
-        let status = EKEventStore.authorizationStatus(for: .reminder)
-        if #available(macOS 14.0, *) {
-            switch status {
-            case .fullAccess:
-                return true
-            case .writeOnly, .denied, .restricted:
-                return false
-            case .notDetermined:
-                break
-            @unknown default:
-                return false
+        let currentStatus = EKEventStore.authorizationStatus(for: .reminder)
+        switch currentStatus {
+        case .fullAccess:
+            remindersAccessConfirmedInSession = true
+            return true
+        case .denied, .restricted:
+            remindersAccessConfirmedInSession = false
+            return false
+        case .writeOnly, .notDetermined:
+            let granted = await requestRemindersFullAccessWithRetry(source: source)
+            remindersAccessConfirmedInSession = granted
+            if granted {
+                eventStore.reset()
             }
-        } else {
-            switch status {
-            case .authorized:
-                return true
-            case .fullAccess:
-                return true
-            case .writeOnly:
-                return false
-            case .denied, .restricted:
-                return false
-            case .notDetermined:
-                break
-            @unknown default:
-                return false
-            }
-        }
-
-        do {
-            return try await eventStore.requestFullAccessToReminders()
-        } catch {
+            return granted
+        @unknown default:
+            remindersAccessConfirmedInSession = false
             return false
         }
     }
 
     @MainActor
     private func openRemindersPrivacySettings() {
-        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders") else {
-            return
+        let candidates = [
+            "x-apple.systempreferences:com.apple.settings.Privacy.Reminders",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders",
+            "x-apple.systempreferences:com.apple.preference.security"
+        ]
+        for raw in candidates {
+            guard let url = URL(string: raw) else { continue }
+            if NSWorkspace.shared.open(url) {
+                return
+            }
         }
-        NSWorkspace.shared.open(url)
     }
 
     @MainActor
-    private func requestCalendarAccess() async -> Bool {
-        // Ensure the app is active so macOS can present the privacy prompt.
-        NSApp.activate(ignoringOtherApps: true)
-
-        let status = EKEventStore.authorizationStatus(for: .event)
-        switch status {
-        case .fullAccess:
+    private func requestCalendarAccess(source: PermissionRequestSource) async -> Bool {
+        if calendarAccessConfirmedInSession {
             return true
-        case .authorized:
+        }
+
+        let currentStatus = EKEventStore.authorizationStatus(for: .event)
+        switch currentStatus {
+        case .fullAccess:
+            calendarAccessConfirmedInSession = true
             return true
         case .denied, .restricted:
+            calendarAccessConfirmedInSession = false
             return false
         case .writeOnly, .notDetermined:
-            do {
-                if try await eventStore.requestFullAccessToEvents() {
-                    return true
-                }
-            } catch {
-                return EKEventStore.authorizationStatus(for: .event) == .fullAccess
+            let granted = await requestCalendarFullAccessWithRetry(source: source)
+            calendarAccessConfirmedInSession = granted
+            if granted {
+                eventStore.reset()
             }
-            return EKEventStore.authorizationStatus(for: .event) == .fullAccess
+            return granted
         @unknown default:
+            calendarAccessConfirmedInSession = false
             return false
         }
     }
 
     @MainActor
     private func openCalendarPrivacySettings() {
-        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") else {
-            return
+        let candidates = [
+            "x-apple.systempreferences:com.apple.settings.Privacy.Calendars",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars",
+            "x-apple.systempreferences:com.apple.preference.security"
+        ]
+        for raw in candidates {
+            guard let url = URL(string: raw) else { continue }
+            if NSWorkspace.shared.open(url) {
+                return
+            }
         }
-        NSWorkspace.shared.open(url)
+    }
+
+    @MainActor
+    private func shouldUseForegroundPermissionPrompt(for source: PermissionRequestSource) -> Bool {
+        guard source == .userInteraction else { return false }
+        guard NSApp.isActive else { return false }
+        guard let frontmost = NSWorkspace.shared.frontmostApplication else { return false }
+        guard frontmost.processIdentifier == ProcessInfo.processInfo.processIdentifier else { return false }
+        return NSApp.keyWindow != nil || NSApp.mainWindow != nil
+    }
+
+    @MainActor
+    private func requestCalendarFullAccessWithRetry(source: PermissionRequestSource) async -> Bool {
+        for attempt in 0..<2 {
+            let statusBefore = EKEventStore.authorizationStatus(for: .event)
+            print("ToDoManager: Calendar auth attempt \(attempt + 1), status before request: \(authorizationStatusName(statusBefore))")
+
+            let shouldPrepareForegroundPrompt = shouldUseForegroundPermissionPrompt(for: source)
+            let previousPolicy = NSApp.activationPolicy()
+            let switchedToRegular = shouldPrepareForegroundPrompt && previousPolicy != .regular
+            if switchedToRegular {
+                _ = NSApp.setActivationPolicy(.regular)
+            }
+
+            defer {
+                if switchedToRegular {
+                    _ = NSApp.setActivationPolicy(previousPolicy)
+                }
+            }
+
+            if shouldPrepareForegroundPrompt {
+                // Give AppKit one frame after policy changes before requesting permission.
+                try? await Task.sleep(nanoseconds: 120_000_000)
+            }
+
+            let permissionStore = EKEventStore()
+            let fullGranted = await requestCalendarFullAccess(using: permissionStore)
+            if fullGranted {
+                print("ToDoManager: Calendar full access granted by EventKit request")
+                return true
+            }
+
+            eventStore.reset()
+            let statusAfterRequest = EKEventStore.authorizationStatus(for: .event)
+            print("ToDoManager: Calendar auth status after request: \(authorizationStatusName(statusAfterRequest))")
+            if statusAfterRequest == .fullAccess {
+                return true
+            }
+
+            // Some systems stay in `.notDetermined` after full-access request without presenting
+            // the privacy sheet. Probe write-only once to force a TCC transition, then retry full.
+            if statusAfterRequest == .notDetermined && attempt == 0 {
+                _ = await requestCalendarWriteOnlyAccess(using: permissionStore)
+                eventStore.reset()
+                let statusAfterWriteOnly = EKEventStore.authorizationStatus(for: .event)
+                print("ToDoManager: Calendar auth status after write-only probe: \(authorizationStatusName(statusAfterWriteOnly))")
+
+                if statusAfterWriteOnly == .fullAccess {
+                    return true
+                }
+
+                if statusAfterWriteOnly == .writeOnly {
+                    let escalated = await requestCalendarFullAccess(using: permissionStore)
+                    if escalated {
+                        print("ToDoManager: Calendar full access granted after write-only probe")
+                        return true
+                    }
+                    eventStore.reset()
+                    let statusAfterEscalation = EKEventStore.authorizationStatus(for: .event)
+                    print("ToDoManager: Calendar auth status after full-access escalation: \(authorizationStatusName(statusAfterEscalation))")
+                    if statusAfterEscalation == .fullAccess {
+                        return true
+                    }
+                }
+            }
+
+            if statusAfterRequest == .denied || statusAfterRequest == .restricted || statusAfterRequest == .writeOnly {
+                return false
+            }
+            // Keep trying once if status is still .notDetermined.
+            if statusAfterRequest != .notDetermined {
+                return false
+            }
+
+            if attempt == 1 {
+                return false
+            }
+        }
+        return false
+    }
+
+    @MainActor
+    private func requestRemindersFullAccessWithRetry(source: PermissionRequestSource) async -> Bool {
+        for attempt in 0..<2 {
+            let statusBefore = EKEventStore.authorizationStatus(for: .reminder)
+            print("ToDoManager: Reminders auth attempt \(attempt + 1), status before request: \(authorizationStatusName(statusBefore))")
+
+            let shouldPrepareForegroundPrompt = shouldUseForegroundPermissionPrompt(for: source)
+            let previousPolicy = NSApp.activationPolicy()
+            let switchedToRegular = shouldPrepareForegroundPrompt && previousPolicy != .regular
+            if switchedToRegular {
+                _ = NSApp.setActivationPolicy(.regular)
+            }
+
+            defer {
+                if switchedToRegular {
+                    _ = NSApp.setActivationPolicy(previousPolicy)
+                }
+            }
+
+            if shouldPrepareForegroundPrompt {
+                // Give AppKit one frame after policy changes before requesting permission.
+                try? await Task.sleep(nanoseconds: 120_000_000)
+            }
+
+            let permissionStore = EKEventStore()
+            let granted = await requestRemindersFullAccess(using: permissionStore)
+            if granted {
+                print("ToDoManager: Reminders full access granted by EventKit request")
+                return true
+            }
+
+            eventStore.reset()
+            let statusAfterRequest = EKEventStore.authorizationStatus(for: .reminder)
+            print("ToDoManager: Reminders auth status after request: \(authorizationStatusName(statusAfterRequest))")
+            if statusAfterRequest == .fullAccess {
+                return true
+            }
+            if statusAfterRequest == .denied || statusAfterRequest == .restricted || statusAfterRequest == .writeOnly {
+                return false
+            }
+            // Keep trying once if status is still .notDetermined.
+            if statusAfterRequest != .notDetermined {
+                return false
+            }
+
+            if attempt == 1 {
+                return false
+            }
+        }
+        return false
+    }
+
+    private func shouldOpenRemindersPrivacySettings() -> Bool {
+        let status = EKEventStore.authorizationStatus(for: .reminder)
+        switch status {
+        case .denied, .restricted, .writeOnly:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func shouldOpenCalendarPrivacySettings() -> Bool {
+        let status = EKEventStore.authorizationStatus(for: .event)
+        switch status {
+        case .denied, .restricted, .writeOnly:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func authorizationStatusName(_ status: EKAuthorizationStatus) -> String {
+        switch status {
+        case .fullAccess:
+            return "fullAccess"
+        case .writeOnly:
+            return "writeOnly"
+        case .notDetermined:
+            return "notDetermined"
+        case .denied:
+            return "denied"
+        case .restricted:
+            return "restricted"
+        @unknown default:
+            return "unknown(\(status.rawValue))"
+        }
+    }
+
+    @MainActor
+    private func requestCalendarFullAccess(using store: EKEventStore) async -> Bool {
+        await withCheckedContinuation { continuation in
+            store.requestFullAccessToEvents { granted, error in
+                if let error {
+                    print("ToDoManager: requestFullAccessToEvents failed: \(error)")
+                }
+                continuation.resume(returning: granted)
+            }
+        }
+    }
+
+    @MainActor
+    private func requestCalendarWriteOnlyAccess(using store: EKEventStore) async -> Bool {
+        await withCheckedContinuation { continuation in
+            store.requestWriteOnlyAccessToEvents { granted, error in
+                if let error {
+                    print("ToDoManager: requestWriteOnlyAccessToEvents failed: \(error)")
+                }
+                continuation.resume(returning: granted)
+            }
+        }
+    }
+
+    @MainActor
+    private func requestRemindersFullAccess(using store: EKEventStore) async -> Bool {
+        await withCheckedContinuation { continuation in
+            store.requestFullAccessToReminders { granted, error in
+                if let error {
+                    print("ToDoManager: requestFullAccessToReminders failed: \(error)")
+                }
+                continuation.resume(returning: granted)
+            }
+        }
     }
 
     private func refreshReminderLists() async {
@@ -490,12 +714,7 @@ final class ToDoManager {
         }
 
         let status = EKEventStore.authorizationStatus(for: .reminder)
-        let hasAccess: Bool
-        if #available(macOS 14.0, *) {
-            hasAccess = status == .fullAccess
-        } else {
-            hasAccess = status == .authorized
-        }
+        let hasAccess = status == .fullAccess
         guard hasAccess else {
             await MainActor.run {
                 availableReminderLists = []
@@ -503,7 +722,8 @@ final class ToDoManager {
             return
         }
 
-        let options = eventStore
+        let readStore = EKEventStore()
+        let options = readStore
             .calendars(for: .reminder)
             .map { calendar in
                 ToDoReminderListOption(
@@ -536,15 +756,17 @@ final class ToDoManager {
     private func fetchReminders() async -> [ExternalTaskPayload] {
         let selectedIDs = selectedReminderListIDs
         guard !selectedIDs.isEmpty else { return [] }
-        let selectedCalendars = eventStore
+
+        let readStore = EKEventStore()
+        let selectedCalendars = readStore
             .calendars(for: .reminder)
             .filter { selectedIDs.contains($0.calendarIdentifier) }
         guard !selectedCalendars.isEmpty else { return [] }
 
-        let predicate = eventStore.predicateForReminders(in: selectedCalendars)
+        let predicate = readStore.predicateForReminders(in: selectedCalendars)
 
         let reminders: [EKReminder] = await withCheckedContinuation { continuation in
-            eventStore.fetchReminders(matching: predicate) { result in
+            readStore.fetchReminders(matching: predicate) { result in
                 continuation.resume(returning: result ?? [])
             }
         }
@@ -567,16 +789,18 @@ final class ToDoManager {
     }
 
     private func fetchCalendarEvents() async -> [ExternalTaskPayload] {
-        let calendars = eventStore.calendars(for: .event)
+        let readStore = EKEventStore()
+        let calendars = readStore.calendars(for: .event)
+        print("ToDoManager: Calendar fetch calendars count = \(calendars.count)")
         guard !calendars.isEmpty else { return [] }
 
         let now = Date()
         let end = Calendar.current.date(byAdding: .day, value: 30, to: now) ?? now.addingTimeInterval(30 * 24 * 60 * 60)
-        let predicate = eventStore.predicateForEvents(withStart: now, end: end, calendars: calendars)
-        let events = eventStore.events(matching: predicate)
+        let predicate = readStore.predicateForEvents(withStart: now, end: end, calendars: calendars)
+        let events: [EKEvent] = readStore.events(matching: predicate)
 
         var seenIDs = Set<String>()
-        return events.compactMap { event in
+        let payloads: [ExternalTaskPayload] = events.compactMap { (event: EKEvent) -> ExternalTaskPayload? in
             guard event.endDate >= now else { return nil }
             if event.status == .canceled { return nil }
 
@@ -597,6 +821,8 @@ final class ToDoManager {
                 listColorHex: Self.hexColor(from: event.calendar.cgColor)
             )
         }
+        print("ToDoManager: Calendar fetch produced \(payloads.count) upcoming events")
+        return payloads
     }
 
     private func applyExternalSync(reminderPayloads: [ExternalTaskPayload], calendarPayloads: [ExternalTaskPayload]) {
@@ -1037,11 +1263,7 @@ final class ToDoManager {
         guard source == .reminders else { return }
 
         let status = EKEventStore.authorizationStatus(for: .reminder)
-        if #available(macOS 14.0, *) {
-            guard status == .fullAccess || status == .writeOnly else { return }
-        } else {
-            guard status == .authorized else { return }
-        }
+        guard status == .fullAccess || status == .writeOnly else { return }
         guard let reminder = eventStore.calendarItem(withIdentifier: identifier) as? EKReminder else { return }
         do {
             try eventStore.remove(reminder, commit: true)
@@ -1052,11 +1274,7 @@ final class ToDoManager {
 
     private func moveExternalReminderToList(reminderIdentifier: String, reminderListID: String?) {
         let status = EKEventStore.authorizationStatus(for: .reminder)
-        if #available(macOS 14.0, *) {
-            guard status == .fullAccess || status == .writeOnly else { return }
-        } else {
-            guard status == .authorized else { return }
-        }
+        guard status == .fullAccess || status == .writeOnly else { return }
         guard let reminder = eventStore.calendarItem(withIdentifier: reminderIdentifier) as? EKReminder else { return }
 
         let targetCalendar: EKCalendar? = {
@@ -1079,7 +1297,7 @@ final class ToDoManager {
 
     private func syncNewItemToReminders(itemID: UUID, preferredListID: String?) {
         Task {
-            let granted = await requestRemindersAccess()
+            let granted = await requestRemindersAccess(source: .userInteraction)
             guard granted else { return }
 
             let itemSnapshot: ToDoItem? = await MainActor.run { [weak self] in

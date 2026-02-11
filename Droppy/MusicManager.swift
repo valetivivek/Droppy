@@ -26,17 +26,22 @@ private struct NowPlayingUpdate: Codable {
         let album: String?
         let duration: Double?
         let elapsedTime: Double?
+        let elapsedTimeNow: Double?  // More accurate estimated current position from adapter
         let playbackRate: Double?
         let bundleIdentifier: String?
         let parentApplicationBundleIdentifier: String?  // Parent app (e.g., Safari for WebKit.GPU)
+        let contentItemIdentifier: String?  // Stable track identifier
         let processIdentifier: Int?
         let artworkData: String?  // Base64 encoded
         let timestamp: String?    // ISO 8601 format: "2026-01-05T18:56:59Z"
         let playing: Bool?        // Explicit playing state from JSON
         
-        /// Get isPlaying preferring explicit 'playing' field, fallback to playbackRate
+        /// Get isPlaying preferring explicit 'playing' field, fallback to playbackRate.
         var isPlaying: Bool {
-            playing ?? ((playbackRate ?? 0) > 0)
+            if let playing {
+                return playing
+            }
+            return (playbackRate ?? 0) > 0
         }
         
         /// Get the launchable app bundle ID (prefer parent for WebKit processes)
@@ -134,13 +139,10 @@ final class MusicManager: ObservableObject {
     @Published var isMediaSourceForced: Bool = false
     private var sourceForceResetTimer: Timer?
     
-    // MARK: - FIX #128: Track Change Debouncing
-    /// Debounce timer for track metadata changes to prevent flicker during video seeking
-    private var metadataDebounceTimer: Timer?
-    /// Pending metadata update waiting for debounce stabilization
-    private var pendingMetadataUpdate: (title: String, artist: String, album: String, bundleId: String?)?
-    /// Last applied metadata signature to detect true track changes
-    private var lastAppliedMetadataSignature: String = ""
+    // MARK: - Track Identity
+    /// Stable identity for the currently shown track (content item id preferred).
+    private var currentTrackIdentity: String = ""
+    private var currentContentItemIdentifier: String?
 
     // MARK: - Apple Music Metadata Sync
     /// Periodic AppleScript sync to keep Apple Music metadata accurate
@@ -435,6 +437,11 @@ final class MusicManager: ObservableObject {
                         end if
                     end repeat
                 end repeat
+                delay 0.1
+                tell application "System Events"
+                    keystroke "\(key)"
+                end tell
+                return "Fallback played active tab"
             end tell
             """
         } else if bundleId == "company.thebrowser.Browser" {
@@ -457,6 +464,11 @@ final class MusicManager: ObservableObject {
                         set tabIndex to tabIndex + 1
                     end repeat
                 end repeat
+                delay 0.1
+                tell application "System Events"
+                    keystroke "\(key)"
+                end tell
+                return "Fallback played active tab"
             end tell
             """
         } else {
@@ -480,6 +492,11 @@ final class MusicManager: ObservableObject {
                         set tabIndex to tabIndex + 1
                     end repeat
                 end repeat
+                delay 0.1
+                tell application "System Events"
+                    keystroke "\(key)"
+                end tell
+                return "Fallback played active tab"
             end tell
             """
         }
@@ -615,6 +632,11 @@ final class MusicManager: ObservableObject {
                         end if
                     end repeat
                 end repeat
+                delay 0.1
+                tell application "System Events"
+                    \(keystrokeCmd)
+                end tell
+                return "Fallback"
             end tell
             """
         } else if bundleId == "company.thebrowser.Browser" {
@@ -636,6 +658,11 @@ final class MusicManager: ObservableObject {
                         set tabIndex to tabIndex + 1
                     end repeat
                 end repeat
+                delay 0.1
+                tell application "System Events"
+                    \(keystrokeCmd)
+                end tell
+                return "Fallback"
             end tell
             """
         } else {
@@ -658,6 +685,11 @@ final class MusicManager: ObservableObject {
                         set tabIndex to tabIndex + 1
                     end repeat
                 end repeat
+                delay 0.1
+                tell application "System Events"
+                    \(keystrokeCmd)
+                end tell
+                return "Fallback"
             end tell
             """
         }
@@ -722,11 +754,46 @@ final class MusicManager: ObservableObject {
         Date() < suppressTimingUpdatesUntil
     }
     
-    /// Force set elapsed time (used after Spotify seek commands)
-    func forceElapsedTime(_ time: Double) {
-        elapsedTime = time
+    /// Current accepted source bundle identifier (used by controllers for source arbitration)
+    var currentAcceptedBundleIdentifier: String? {
+        bundleIdentifier
+    }
+    
+    /// Duration for UI display - always returns songDuration, never 0 when we have a known value
+    var displayDurationForUI: Double {
+        max(songDuration, 0)
+    }
+
+    private func makeTrackIdentity(
+        title: String,
+        artist: String,
+        album: String,
+        bundleId: String?
+    ) -> String {
+        return "meta:\(title)|\(artist)|\(album)|bundle:\(bundleId ?? "")"
+    }
+    
+    /// Check whether a direct position update from a specific source should be accepted.
+    /// Returns true if the source matches the currently active media source.
+    func shouldAcceptDirectPositionUpdate(from sourceBundleId: String) -> Bool {
+        guard let active = bundleIdentifier else { return true }
+        return active == sourceBundleId
+    }
+    
+    /// Force set elapsed time (used after Spotify/Apple Music seek commands)
+    /// sourceBundle parameter allows callers to identify themselves for logging.
+    func forceElapsedTime(_ time: Double, sourceBundle: String? = nil) {
+        // Reject updates from non-active sources
+        if let sourceBundle, !shouldAcceptDirectPositionUpdate(from: sourceBundle) {
+            return
+        }
+        // During timing suppression, reject updates that look like stale pre-seek positions
+        if isTimingSuppressed {
+            return
+        }
+        let clamped = max(0, min(time, songDuration > 0 ? songDuration : time))
+        elapsedTime = clamped
         timestampDate = Date()
-        suppressTimingUpdatesUntil = .distantPast // Clear suppression
     }
     
     /// FIX #95: Force switch to Spotify by fetching data directly via AppleScript
@@ -765,6 +832,13 @@ final class MusicManager: ObservableObject {
                 self.elapsedTime = position
                 self.timestampDate = Date()
                 self.bundleIdentifier = SpotifyController.spotifyBundleId
+                self.currentTrackIdentity = self.makeTrackIdentity(
+                    title: title,
+                    artist: artist,
+                    album: album ?? "",
+                    bundleId: SpotifyController.spotifyBundleId
+                )
+                self.currentContentItemIdentifier = nil
                 self.isPlaying = true
                 self.playbackRate = 1.0
                 self.isMediaHUDHidden = false
@@ -788,6 +862,13 @@ final class MusicManager: ObservableObject {
     // MARK: - Process Management
     private var adapterProcess: Process?
     private var outputPipe: Pipe?
+    private var hasReceivedStreamUpdate: Bool = false
+    private var fallbackTimingTimer: Timer?
+    private var isFallbackFetchInFlight = false
+    private var lastFallbackFetchAt: Date = .distantPast
+    private let fallbackTimingSyncInterval: TimeInterval = 1.0
+    private let fallbackStaleThreshold: TimeInterval = 1.25
+    private let fallbackFetchCooldown: TimeInterval = 0.75
     
     // MediaRemote framework for sending commands (still works for control)
     private var mediaRemoteBundle: CFBundle?
@@ -887,10 +968,14 @@ final class MusicManager: ObservableObject {
         songDuration = 0
         elapsedTime = 0
         playbackRate = 0
+        timestampDate = .distantPast
         bundleIdentifier = nil
+        currentTrackIdentity = ""
+        currentContentItemIdentifier = nil
         wasRecentlyPlaying = false
         isMediaHUDForced = false
         stopAppleMusicMetadataSyncTimer()
+        stopFallbackTimingSync()
     }
     
     /// Called when screen wakes from sleep - restart the adapter to prevent frozen HUD
@@ -916,15 +1001,19 @@ final class MusicManager: ObservableObject {
     
     /// Fetch complete now playing info using the "get" command
     /// This solves the cold start problem where duration isn't sent in the initial stream
-    private func fetchFullNowPlayingInfo() {
+    private func fetchFullNowPlayingInfo(
+        allowPayloadDuringActiveStream: Bool = false,
+        completion: (() -> Void)? = nil
+    ) {
         guard let scriptURL = Bundle.main.url(forResource: "mediaremote-adapter", withExtension: "pl"),
               let frameworkPath = Bundle.main.privateFrameworksPath?.appending("/MediaRemoteAdapter.framework") else {
+            completion?()
             return
         }
         
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
-        process.arguments = [scriptURL.path, frameworkPath, "get"]
+        process.arguments = [scriptURL.path, frameworkPath, "get", "--now"]
         
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -939,16 +1028,23 @@ final class MusicManager: ObservableObject {
                 process.waitUntilExit()
                 
                 if !data.isEmpty {
-                    print("MusicManager: Cold start fetch received \(data.count) bytes")
-                    self?.processJSONLine(data)
+                    print("MusicManager: Metadata fetch received \(data.count) bytes")
+                    self?.processJSONLine(data, allowPayloadDuringActiveStream: allowPayloadDuringActiveStream)
+                }
+                DispatchQueue.main.async {
+                    completion?()
                 }
             }
         } catch {
             print("MusicManager: Cold start fetch failed: \(error)")
+            DispatchQueue.main.async {
+                completion?()
+            }
         }
     }
     
     deinit {
+        stopFallbackTimingSync()
         stopAdapterProcess()
     }
     
@@ -1034,10 +1130,56 @@ final class MusicManager: ObservableObject {
         adapterProcess = nil
         outputPipe = nil
     }
+
+    private var shouldRunFallbackTimingSync: Bool {
+        guard isPlaying else { return false }
+        guard bundleIdentifier != nil else { return false }
+        return !isSpotifySource && !isAppleMusicSource
+    }
+
+    private func stopFallbackTimingSync() {
+        fallbackTimingTimer?.invalidate()
+        fallbackTimingTimer = nil
+        isFallbackFetchInFlight = false
+        lastFallbackFetchAt = .distantPast
+    }
+
+    private func requestTimingResyncIfNeeded(reason: String, force: Bool = false) {
+        _ = reason // Reserved for MUSYMUSY diagnostics.
+        guard !isTimingSuppressed else { return }
+        guard !isFallbackFetchInFlight else { return }
+
+        let now = Date()
+        if !force {
+            guard now.timeIntervalSince(lastFallbackFetchAt) >= fallbackFetchCooldown else { return }
+            guard now.timeIntervalSince(timestampDate) > fallbackStaleThreshold else { return }
+        }
+
+        isFallbackFetchInFlight = true
+        lastFallbackFetchAt = now
+        fetchFullNowPlayingInfo(allowPayloadDuringActiveStream: true) { [weak self] in
+            self?.isFallbackFetchInFlight = false
+        }
+    }
+
+    private func updateFallbackTimingSyncState() {
+        if shouldRunFallbackTimingSync {
+            if fallbackTimingTimer == nil {
+                let timer = Timer.scheduledTimer(withTimeInterval: fallbackTimingSyncInterval, repeats: true) { [weak self] _ in
+                    self?.requestTimingResyncIfNeeded(reason: "fallback_timer")
+                }
+                RunLoop.main.add(timer, forMode: .common)
+                fallbackTimingTimer = timer
+            }
+            requestTimingResyncIfNeeded(reason: "fallback_start")
+        } else {
+            stopFallbackTimingSync()
+        }
+    }
     
     // MARK: - JSON Stream Processing
     
-    private func processJSONLine(_ data: Data) {
+    private func processJSONLine(_ data: Data, allowPayloadDuringActiveStream: Bool = false) {
         // Debug: Always log raw JSON for timing issues
         if let jsonStr = String(data: data, encoding: .utf8) {
             print("MusicManager: Raw JSON received: \(jsonStr.prefix(500))")
@@ -1048,6 +1190,7 @@ final class MusicManager: ObservableObject {
             // Try decoding as full update structure first
             if let update = try? decoder.decode(NowPlayingUpdate.self, from: data) {
                 DispatchQueue.main.async { [weak self] in
+                    self?.hasReceivedStreamUpdate = true
                     self?.handleUpdate(update)
                 }
                 return
@@ -1059,6 +1202,10 @@ final class MusicManager: ObservableObject {
             print("MusicManager: Decoded as direct payload")
             
             DispatchQueue.main.async { [weak self] in
+                // Ignore cold-start "get" snapshots once stream updates are active.
+                if self?.hasReceivedStreamUpdate == true && !allowPayloadDuringActiveStream {
+                    return
+                }
                 self?.handleUpdate(update)
             }
         } catch {
@@ -1101,114 +1248,120 @@ final class MusicManager: ObservableObject {
             return
         }
 
-        // MARK: FIX #128 - Debounced Track Change Detection
-        // During video seeking, MediaRemote sends rapid updates that can cause UI flicker.
-        // We debounce track changes to wait for stable metadata before updating the display.
-        
+        // MARK: - Track + Timing State
         let incomingTitle = payload.title ?? songTitle
         let incomingArtist = payload.artist ?? artistName
         let incomingAlbum = payload.album ?? albumName
         let incomingBundleId = payload.launchableBundleIdentifier ?? bundleIdentifier
-        
-        // Create a signature for the incoming metadata
-        let incomingSignature = "\(incomingTitle)||\(incomingArtist)||\(incomingBundleId ?? "")"
-        
-        // Check if this is a track change (different from currently displayed)
-        let isTrackChange = incomingSignature != lastAppliedMetadataSignature && !lastAppliedMetadataSignature.isEmpty
-        
+        let incomingIdentity = makeTrackIdentity(
+            title: incomingTitle,
+            artist: incomingArtist,
+            album: incomingAlbum,
+            bundleId: incomingBundleId
+        )
+        let metadataChanged = !currentTrackIdentity.isEmpty && incomingIdentity != currentTrackIdentity
+        let rawElapsed = payload.elapsedTimeNow ?? payload.elapsedTime
+        let incomingElapsed = rawElapsed
+        let elapsedRestarted = (incomingElapsed ?? elapsedTime) + 1.0 < elapsedTime
+        let implicitBoundary = !isTimingSuppressed && payload.isPlaying && elapsedRestarted && elapsedTime > 5
+        // Never treat content-item churn during seek as a track change.
+        let isTrackChange = metadataChanged || implicitBoundary
+        let previousIsPlaying = isPlaying
+        let previousPlaybackRate = playbackRate
+        let previousProjectedPosition = estimatedPlaybackPosition(at: Date())
+        let staleEndSnapshot = isTrackChange && {
+            guard let elapsed = rawElapsed, let duration = payload.duration, duration > 0 else { return false }
+            guard elapsed.isFinite, duration.isFinite else { return false }
+            // Some sources emit stale "end of previous track" timing right after metadata switch.
+            return elapsed > 10 && elapsed >= (duration - 0.35)
+        }()
+
         if isTrackChange {
-            // Cancel any existing debounce timer
-            metadataDebounceTimer?.invalidate()
-            
-            // Store pending metadata
-            pendingMetadataUpdate = (title: incomingTitle, artist: incomingArtist, album: incomingAlbum, bundleId: incomingBundleId)
-            
-            // Start debounce timer - wait 300ms for metadata to stabilize
-            metadataDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
-                self?.applyPendingMetadataUpdate()
+            // Hard reset timing on track change to prevent carrying over stale values.
+            songDuration = 0
+            elapsedTime = 0
+            timestampDate = Date()
+
+            let nextBundle = incomingBundleId ?? bundleIdentifier
+            if nextBundle == SpotifyController.spotifyBundleId {
+                SpotifyController.shared.onTrackChange()
             }
-            
-            print("MusicManager: FIX #128 - Track change detected, debouncing for 300ms...")
-        } else {
-            // Same track or first load - apply immediately and update signature
-            if let title = payload.title {
-                if title != songTitle {
-                    // Reset timing values when song changes to prevent stale timestamps
-                    songDuration = 0
-                    elapsedTime = 0
-                    // Notify Spotify controller of track change
-                    if isSpotifySource {
-                        SpotifyController.shared.onTrackChange()
-                    }
-                    // Notify Apple Music controller of track change
-                    if isAppleMusicSource {
-                        AppleMusicController.shared.onTrackChange()
-                    }
-                }
-                songTitle = title
+            if nextBundle == AppleMusicController.appleMusicBundleId {
+                AppleMusicController.shared.onTrackChange()
             }
-            if let artist = payload.artist {
-                artistName = artist
+            let timingIncomplete = (payload.elapsedTimeNow == nil && payload.elapsedTime == nil) || ((payload.duration ?? 0) <= 0)
+            if timingIncomplete || staleEndSnapshot {
+                requestTimingResyncIfNeeded(reason: "track_change_seed", force: true)
             }
-            if let album = payload.album {
-                albumName = album
-            }
-            
-            // Update the applied signature
-            lastAppliedMetadataSignature = "\(songTitle)||\(artistName)||\(bundleIdentifier ?? "")"
-            
-            // Clear any pending update since we just applied
-            metadataDebounceTimer?.invalidate()
-            pendingMetadataUpdate = nil
         }
+
+        songTitle = incomingTitle
+        artistName = incomingArtist
+        albumName = incomingAlbum
+        currentTrackIdentity = incomingIdentity
+        currentContentItemIdentifier = payload.contentItemIdentifier
+
         if let duration = payload.duration, duration > 0 {
-            // Only accept duration if it makes sense (greater than current elapsed time)
-            // For web sources, MediaRemote sometimes sends elapsedTime as duration
-            let currentElapsed = payload.elapsedTime ?? elapsedTime
-            if duration > currentElapsed || currentElapsed < 5 {
+            // Ignore stale end-boundary duration that belongs to the previous track.
+            if !staleEndSnapshot {
                 songDuration = duration
-            } else {
-                print("MusicManager: Rejected invalid duration \(duration) <= elapsed \(currentElapsed)")
             }
+        } else if isTrackChange {
+            songDuration = 0
         }
-        if let elapsed = payload.elapsedTime {
-            // SIMPLE TIMING LOGIC:
-            // 
-            // For Spotify: IGNORE all MediaRemote timing - we use AppleScript polling instead
-            // For other sources: Just accept what MediaRemote sends
-            
-            // Check if this update is from Spotify (check payload directly, not stored value)
-            let isFromSpotify = payload.launchableBundleIdentifier == SpotifyController.spotifyBundleId ||
-                                (payload.launchableBundleIdentifier == nil && isSpotifySource)
-            
-            if isFromSpotify {
-                // SPOTIFY: Ignore MediaRemote timing completely
-                // SpotifyController handles timing via AppleScript polling every 1 second
-            } else {
-                // OTHER SOURCES: Accept MediaRemote timing directly
-                var newElapsedTime = elapsed
-                
-                // Adjust for timestamp age if available
-                if let ts = payload.timestamp {
-                    let formatter = ISO8601DateFormatter()
-                    if let captureDate = formatter.date(from: ts) {
-                        let timeSinceCapture = Date().timeIntervalSince(captureDate)
-                        let rate = payload.playbackRate ?? 1.0
-                        
-                        // Only adjust if timestamp is recent and we're playing
-                        if timeSinceCapture >= 0 && timeSinceCapture < 5 && rate > 0 {
-                            newElapsedTime = elapsed + (timeSinceCapture * rate)
-                        }
-                    }
+
+        let eventTimestamp: Date = {
+            guard let ts = payload.timestamp else { return Date() }
+            return ISO8601DateFormatter().date(from: ts) ?? Date()
+        }()
+
+        // Accept adapter timing directly; projection happens in estimatedPlaybackPosition().
+        if let elapsed = rawElapsed, !isTimingSuppressed, !staleEndSnapshot {
+            var newElapsedTime = elapsed
+
+            // If adapter didn't provide elapsedTimeNow, compensate elapsedTime to "now"
+            // using timestamp age. Anchor final state to Date() to avoid stale timestamp drift.
+            if payload.elapsedTimeNow == nil {
+                let age = Date().timeIntervalSince(eventTimestamp)
+                let rate = payload.playbackRate ?? playbackRate
+                if payload.isPlaying && age >= 0 && age < 8 && rate > 0 {
+                    newElapsedTime += age * rate
                 }
-                
-                elapsedTime = newElapsedTime
-                timestampDate = Date()
             }
+            // Clamp to duration if available
+            if songDuration > 0 {
+                newElapsedTime = min(max(0, newElapsedTime), songDuration)
+            } else {
+                newElapsedTime = max(0, newElapsedTime)
+            }
+
+            elapsedTime = newElapsedTime
+            timestampDate = Date()
+        } else if isTrackChange {
+            elapsedTime = 0
+            timestampDate = Date()
         }
-        if let rate = payload.playbackRate {
-            playbackRate = rate
+
+        let newPlaybackRate: Double = {
+            if let rate = payload.playbackRate { return rate }
+            if let playing = payload.playing { return playing ? max(previousPlaybackRate, 1.0) : 0 }
+            return previousPlaybackRate
+        }()
+        let newIsPlaying = payload.isPlaying
+
+        if rawElapsed == nil && !isTrackChange && !isTimingSuppressed &&
+            (newPlaybackRate != previousPlaybackRate || newIsPlaying != previousIsPlaying) {
+            var anchored = previousProjectedPosition
+            if songDuration > 0 {
+                anchored = min(max(0, anchored), songDuration)
+            } else {
+                anchored = max(0, anchored)
+            }
+            elapsedTime = anchored
+            timestampDate = Date()
         }
+
+        playbackRate = newPlaybackRate
         if let bundle = payload.launchableBundleIdentifier {
             let wasSpotify = isSpotifySource
             let wasAppleMusic = isAppleMusicSource
@@ -1245,8 +1398,8 @@ final class MusicManager: ObservableObject {
             }
         }
         
-        // Always update isPlaying from playbackRate (computed property)
-        isPlaying = payload.isPlaying
+        // Keep play state aligned with adapter payload.
+        isPlaying = newIsPlaying
         
         // Handle artwork
         if let base64Art = payload.artworkData,
@@ -1258,6 +1411,7 @@ final class MusicManager: ObservableObject {
         
         // Debug: Log the update
         print("MusicManager: Updated - title='\(songTitle)', artist='\(artistName)', isPlaying=\(isPlaying), elapsed=\(elapsedTime), duration=\(songDuration), rate=\(playbackRate)")
+        updateFallbackTimingSyncState()
     }
     
     // MARK: - Cached Visualizer Color
@@ -1275,39 +1429,6 @@ final class MusicManager: ObservableObject {
         }
     }
     
-    // MARK: - FIX #128: Apply Pending Metadata Update
-    
-    /// Applies pending metadata update after debounce period
-    /// Called by debounce timer to prevent flicker during video seeking
-    private func applyPendingMetadataUpdate() {
-        guard let pending = pendingMetadataUpdate else { return }
-        
-        print("MusicManager: FIX #128 - Applying debounced metadata update: '\(pending.title)' by '\(pending.artist)'")
-        
-        // Reset timing values for new track
-        songDuration = 0
-        elapsedTime = 0
-        
-        // Notify controllers of track change
-        if isSpotifySource {
-            SpotifyController.shared.onTrackChange()
-        }
-        if isAppleMusicSource {
-            AppleMusicController.shared.onTrackChange()
-        }
-        
-        // Apply the pending metadata
-        songTitle = pending.title
-        artistName = pending.artist
-        albumName = pending.album
-        
-        // Update signature
-        lastAppliedMetadataSignature = "\(songTitle)||\(artistName)||\(bundleIdentifier ?? "")"
-        
-        // Clear pending state
-        pendingMetadataUpdate = nil
-    }
-
     // MARK: - Apple Music Metadata Sync
 
     /// Start periodic Apple Music metadata reconciliation
@@ -1350,9 +1471,6 @@ final class MusicManager: ObservableObject {
             let didChange = title != self.songTitle || artist != self.artistName || resolvedAlbum != self.albumName
 
             if didChange {
-                self.metadataDebounceTimer?.invalidate()
-                self.pendingMetadataUpdate = nil
-
                 self.songTitle = title
                 self.artistName = artist
                 self.albumName = resolvedAlbum
@@ -1366,7 +1484,13 @@ final class MusicManager: ObservableObject {
                 }
 
                 self.bundleIdentifier = AppleMusicController.appleMusicBundleId
-                self.lastAppliedMetadataSignature = "\(title)||\(artist)||\(AppleMusicController.appleMusicBundleId)"
+                self.currentTrackIdentity = self.makeTrackIdentity(
+                    title: title,
+                    artist: artist,
+                    album: resolvedAlbum,
+                    bundleId: AppleMusicController.appleMusicBundleId
+                )
+                self.currentContentItemIdentifier = nil
 
                 AppleMusicController.shared.onTrackChange()
             }
@@ -1456,22 +1580,39 @@ final class MusicManager: ObservableObject {
     
     /// Seek to specific time
     func seek(to time: Double) {
+        // FIX: Use displayDurationForUI instead of songDuration for clamping.
+        // When songDuration is 0 (not yet loaded), don't clamp to 0.
+        let duration = displayDurationForUI
+        let clampedTime = duration > 0 ? max(0, min(time, duration)) : max(0, time)
+        print("MusicManager: Seeking to \(clampedTime)s (duration: \(duration)s)")
+        
+        // FIX: Suppress timing updates briefly so stale payloads from the old position
+        // don't overwrite our seek target.
+        suppressTimingUpdates(for: 2.0)
+        
+        // Update local state immediately for responsive UI (synchronous, not async)
+        elapsedTime = clampedTime
+        timestampDate = Date()
+
+        // When source filtering is enabled, seek directly in the displayed source app.
+        if isMediaSourceFilterEnabled, let displayedBundle = bundleIdentifier {
+            if displayedBundle == SpotifyController.spotifyBundleId {
+                runAppleScriptAsync("tell application \"Spotify\" to set player position to \(clampedTime)")
+                return
+            }
+            if displayedBundle == AppleMusicController.appleMusicBundleId {
+                runAppleScriptAsync("tell application \"Music\" to set player position to \(clampedTime)")
+                return
+            }
+        }
+
         guard let setElapsedTime = MRMediaRemoteSetElapsedTimePtr else {
             print("MusicManager: Seek failed - MRMediaRemoteSetElapsedTime not available")
             return
         }
-        
-        let clampedTime = max(0, min(time, songDuration))
-        print("MusicManager: Seeking to \(clampedTime)s (duration: \(songDuration)s)")
-        
+
         // Call the MediaRemote function to seek
         setElapsedTime(clampedTime)
-        
-        // Update local state immediately for responsive UI
-        DispatchQueue.main.async {
-            self.elapsedTime = clampedTime
-            self.timestampDate = Date()
-        }
     }
     
     /// Skip forward/backward by seconds
@@ -1721,10 +1862,15 @@ final class MusicManager: ObservableObject {
     }
     
     func estimatedPlaybackPosition(at date: Date = Date()) -> Double {
-        guard isPlaying else { return elapsedTime }
-        let delta = date.timeIntervalSince(timestampDate)
+        guard isPlaying else {
+            if songDuration > 0 {
+                return min(max(elapsedTime, 0), songDuration)
+            } else {
+                return max(elapsedTime, 0)
+            }
+        }
+        let delta = max(0, date.timeIntervalSince(timestampDate))
         let progressed = elapsedTime + (delta * playbackRate)
-        // Only clamp to duration if we have a valid duration (> 0)
         if songDuration > 0 {
             return min(max(progressed, 0), songDuration)
         } else {

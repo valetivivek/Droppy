@@ -124,9 +124,20 @@ struct ShelfQuickActionButton: View {
     
     var body: some View {
         // Use AppKit-based drop target for reliable Photos.app file promise support
-        FilePromiseDropTarget(isTargeted: $isTargeted, onFilesReceived: { urls in
-            shareAction(urls)
-        }) {
+        FilePromiseDropTarget(
+            isTargeted: $isTargeted,
+            onFilesReceived: { urls in
+                shareAction(urls)
+            },
+            onHoverChanged: { hovering in
+                isHovering = hovering
+                if hovering {
+                    DroppyState.shared.hoveredShelfQuickAction = actionType
+                } else if DroppyState.shared.hoveredShelfQuickAction == actionType {
+                    DroppyState.shared.hoveredShelfQuickAction = nil
+                }
+            }
+        ) {
             Circle()
                 // Transparent mode: use material, Dark mode: pure black
                 .fill(useTransparent ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
@@ -152,15 +163,6 @@ struct ShelfQuickActionButton: View {
                 .scaleEffect(isTargeted ? 1.18 : (isHovering ? 1.05 : 1.0))
                 .animation(DroppyAnimation.hoverBouncy, value: isTargeted)
                 .animation(DroppyAnimation.hoverBouncy, value: isHovering)
-        }
-        .onHover { hovering in
-            isHovering = hovering
-            // Update shared state for shelf explanation overlay
-            if hovering {
-                DroppyState.shared.hoveredShelfQuickAction = actionType
-            } else if DroppyState.shared.hoveredShelfQuickAction == actionType {
-                DroppyState.shared.hoveredShelfQuickAction = nil
-            }
         }
         .frame(width: size, height: size)
         // Update shared state when this button is targeted

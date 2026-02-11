@@ -49,6 +49,7 @@ struct AIInstallView: View {
     @State private var showConfetti = false
     @State private var currentStep: AIInstallStep = .checking
     @State private var showReviewsSheet = false
+    @State private var copiedManualCommand = false
     
     // Stats passed from parent
     var installCount: Int?
@@ -99,6 +100,7 @@ struct AIInstallView: View {
         }
         .onAppear {
             pulseAnimation = true
+            manager.checkInstallationStatus()
         }
         .onChange(of: manager.isInstalled) { _, installed in
             if installed && manager.isInstalling == false {
@@ -268,6 +270,7 @@ struct AIInstallView: View {
             featureRow(icon: "bolt.fill", text: "Works offline after install")
             featureRow(icon: "lock.fill", text: "100% on-device processing")
             featureRow(icon: "arrow.down.circle", text: "One-time download (~400MB)")
+            prerequisiteSection
             
             // Screenshot loaded from web (cached to prevent flashing)
             CachedAsyncImage(url: URL(string: "https://getdroppy.app/assets/images/ai-bg-screenshot.png")) { image in
@@ -285,6 +288,77 @@ struct AIInstallView: View {
             }
         }
         .padding(.bottom, 20)
+    }
+    
+    private var prerequisiteSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Divider()
+                .padding(.vertical, 8)
+            
+            HStack(spacing: 8) {
+                Image(systemName: manager.hasDetectedPythonPath ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(manager.hasDetectedPythonPath ? .green : .orange)
+                Text(manager.hasDetectedPythonPath ? "Python detected on your Mac" : "Could not detect Python automatically")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+            }
+            
+            Text(manager.hasDetectedPythonPath
+                 ? "Install Now will install only the AI background-removal package into this Python."
+                 : "Install Now will try to set up Python first (or you can run the command below in Terminal).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            
+            if let pythonPath = manager.detectedPythonPath, manager.hasDetectedPythonPath {
+                Text(pythonPath)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            } else {
+                Text("No `python3` path found in common locations yet.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            
+            Text("Manual command")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.primary)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                Text(manager.recommendedManualInstallCommand)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .padding(DroppySpacing.md)
+            .background(AdaptiveColors.overlayAuto(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.small))
+            .overlay(
+                RoundedRectangle(cornerRadius: DroppyRadius.small)
+                    .stroke(Color.green.opacity(0.3), lineWidth: 1)
+            )
+            
+            HStack(spacing: 8) {
+                Button {
+                    manager.checkInstallationStatus()
+                } label: {
+                    Label("Re-check", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(DroppyPillButtonStyle(size: .small))
+                
+                Button {
+                    copyManualCommand()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: copiedManualCommand ? "checkmark" : "doc.on.clipboard")
+                        Text(copiedManualCommand ? "Copied!" : "Copy")
+                    }
+                }
+                .buttonStyle(DroppyAccentButtonStyle(color: .green, size: .small))
+            }
+        }
     }
     
     private func featureRow(icon: String, text: String) -> some View {
@@ -308,13 +382,46 @@ struct AIInstallView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
             
-            Text("Make sure Python 3 is installed on your Mac.")
+            Text("Retry install, or run the manual command shown above and press Re-check.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
+            
+            Text(manager.hasDetectedPythonPath
+                 ? "Python is already detected. This usually means only the AI package install failed."
+                 : "Python was not detected yet. Install Now can still trigger setup automatically.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+            
+            HStack(spacing: 8) {
+                Button {
+                    manager.checkInstallationStatus()
+                } label: {
+                    Label("Re-check", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(DroppyPillButtonStyle(size: .small))
+                
+                Button {
+                    copyManualCommand()
+                } label: {
+                    Label(copiedManualCommand ? "Copied" : "Copy Command", systemImage: copiedManualCommand ? "checkmark" : "doc.on.clipboard")
+                }
+                .buttonStyle(DroppyPillButtonStyle(size: .small))
+            }
         }
         .padding(.bottom, 16)
+    }
+    
+    private func copyManualCommand() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(manager.recommendedManualInstallCommand, forType: .string)
+        copiedManualCommand = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            copiedManualCommand = false
+        }
     }
     
     // MARK: - Buttons

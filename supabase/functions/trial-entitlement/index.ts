@@ -29,13 +29,14 @@ serve(async (req) => {
         }
 
         // 2. Parse Request Body
-        const { device_id, app_bundle_id, app_version } = await req.json();
+        const { device_id, account_hash, app_bundle_id, app_version } = await req.json();
         if (!device_id) {
             return new Response(JSON.stringify({ error: "Missing device_id" }), {
                 status: 400,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         }
+        const normalizedAccountHash = normalizeAccountHash(account_hash);
 
         // 3. Initialize Supabase Admin Client (Service Role)
         // We need service role to read/write to the trial_entitlements table which has RLS enabled
@@ -49,9 +50,9 @@ serve(async (req) => {
         const action = url.pathname.split("/").pop(); // "status" or "start"
 
         if (action === "start") {
-            return await handleStartTrial(supabaseAdmin, device_id);
+            return await handleStartTrial(supabaseAdmin, device_id, normalizedAccountHash);
         } else if (action === "status") {
-            return await handleStatusCheck(supabaseAdmin, device_id);
+            return await handleStatusCheck(supabaseAdmin, device_id, normalizedAccountHash);
         } else {
             return new Response(JSON.stringify({ error: "Invalid endpoint" }), {
                 status: 404,
@@ -67,19 +68,11 @@ serve(async (req) => {
     }
 });
 
-async function handleStatusCheck(supabase: any, device_id: string) {
+async function handleStatusCheck(supabase: any, device_id: string, account_hash: string | null) {
     const now = new Date();
     const serverNow = Math.floor(now.getTime() / 1000);
 
-    const { data, error } = await supabase
-        .from("trial_entitlements")
-        .select("*")
-        .eq("device_id", device_id)
-        .single();
-
-    if (error && error.code !== "PGRST116") { // PGRST116 is "Row not found"
-        throw error;
-    }
+    const data = await findEntitlement(supabase, device_id, account_hash);
 
     if (!data) {
         // No trial record found -> Eligible
@@ -94,6 +87,8 @@ async function handleStatusCheck(supabase: any, device_id: string) {
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
+
+    await backfillAccountHashIfMissing(supabase, data, account_hash);
 
     // Trial record exists
     const expiresAt = new Date(data.expires_at).getTime() / 1000;
@@ -116,19 +111,17 @@ async function handleStatusCheck(supabase: any, device_id: string) {
     );
 }
 
-async function handleStartTrial(supabase: any, device_id: string) {
+async function handleStartTrial(supabase: any, device_id: string, account_hash: string | null) {
     const now = new Date();
     const serverNow = Math.floor(now.getTime() / 1000);
     const trialDurationSeconds = 3 * 24 * 60 * 60; // 3 days
 
-    // 1. Check if exists first (Lock/Read)
-    const { data: existing } = await supabase
-        .from("trial_entitlements")
-        .select("*")
-        .eq("device_id", device_id)
-        .single();
+    // 1. Check if exists first by device or account
+    const existing = await findEntitlement(supabase, device_id, account_hash);
 
     if (existing) {
+        await backfillAccountHashIfMissing(supabase, existing, account_hash);
+
         // Already exists, return current status
         const expiresAt = new Date(existing.expires_at).getTime() / 1000;
         const startedAt = new Date(existing.started_at).getTime() / 1000;
@@ -157,6 +150,7 @@ async function handleStartTrial(supabase: any, device_id: string) {
         .insert([
             {
                 device_id: device_id,
+                account_hash: account_hash,
                 started_at: now.toISOString(),
                 expires_at: expiresAtDate.toISOString(),
                 consumed: true,
@@ -165,7 +159,7 @@ async function handleStartTrial(supabase: any, device_id: string) {
 
     if (insertError) {
         if (insertError.code === "23505") { // Unique violation race condition
-            return handleStartTrial(supabase, device_id); // Retry/Return existing
+            return handleStartTrial(supabase, device_id, account_hash); // Retry/Return existing
         }
         throw insertError;
     }
@@ -182,4 +176,66 @@ async function handleStartTrial(supabase: any, device_id: string) {
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+}
+
+function normalizeAccountHash(value: unknown): string | null {
+    if (typeof value !== "string") {
+        return null;
+    }
+    const normalized = value.trim().toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(normalized)) {
+        return null;
+    }
+    return normalized;
+}
+
+async function findEntitlement(supabase: any, device_id: string, account_hash: string | null) {
+    const { data: byDevice, error: deviceError } = await supabase
+        .from("trial_entitlements")
+        .select("*")
+        .eq("device_id", device_id)
+        .maybeSingle();
+
+    if (deviceError) {
+        throw deviceError;
+    }
+
+    if (byDevice) {
+        return byDevice;
+    }
+
+    if (!account_hash) {
+        return null;
+    }
+
+    const { data: byAccount, error: accountError } = await supabase
+        .from("trial_entitlements")
+        .select("*")
+        .eq("account_hash", account_hash)
+        .maybeSingle();
+
+    if (accountError) {
+        throw accountError;
+    }
+
+    return byAccount ?? null;
+}
+
+async function backfillAccountHashIfMissing(supabase: any, entitlement: any, account_hash: string | null) {
+    if (!account_hash) {
+        return;
+    }
+    if (!entitlement?.id || entitlement.account_hash) {
+        return;
+    }
+
+    const { error } = await supabase
+        .from("trial_entitlements")
+        .update({ account_hash })
+        .eq("id", entitlement.id)
+        .is("account_hash", null);
+
+    if (error && error.code !== "23505") {
+        throw error;
+    }
 }

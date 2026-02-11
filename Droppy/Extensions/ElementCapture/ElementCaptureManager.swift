@@ -591,7 +591,12 @@ final class ElementCaptureManager: ObservableObject {
             borderWidth: borderWidth,
             cornerRadius: cornerRadius
         )
-        
+        highlightWindow?.onCancel = { [weak self] in
+            self?.stopCaptureMode()
+        }
+
+        NSApp.activate(ignoringOtherApps: true)
+        highlightWindow?.makeKeyAndOrderFront(nil)
         highlightWindow?.orderFrontRegardless()
         print("[ElementCapture] Created highlight window on screen \(currentScreenDisplayID), frame: \(screen.frame)")
     }
@@ -1004,7 +1009,9 @@ final class ElementCaptureManager: ObservableObject {
     // MARK: - Event Tap (Click Interception)
     
     private func installEventTap() {
-        let eventMask: CGEventMask = (1 << CGEventType.leftMouseDown.rawValue)
+        let eventMask: CGEventMask =
+            (1 << CGEventType.leftMouseDown.rawValue) |
+            (1 << CGEventType.keyDown.rawValue)
         
         eventTap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -1033,13 +1040,28 @@ final class ElementCaptureManager: ObservableObject {
                     return Unmanaged.passRetained(event)
                 }
 
-                // Only handle if we're active and have an element
-                if manager.isActive && manager.hasElement {
-                    // Trigger capture on main thread
+                guard manager.isActive else {
+                    return Unmanaged.passRetained(event)
+                }
+
+                // Fallback ESC handling via event tap so cancellation remains reliable even if
+                // local/global key monitors miss a key press due focus changes.
+                if type == .keyDown {
+                    let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+                    if keyCode == 53 {
+                        DispatchQueue.main.async {
+                            manager.stopCaptureMode()
+                        }
+                        return nil
+                    }
+                    return Unmanaged.passRetained(event)
+                }
+
+                // Capture on click in element mode.
+                if type == .leftMouseDown && manager.hasElement {
                     Task { @MainActor in
                         await manager.captureCurrentElement()
                     }
-                    // Swallow the event (return nil prevents it from propagating)
                     return nil
                 }
                 
@@ -1327,7 +1349,9 @@ final class ElementCaptureManager: ObservableObject {
             throw CaptureError.noDisplay
         }
         
-        let displayBounds = CGRect(x: 0, y: 0, width: CGFloat(display.width), height: CGFloat(display.height))
+        let displayWidthPoints = max(CGFloat(display.width), 1)
+        let displayHeightPoints = max(CGFloat(display.height), 1)
+        let displayBounds = CGRect(x: 0, y: 0, width: displayWidthPoints, height: displayHeightPoints)
         guard displayBounds.width >= 1, displayBounds.height >= 1 else {
             throw CaptureError.noElement
         }
@@ -1340,6 +1364,34 @@ final class ElementCaptureManager: ObservableObject {
         guard xScale.isFinite, yScale.isFinite, xScale > 0, yScale > 0 else {
             throw CaptureError.captureFailed
         }
+
+        // Render output at native display pixel density for sharper captures,
+        // especially on Retina / HiDPI screens.
+        let nativePixelWidth = max(CGFloat(CGDisplayPixelsWide(targetDisplayID)), displayWidthPoints)
+        let nativePixelHeight = max(CGFloat(CGDisplayPixelsHigh(targetDisplayID)), displayHeightPoints)
+        let nativeScaleX = nativePixelWidth / displayWidthPoints
+        let nativeScaleY = nativePixelHeight / displayHeightPoints
+        
+        var modeScaleX: CGFloat = 1
+        var modeScaleY: CGFloat = 1
+        if let mode = CGDisplayCopyDisplayMode(targetDisplayID) {
+            let modeWidth = max(CGFloat(mode.width), 1)
+            let modeHeight = max(CGFloat(mode.height), 1)
+            let derivedModeScaleX = CGFloat(mode.pixelWidth) / modeWidth
+            let derivedModeScaleY = CGFloat(mode.pixelHeight) / modeHeight
+            if derivedModeScaleX.isFinite && derivedModeScaleX > 0 {
+                modeScaleX = derivedModeScaleX
+            }
+            if derivedModeScaleY.isFinite && derivedModeScaleY > 0 {
+                modeScaleY = derivedModeScaleY
+            }
+        }
+        
+        var outputScaleX = max(nativeScaleX, modeScaleX, screen.backingScaleFactor, 1)
+        var outputScaleY = max(nativeScaleY, modeScaleY, screen.backingScaleFactor, 1)
+        // Defensive upper bound to avoid pathological output allocations.
+        outputScaleX = min(outputScaleX, 4)
+        outputScaleY = min(outputScaleY, 4)
         
         let localX = clampedCocoaRect.origin.x - screen.frame.origin.x
         let localYFromBottom = clampedCocoaRect.origin.y - screen.frame.origin.y
@@ -1373,8 +1425,8 @@ final class ElementCaptureManager: ObservableObject {
         let filter = SCContentFilter(display: display, excludingWindows: windowsToExclude)
         let config = SCStreamConfiguration()
         config.sourceRect = sourceRect
-        config.width = max(1, Int(sourceRect.width.rounded(.up)))
-        config.height = max(1, Int(sourceRect.height.rounded(.up)))
+        config.width = max(1, Int((sourceRect.width * outputScaleX).rounded(.up)))
+        config.height = max(1, Int((sourceRect.height * outputScaleY).rounded(.up)))
         config.scalesToFit = false
         config.pixelFormat = kCVPixelFormatType_32BGRA
         config.showsCursor = false
@@ -1382,7 +1434,7 @@ final class ElementCaptureManager: ObservableObject {
             config.captureResolution = .best
         }
         
-        print("[ElementCapture] Capture(local): displayID=\(targetDisplayID), screen=\(screen.frame), displayBounds=\(displayBounds), requested=\(requestedRect), clamped=\(clampedCocoaRect), source=\(sourceRect), output=\(config.width)x\(config.height)")
+        print("[ElementCapture] Capture(local): displayID=\(targetDisplayID), screen=\(screen.frame), displayBounds=\(displayBounds), requested=\(requestedRect), clamped=\(clampedCocoaRect), source=\(sourceRect), outputScale=\(String(format: "%.2f", outputScaleX))x\(String(format: "%.2f", outputScaleY)), output=\(config.width)x\(config.height)")
         return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
     }
     
@@ -1462,6 +1514,10 @@ final class ElementHighlightWindow: NSWindow {
     
     private let highlightView = HighlightBorderView()
     private var currentTargetFrame: CGRect = .zero
+    var onCancel: (() -> Void)?
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
     
     override init(contentRect: NSRect, styleMask: NSWindow.StyleMask, backing: NSWindow.BackingStoreType, defer flag: Bool) {
         super.init(contentRect: contentRect, styleMask: styleMask, backing: backing, defer: flag)
@@ -1479,6 +1535,26 @@ final class ElementHighlightWindow: NSWindow {
         self.contentView = highlightView
         highlightView.frame = NSRect(origin: .zero, size: contentRect.size)
         highlightView.autoresizingMask = [.width, .height]
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 {
+            onCancel?()
+            return
+        }
+        super.keyDown(with: event)
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.type == .keyDown && event.keyCode == 53 {
+            onCancel?()
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        onCancel?()
     }
     
     func configure(borderColor: NSColor, borderWidth: CGFloat, cornerRadius: CGFloat) {
@@ -1657,6 +1733,8 @@ final class CapturePreviewWindowController {
     private var window: NSWindow?
     private var hostingView: NSHostingView<AnyView>?  // Keep strong reference
     private var autoDismissTimer: Timer?
+    private var escapeMonitor: Any?
+    private var globalEscapeMonitor: Any?
     
     private init() {}
     
@@ -1721,6 +1799,7 @@ final class CapturePreviewWindowController {
         }
         
         self.window = newWindow
+        installEscapeMonitors()
         
         // Auto-dismiss after 3 seconds
         autoDismissTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
@@ -1731,6 +1810,7 @@ final class CapturePreviewWindowController {
     func dismiss() {
         autoDismissTimer?.invalidate()
         autoDismissTimer = nil
+        removeEscapeMonitors()
         
         guard let window = window else { return }
         
@@ -1748,10 +1828,41 @@ final class CapturePreviewWindowController {
     }
     
     private func cleanUp() {
+        removeEscapeMonitors()
         window?.orderOut(nil)
         window?.contentView = nil
         window = nil
         hostingView = nil
+    }
+
+    private func installEscapeMonitors() {
+        removeEscapeMonitors()
+
+        escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53 else { return event }
+            guard let self = self, let window = self.window, window.isVisible else { return event }
+            self.dismiss()
+            return nil
+        }
+
+        globalEscapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53 else { return }
+            Task { @MainActor [weak self] in
+                guard let self = self, let window = self.window, window.isVisible else { return }
+                self.dismiss()
+            }
+        }
+    }
+
+    private func removeEscapeMonitors() {
+        if let monitor = escapeMonitor {
+            NSEvent.removeMonitor(monitor)
+            escapeMonitor = nil
+        }
+        if let monitor = globalEscapeMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalEscapeMonitor = nil
+        }
     }
 }
 

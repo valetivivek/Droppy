@@ -183,6 +183,14 @@ final class BrightnessManager: ObservableObject {
     private var pollFailCount: Int = 0
     private var isPollingInProgress = false // Mutex to prevent overlapping XPC calls
     
+    // Lunar compatibility:
+    // when Lunar owns brightness keys, we can only observe changes via polling.
+    // Keep polling silent by default, but allow HUD updates for meaningful Lunar-driven deltas.
+    private var cachedLunarRunning = false
+    private var lastLunarRunningCheckAt: Date = .distantPast
+    private let lunarRunningCheckInterval: TimeInterval = 2.0
+    private let lunarPollingHUDDeltaThreshold: Float = 0.01
+    
     // MARK: - Lazy Re-initialization (Bug #125)
     // After reboot, display detection may fail initially due to timing
     // Allow retry within a grace period after launch
@@ -411,6 +419,7 @@ final class BrightnessManager: ObservableObject {
         let clamped = max(0, min(1, value))
         guard let targetDisplay = resolveBrightnessTarget(screenHint: screenHint) else { return }
         if setBrightness(clamped, for: targetDisplay) {
+            lastPolledBrightness = clamped
             publish(brightness: clamped, touchDate: true, displayID: targetDisplay.displayID)
         } else {
             refresh(screenHint: screenHint)
@@ -533,12 +542,40 @@ final class BrightnessManager: ObservableObject {
         }
     }
     
+    private func isLunarRunning() -> Bool {
+        let now = Date()
+        if now.timeIntervalSince(lastLunarRunningCheckAt) < lunarRunningCheckInterval {
+            return cachedLunarRunning
+        }
+        
+        let knownBundleIDs: Set<String> = [
+            "fyi.lunar.Lunar",
+            "fyi.lunar"
+        ]
+        
+        cachedLunarRunning = NSWorkspace.shared.runningApplications.contains { app in
+            if app.isTerminated { return false }
+            
+            if let bundleID = app.bundleIdentifier, knownBundleIDs.contains(bundleID) {
+                return true
+            }
+            
+            if let localizedName = app.localizedName?.lowercased(), localizedName.contains("lunar") {
+                return true
+            }
+            
+            return false
+        }
+        lastLunarRunningCheckAt = now
+        return cachedLunarRunning
+    }
+    
     // MARK: - Brightness Polling
     
     private func startBrightnessPolling() {
         guard isSupported else { return }
         
-        print("BrightnessManager: Starting brightness polling (silent - HUD only on manual key press)")
+        print("BrightnessManager: Starting brightness polling (silent by default, Lunar bridge enabled)")
         // CRITICAL: Poll on main thread to avoid XPC/DisplayServices thread safety crashes
         // DisplayServicesGetBrightness makes XPC calls that are not thread-safe
         let timer = DispatchSource.makeTimerSource(queue: .main)
@@ -554,11 +591,15 @@ final class BrightnessManager: ObservableObject {
                 
                 if let current = self.getCurrentBrightness() {
                     self.pollFailCount = 0
-                    // SILENT update only - never trigger HUD from polling
-                    // HUD is only triggered via manual key presses (MediaKeyInterceptor)
-                    // This prevents false triggers from auto-brightness, environment changes, or power state
-                    if abs(current - self.rawBrightness) > 0.001 {
-                        self.rawBrightness = current
+                    let delta = abs(current - self.lastPolledBrightness)
+                    if delta > 0.001 {
+                        // Keep polling silent in normal mode to avoid ambient auto-brightness noise.
+                        // Lunar handles brightness keys itself, so we bridge polled deltas back into HUD updates.
+                        if self.isLunarRunning(), delta >= self.lunarPollingHUDDeltaThreshold {
+                            self.publish(brightness: current, touchDate: true, displayID: self.mainDisplayID)
+                        } else {
+                            self.rawBrightness = current
+                        }
                         self.lastPolledBrightness = current
                     }
                 } else {

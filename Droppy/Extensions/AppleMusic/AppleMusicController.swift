@@ -32,6 +32,8 @@ final class AppleMusicController {
     /// Serial queue for AppleScript execution - NSAppleScript is NOT thread-safe
     /// Concurrent AppleScript calls crash the AppleScript runtime
     private let appleScriptQueue = DispatchQueue(label: "com.droppy.AppleMusicController.applescript")
+    private let musyDebugEnabled = true
+    private let musyDebugPrefix = "MUSYMUSY"
     
     /// Apple Music bundle identifier
     static let appleMusicBundleId = "com.apple.Music"
@@ -80,6 +82,11 @@ final class AppleMusicController {
     // MARK: - Initialization
     
     private init() {}
+
+    private func musyLog(_ message: String) {
+        guard musyDebugEnabled else { return }
+        print("\(musyDebugPrefix) APPLEMUSIC \(Date().timeIntervalSince1970) \(message)")
+    }
     
     // MARK: - Apple Music Detection
     
@@ -93,6 +100,7 @@ final class AppleMusicController {
     /// Check if Apple Music is currently playing (async)
     func isAppleMusicPlaying(completion: @escaping (Bool) -> Void) {
         guard isAppleMusicRunning else {
+            musyLog("isAppleMusicPlaying running=false")
             completion(false)
             return
         }
@@ -109,6 +117,7 @@ final class AppleMusicController {
         
         runAppleScript(script) { result in
             let isPlaying = (result as? Bool) ?? false
+            self.musyLog("isAppleMusicPlaying result=\(isPlaying)")
             completion(isPlaying)
         }
     }
@@ -116,9 +125,11 @@ final class AppleMusicController {
     /// Fetch current track info directly from Apple Music via AppleScript
     func fetchCurrentTrackInfo(completion: @escaping (String?, String?, String?, Double?, Double?) -> Void) {
         guard isAppleMusicRunning else {
+            musyLog("fetchCurrentTrackInfo skipped running=false")
             completion(nil, nil, nil, nil, nil)
             return
         }
+        musyLog("fetchCurrentTrackInfo.start")
         
         let script = """
         tell application "Music"
@@ -137,12 +148,14 @@ final class AppleMusicController {
         
         runAppleScript(script) { result in
             guard let resultString = result as? String, !resultString.isEmpty else {
+                self.musyLog("fetchCurrentTrackInfo.emptyResult")
                 completion(nil, nil, nil, nil, nil)
                 return
             }
             
             let parts = resultString.components(separatedBy: "|||")
             guard parts.count >= 5 else {
+                self.musyLog("fetchCurrentTrackInfo.invalidParts count=\(parts.count)")
                 completion(nil, nil, nil, nil, nil)
                 return
             }
@@ -152,6 +165,7 @@ final class AppleMusicController {
             let album = parts[2]
             let duration = Double(parts[3]) ?? 0
             let position = Double(parts[4]) ?? 0
+            self.musyLog("fetchCurrentTrackInfo.result title='\(title.prefix(40))' artist='\(artist.prefix(30))' duration=\(String(format: "%.3f", duration)) position=\(String(format: "%.3f", position))")
             
             completion(title, artist, album, duration, position)
         }
@@ -162,6 +176,7 @@ final class AppleMusicController {
         // Don't refresh if extension is disabled
         guard !ExtensionType.appleMusic.isRemoved else { return }
         guard isAppleMusicRunning else { return }
+        musyLog("refreshState.start")
         
         // Track Apple Music integration activation (only once per user)
         if !UserDefaults.standard.bool(forKey: "appleMusicTracked") {
@@ -196,6 +211,7 @@ final class AppleMusicController {
             }
             
             self?.syncPlayerPosition()
+            self?.musyLog("positionSyncTimer.started interval=1.0")
         }
     }
     
@@ -203,6 +219,7 @@ final class AppleMusicController {
     func stopPositionSyncTimer() {
         positionSyncTimer?.invalidate()
         positionSyncTimer = nil
+        musyLog("positionSyncTimer.stopped")
     }
     
     /// Called when track changes - update loved status
@@ -336,6 +353,8 @@ final class AppleMusicController {
     
     /// Fetch the actual player position from Apple Music
     func fetchPlayerPosition(completion: ((Double) -> Void)? = nil) {
+        let startedAt = Date()
+        musyLog("extract.start source=appleMusicPlayerPosition startedAt=\(startedAt.timeIntervalSince1970)")
         let script = """
         tell application "Music"
             return player position
@@ -350,6 +369,8 @@ final class AppleMusicController {
             } else if let pos = result as? Int {
                 position = Double(pos)
             }
+            let finishedAt = Date()
+            self.musyLog("extract.result source=appleMusicPlayerPosition position=\(String(format: "%.3f", position)) rawType=\(String(describing: type(of: result as Any))) startedAt=\(startedAt.timeIntervalSince1970) finishedAt=\(finishedAt.timeIntervalSince1970)")
             
             completion?(position)
         }
@@ -357,13 +378,29 @@ final class AppleMusicController {
     
     /// Sync MusicManager elapsed time with Apple Music's true position
     func syncPlayerPosition() {
+        musyLog("syncPlayerPosition.tick acceptedSource=\(MusicManager.shared.currentAcceptedBundleIdentifier ?? "nil") managerElapsed=\(String(format: "%.3f", MusicManager.shared.elapsedTime)) managerDuration=\(String(format: "%.3f", MusicManager.shared.songDuration)) managerRate=\(String(format: "%.3f", MusicManager.shared.playbackRate))")
         guard isAppleMusicRunning else {
+            musyLog("syncPlayerPosition.skip reason=appleMusicNotRunning")
+            stopPositionSyncTimer()
+            return
+        }
+
+        guard MusicManager.shared.shouldAcceptDirectPositionUpdate(from: Self.appleMusicBundleId) else {
+            musyLog("syncPlayerPosition.skip reason=notAcceptedSource")
             stopPositionSyncTimer()
             return
         }
         
+        // FIX: Skip sync during active seek suppression to avoid overwriting
+        // the seek target with a pre-seek position from the player
+        guard !MusicManager.shared.isTimingSuppressed else {
+            musyLog("syncPlayerPosition.skip reason=timingSuppressed")
+            return
+        }
+        
         fetchPlayerPosition { position in
-            MusicManager.shared.forceElapsedTime(position)
+            self.musyLog("syncPlayerPosition.apply position=\(String(format: "%.3f", position))")
+            MusicManager.shared.forceElapsedTime(position, sourceBundle: Self.appleMusicBundleId)
         }
     }
     
@@ -433,6 +470,7 @@ final class AppleMusicController {
 
                 guard let script = NSAppleScript(source: source) else {
                     print("AppleMusicController: Failed to create AppleScript")
+                    self.musyLog("applescript.error reason=createFailed")
                     return nil
                 }
 
@@ -440,6 +478,7 @@ final class AppleMusicController {
 
                 if let error = error {
                     print("AppleMusicController: AppleScript error: \(error)")
+                    self.musyLog("applescript.error \(error)")
                     return nil
                 }
 

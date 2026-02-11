@@ -38,8 +38,6 @@ struct FloatingBasketView: View {
     // MARK: - Dropover-Style State
     /// Whether the basket is expanded to show the full grid view
     @State private var isExpanded = false
-    /// Hover state for the file count label
-    @State private var isFileLabelHovering = false
     /// Whether to show list view instead of grid view
     @State private var isListView = false
     
@@ -103,7 +101,7 @@ struct FloatingBasketView: View {
         let slotCount = basketState.items.count
         
         if slotCount == 0 {
-            return 230  // Empty basket - SAME size as collapsed
+            return 208  // Empty basket - same compact height as collapsed
         } else if isExpanded {
             let rowCount = ceil(Double(slotCount) / Double(columnsPerRow))
             let headerHeight: CGFloat = 44  // Header + top padding
@@ -127,19 +125,19 @@ struct FloatingBasketView: View {
                 return headerHeight + (cappedRowCount * itemHeight) + (max(0, cappedRowCount - 1) * rowSpacing) + bottomPadding
             }
         } else {
-            // Collapsed stacked preview - same as empty
-            return 230
+            // Collapsed stacked preview - compact
+            return 208
         }
     }
     
     /// Base width - always use full grid width for proper layout
     private var baseWidth: CGFloat {
         if basketState.items.count == 0 {
-            return 200  // Empty state width - SAME as collapsed
+            return 224  // Slightly wider collapsed/empty basket
         } else if isExpanded {
             return fullGridWidth  // Full width when expanded (360)
         } else {
-            return 200  // Collapsed width - same as empty
+            return 224  // Slightly wider collapsed basket
         }
     }
     
@@ -180,7 +178,6 @@ struct FloatingBasketView: View {
                     BasketQuickActionsBar(items: basketState.items, basketState: basketState)
                 }
             }
-            .animation(DroppyAnimation.basketTransition, value: basketState.items.count)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea()
@@ -196,7 +193,7 @@ struct FloatingBasketView: View {
         .background {
             // Hidden button for Cmd+A select all
             Button("") {
-                basketState.selectedItems = Set(basketState.items.map(\.id))
+                basketState.selectAllBasketItems()
             }
             .keyboardShortcut("a", modifiers: .command)
             .opacity(0)
@@ -222,7 +219,7 @@ struct FloatingBasketView: View {
             // Quick action hover explanation takes priority over regular content
             if let hoveredAction = basketState.hoveredQuickAction {
                 quickActionExplanation(for: hoveredAction)
-                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    .transition(.opacity)
             } else if basketState.items.count == 0 {
                 emptyContent
             } else if isExpanded {
@@ -294,7 +291,6 @@ struct FloatingBasketView: View {
         .scaleEffect((basketState.isTargeted || basketState.isAirDropZoneTargeted) && !basketState.isQuickActionsTargeted ? 0.97 : 1.0)
         .animation(DroppyAnimation.bouncy, value: basketState.isTargeted)
         .animation(DroppyAnimation.bouncy, value: basketState.isAirDropZoneTargeted)
-        .animation(DroppyAnimation.bouncy, value: basketState.items.count)
         // NOTE: Drop handling is managed by the AppKit BasketDragContainer (BasketDragContainer.swift)
         // which properly handles NSFilePromiseReceiver for Photos.app compatibility.
         // Do NOT add .dropDestination here - it causes CoreTransferable errors for file promises.
@@ -302,7 +298,7 @@ struct FloatingBasketView: View {
         .onPreferenceChange(ItemFramePreferenceKey.self) { frames in
             self.itemFrames = frames
         }
-        .gesture(dragSelectionGesture)
+        .simultaneousGesture(dragSelectionGesture, including: .all)
         .onAppear {
             withAnimation(.linear(duration: 25).repeatForever(autoreverses: false)) {
                 dashPhase -= 280
@@ -357,41 +353,61 @@ struct FloatingBasketView: View {
     }
     
     private var dragSelectionGesture: some Gesture {
-        // Use higher minimum distance (10) to allow item-level gestures (reordering at 8) to fire first
-        DragGesture(minimumDistance: 10, coordinateSpace: .local)
+        // Keep a low threshold so empty-space clicks can clear selection,
+        // but only start marquee selection once movement is intentional.
+        DragGesture(minimumDistance: 0, coordinateSpace: .named("basketContainer"))
             .onChanged { value in
+                let dragDistance = hypot(
+                    value.location.x - value.startLocation.x,
+                    value.location.y - value.startLocation.y
+                )
+
                 if !isDragSelecting {
+                    guard dragDistance >= 6 else { return }
+
                     // Ignore drags starting in the header (window drag area)
                     if headerFrame.contains(value.startLocation) {
                         return
                     }
-                    
-                    // Check if drag started on an item using robust geometry data
-                    for frame in itemFrames.values {
-                        if frame.contains(value.startLocation) {
-                            return
-                        }
-                    }
-                    
+
+                    // Item drags/reordering should stay owned by item-level handlers.
+                    guard !isPointOverBasketItem(value.startLocation) else { return }
+
                     // Start selection
                     isDragSelecting = true
                     ownerController?.beginBasketSelectionDrag()
                     dragSelectionStart = value.startLocation
                     basketState.selectedItems.removeAll()
                 }
+
+                guard isDragSelecting else { return }
                 dragSelectionCurrent = value.location
                 updateAutoScrollVelocity(at: value.location)
                 
                 // Update selection based on items intersecting the rectangle
                 updateSelectionFromRect()
             }
-            .onEnded { _ in
+            .onEnded { value in
+                let dragDistance = hypot(
+                    value.location.x - value.startLocation.x,
+                    value.location.y - value.startLocation.y
+                )
                 autoScrollVelocity = 0
                 if isDragSelecting {
                     ownerController?.endBasketSelectionDrag()
+                } else if dragDistance < 6,
+                          !headerFrame.contains(value.startLocation),
+                          !isPointOverBasketItem(value.startLocation) {
+                    clearBasketSelectionAndRenameState()
                 }
                 isDragSelecting = false
             }
+    }
+
+    private func isPointOverBasketItem(_ point: CGPoint) -> Bool {
+        itemFrames.values.contains { frame in
+            frame.insetBy(dx: -2, dy: -2).contains(point)
+        }
     }
     
     private func updateSelectionFromRect() {
@@ -559,9 +575,28 @@ struct FloatingBasketView: View {
     /// Collapsed stacked preview matching Dropover exactly
     /// X button and menu are handled by persistent overlay in mainBasketContainer
     private var collapsedStackContent: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            
+        let expandToGrid = {
+            withAnimation(DroppyAnimation.basketTransition) {
+                isListView = false
+                isExpanded = true
+            }
+        }
+
+        return VStack(spacing: 0) {
+            // Keep the title centered on the same vertical band as x/hide controls.
+            HStack {
+                Spacer()
+                Button(action: expandToGrid) {
+                    PeekFileCountHeader(items: basketState.items, style: .plain)
+                }
+                .buttonStyle(.plain)
+                Spacer()
+            }
+            .frame(height: 32)
+            .padding(.top, 18)
+
+            Spacer(minLength: 0)
+
             // Stacked thumbnail preview - draggable for all files, tappable to expand
             DraggableArea(
                 items: {
@@ -569,10 +604,8 @@ struct FloatingBasketView: View {
                     basketState.items.map { $0.url as NSURL }
                 },
                 onTap: { _ in
-                    // Tap to expand
-                    withAnimation(DroppyAnimation.basketTransition) {
-                        isExpanded = true
-                    }
+                    // Tap always opens grid view.
+                    expandToGrid()
                 },
                 onRightClick: {
                     // No right-click action for stack preview
@@ -587,27 +620,19 @@ struct FloatingBasketView: View {
                         }
                     }
                 },
-                selectionSignature: basketState.items.count
+                selectionSignature: basketState.items.map(\.id).hashValue
             ) {
-                BasketStackPreviewView(items: basketState.items)
-            }
-            
-            Spacer()
-            
-            // File count label - also tappable to expand
-            BasketFileCountLabel(items: basketState.items, isHovering: isFileLabelHovering) {
-                withAnimation(DroppyAnimation.basketTransition) {
-                    isExpanded = true
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    BasketStackPreviewView(items: basketState.items)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .contentShape(Rectangle())
             }
-            .onHover { hovering in
-                isFileLabelHovering = hovering
-            }
-            .padding(.bottom, 16)
+            .frame(maxWidth: .infinity, minHeight: 158, maxHeight: 158, alignment: .bottom)
+            .clipped()
         }
-        // Add top padding to match header height for proper centering
-        .padding(.top, 50) // 18pt margin + 32pt button height
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
     
     // MARK: - Dropover-Style Expanded Content
@@ -868,18 +893,9 @@ struct FloatingBasketView: View {
     private var basketItemsGrid: some View {
         ScrollView {
             ZStack(alignment: .top) {
-                // Background tap handler - catches clicks on empty areas
+                // Background spacer keeps the ZStack's full hit region.
                 Color.clear
                     .contentShape(Rectangle())
-                    .onTapGesture {
-                        basketState.selectedItems.removeAll()
-                        // If rename was active, end the file operation lock
-                        if renamingItemId != nil {
-                            basketState.isRenaming = false
-                            DroppyState.shared.endFileOperation()
-                        }
-                        renamingItemId = nil
-                    }
                 
                 // Items grid using LazyVGrid for efficient rendering
                 let columns = Array(repeating: GridItem(.fixed(itemWidth), spacing: itemSpacing), count: columnsPerRow)
@@ -888,21 +904,17 @@ struct FloatingBasketView: View {
                     // Power Folders first (always distinct, never stacked)
                     ForEach(basketState.powerFolders) { folder in
                         BasketItemView(item: folder, state: basketState, renamingItemId: $renamingItemId) {
-                            withAnimation(DroppyAnimation.state) {
-                                basketState.powerFolders.removeAll { $0.id == folder.id }
-                            }
+                            basketState.powerFolders.removeAll { $0.id == folder.id }
                         }
-                        .transition(basketState.isBulkUpdating ? .identity : .scale.combined(with: .opacity))
+                        .transition(basketState.isBulkUpdating ? .identity : .opacity)
                     }
                     
                     // Regular items - flat display
                     ForEach(basketState.itemsList) { item in
                         BasketItemView(item: item, state: basketState, renamingItemId: $renamingItemId) {
-                            withAnimation(DroppyAnimation.state) {
-                                basketState.removeItem(item)
-                            }
+                            basketState.removeItem(item)
                         }
-                        .transition(basketState.isBulkUpdating ? .identity : .scale.combined(with: .opacity))
+                        .transition(basketState.isBulkUpdating ? .identity : .opacity)
                     }
                 }
                 .transaction { transaction in
@@ -910,26 +922,12 @@ struct FloatingBasketView: View {
                         transaction.animation = nil
                     }
                 }
-                .animation(basketState.isBulkUpdating ? nil : DroppyAnimation.bouncy, value: basketState.itemsList.count)
-                .animation(basketState.isBulkUpdating ? nil : DroppyAnimation.bouncy, value: basketState.powerFolders.count)
+                .animation(basketState.isBulkUpdating ? nil : DroppyAnimation.basketTransition, value: basketState.itemsList.count)
+                .animation(basketState.isBulkUpdating ? nil : DroppyAnimation.basketTransition, value: basketState.powerFolders.count)
                 .background(ScrollViewResolver { scrollView in
                     self.basketScrollView = scrollView
                 })
             }
-            .contentShape(Rectangle())
-            .simultaneousGesture(
-                SpatialTapGesture()
-                    .onEnded { value in
-                        let tappedOnItem = itemFrames.values.contains { $0.contains(value.location) }
-                        guard !tappedOnItem else { return }
-                        basketState.selectedItems.removeAll()
-                        if renamingItemId != nil {
-                            basketState.isRenaming = false
-                            DroppyState.shared.endFileOperation()
-                        }
-                        renamingItemId = nil
-                    }
-            )
             .frame(maxWidth: .infinity, minHeight: max(scrollViewportFrame.height, 1), alignment: .top)
             .padding(.horizontal, horizontalPadding)
             .padding(.bottom, 18)
@@ -953,14 +951,6 @@ struct FloatingBasketView: View {
             ZStack(alignment: .top) {
                 Color.clear
                     .contentShape(Rectangle())
-                    .onTapGesture {
-                        basketState.selectedItems.removeAll()
-                        if renamingItemId != nil {
-                            basketState.isRenaming = false
-                            DroppyState.shared.endFileOperation()
-                        }
-                        renamingItemId = nil
-                    }
 
                 LazyVStack(spacing: 4) {
                     // Power Folders first
@@ -970,9 +960,7 @@ struct FloatingBasketView: View {
                             state: basketState,
                             renamingItemId: $renamingItemId,
                             onRemove: {
-                                withAnimation(DroppyAnimation.state) {
-                                    basketState.powerFolders.removeAll { $0.id == folder.id }
-                                }
+                                basketState.powerFolders.removeAll { $0.id == folder.id }
                             },
                             layoutMode: .list,
                             listRowWidth: fullGridWidth - (horizontalPadding * 2)  // CRITICAL: Fixed width for text truncation
@@ -986,9 +974,7 @@ struct FloatingBasketView: View {
                             state: basketState,
                             renamingItemId: $renamingItemId,
                             onRemove: {
-                                withAnimation(DroppyAnimation.state) {
-                                    basketState.removeItem(item)
-                                }
+                                basketState.removeItem(item)
                             },
                             layoutMode: .list,
                             listRowWidth: fullGridWidth - (horizontalPadding * 2)  // CRITICAL: Fixed width for text truncation
@@ -1000,6 +986,8 @@ struct FloatingBasketView: View {
                         transaction.animation = nil
                     }
                 }
+                .animation(basketState.isBulkUpdating ? nil : DroppyAnimation.basketTransition, value: basketState.itemsList.count)
+                .animation(basketState.isBulkUpdating ? nil : DroppyAnimation.basketTransition, value: basketState.powerFolders.count)
                 .background(ScrollViewResolver { scrollView in
                     self.basketScrollView = scrollView
                 })
@@ -1180,6 +1168,15 @@ struct FloatingBasketView: View {
         if basketState.items.isEmpty {
             ownerController?.hideBasket()
         }
+    }
+
+    private func clearBasketSelectionAndRenameState() {
+        basketState.selectedItems.removeAll()
+        if renamingItemId != nil {
+            basketState.isRenaming = false
+            DroppyState.shared.endFileOperation()
+        }
+        renamingItemId = nil
     }
 }
 

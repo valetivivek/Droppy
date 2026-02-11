@@ -317,6 +317,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.register(defaults: [
             AppPreferenceKey.showInMenuBar: PreferenceDefault.showInMenuBar,
             AppPreferenceKey.showQuickshareInMenuBar: PreferenceDefault.showQuickshareInMenuBar,
+            AppPreferenceKey.quickshareRequireUploadConfirmation: PreferenceDefault.quickshareRequireUploadConfirmation,
             AppPreferenceKey.enableNotchShelf: PreferenceDefault.enableNotchShelf,
             AppPreferenceKey.enableHUDReplacement: PreferenceDefault.enableHUDReplacement,
             AppPreferenceKey.showMediaPlayer: PreferenceDefault.showMediaPlayer,
@@ -417,7 +418,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             stopLicensedFeatures()
             ClipboardManager.shared.stopMonitoring()
             SettingsWindowController.shared.close()
-            LicenseWindowController.shared.show()
+            LicenseWindowController.shared.show(activationMode: .onlyIfAlreadyActive)
         }
     }
 
@@ -436,7 +437,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             stopLicensedFeatures()
             SettingsWindowController.shared.close()
             DispatchQueue.main.async {
-                LicenseWindowController.shared.show()
+                LicenseWindowController.shared.show(activationMode: .onlyIfAlreadyActive)
             }
         }
     }
@@ -607,7 +608,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            OnboardingWindowController.shared.show()
+            OnboardingWindowController.shared.show(activationMode: .onlyIfAlreadyActive)
         }
     }
     
@@ -617,6 +618,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             LicenseWindowController.shared.show()
             return
         }
+
+        showOnboardingIfNeeded()
 
         // Poll for accessibility permission in case user just returned from System Settings
         // This handles the "TCC delay" where permission is granted but system API returns false for a few seconds

@@ -151,17 +151,37 @@ final class LicenseManager: ObservableObject {
         defer { isChecking = false }
 
         do {
+            // Step 1: Verify without incrementing first so fresh installs cannot
+            // consume/accept an already-used single-device key.
+            let preflight = try await verifyLicense(licenseKey: trimmedKey, incrementUsesCount: false)
+            guard preflight.isValidPurchase else {
+                statusMessage = preflight.message?.nonEmpty ?? "That license key is not valid for this product."
+                return false
+            }
+
+            let preflightUses = preflight.purchase?.uses
+            if preflightUses == nil || (preflightUses ?? 0) >= Self.maxDeviceActivations {
+                statusMessage = "This license is already active on another device. Deactivate it there first."
+                return false
+            }
+
+            if let purchaseEmail = normalizedEmail(preflight.purchase?.email),
+               normalizedEmail(trimmedEmail) != purchaseEmail {
+                statusMessage = "Email does not match this Gumroad license key."
+                return false
+            }
+
+            // Step 2: Claim one seat only after preflight passes.
             let response = try await verifyLicense(licenseKey: trimmedKey, incrementUsesCount: true)
             guard response.isValidPurchase else {
                 statusMessage = response.message?.nonEmpty ?? "That license key is not valid for this product."
                 return false
             }
 
-            // Enforce single-device limit: if uses exceeds the max, this key is
-            // already active on another device. Roll back the increment and reject.
-            let currentUses = response.purchase?.uses ?? 1
-            if currentUses > Self.maxDeviceActivations {
-                // Decrement back so the count stays accurate
+            // Concurrency guard: if another activation raced us and pushed uses over
+            // the seat limit, roll back our increment.
+            let incrementedUses = response.purchase?.uses ?? (preflightUses ?? 0) + 1
+            if incrementedUses > Self.maxDeviceActivations {
                 _ = try? await verifyLicense(licenseKey: trimmedKey, incrementUsesCount: false, decrementUsesCount: true)
                 statusMessage = "This license is already active on another device. Deactivate it there first."
                 return false
@@ -169,13 +189,12 @@ final class LicenseManager: ObservableObject {
 
             if let purchaseEmail = normalizedEmail(response.purchase?.email),
                normalizedEmail(trimmedEmail) != purchaseEmail {
-                // Wrong email for this key: roll back the increment to avoid burning a seat.
                 _ = try? await verifyLicense(licenseKey: trimmedKey, incrementUsesCount: false, decrementUsesCount: true)
                 statusMessage = "Email does not match this Gumroad license key."
                 return false
             }
 
-            let resolvedEmail = response.purchase?.email?.nonEmpty ?? trimmedEmail
+            let resolvedEmail = response.purchase?.email?.nonEmpty ?? preflight.purchase?.email?.nonEmpty ?? trimmedEmail
             let keyHint = Self.keyHint(for: trimmedKey)
 
             guard keychainStore.storeLicenseKey(trimmedKey) else {
@@ -244,6 +263,20 @@ final class LicenseManager: ObservableObject {
                     verifiedAt: nil,
                     message: response.message?.nonEmpty ?? "License is no longer valid.",
                     clearKeychain: true
+                )
+                return
+            }
+
+            let currentUses = response.purchase?.uses ?? 1
+            if currentUses > Self.maxDeviceActivations {
+                setActivatedState(
+                    isActive: false,
+                    email: "",
+                    keyHint: "",
+                    deviceName: "",
+                    verifiedAt: nil,
+                    message: "License is active on another device. Deactivate it there first, then verify again.",
+                    clearKeychain: false
                 )
                 return
             }

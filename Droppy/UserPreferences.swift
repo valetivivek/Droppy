@@ -75,8 +75,8 @@ enum AppPreferenceKey {
     static let autoCollapseShelf = "autoCollapseShelf"
     static let autoCollapseDelay = "autoCollapseDelay"
     static let autoExpandShelf = "autoExpandShelf"
+    static let autoExpandOnMainMac = "autoExpandOnMainMac"  // Allow hover auto-expand on the built-in Mac display
     static let autoExpandOnExternalDisplays = "autoExpandOnExternalDisplays"  // Allow hover auto-expand on external displays
-    static let preventAutoExpandInMenuBar = "preventAutoExpandInMenuBar"  // Block hover auto-expand while pointer is in menu bar strip
     static let autoExpandDelay = "autoExpandDelay"
     static let autoOpenMediaHUDOnShelfExpand = "autoOpenMediaHUDOnShelfExpand"  // Auto-show media HUD when shelf expands
     static let autoShrinkShelf = "autoShrinkShelf"  // Legacy
@@ -117,6 +117,7 @@ enum AppPreferenceKey {
     static let showInMenuBar = "showInMenuBar"
     static let showQuickshareInMenuBar = "showQuickshareInMenuBar"
     static let showQuickshareInSidebar = "showQuickshareInSidebar"
+    static let quickshareRequireUploadConfirmation = "quickshareRequireUploadConfirmation"
     static let startAtLogin = "startAtLogin"
     static let hasCompletedOnboarding = "hasCompletedOnboarding"
     static let didMigrateShelfAirDropDefault = "didMigrateShelfAirDropDefault"
@@ -260,8 +261,8 @@ enum PreferenceDefault {
     // PREMIUM PARITY: 0.25s expand, 0.10s collapse (v1.3.109)
     static let autoCollapseDelay: Double = 0.10
     static let autoExpandShelf = true
+    static let autoExpandOnMainMac = true  // Preserve current behavior: hover auto-expand enabled on built-in display
     static let autoExpandOnExternalDisplays = true  // Keep legacy behavior by default; users can disable if it conflicts with menu bar usage
-    static let preventAutoExpandInMenuBar = true  // Avoid accidental shelf opening while targeting menu bar icons
     static let autoExpandDelay: Double = 0.25
     static let autoOpenMediaHUDOnShelfExpand = false  // Auto-open media HUD when shelf expands (opt-in)
     static let autoShrinkShelf = true  // Legacy
@@ -299,6 +300,7 @@ enum PreferenceDefault {
     static let showInMenuBar = true
     static let showQuickshareInMenuBar = true
     static let showQuickshareInSidebar = true  // On by default, can be turned off
+    static let quickshareRequireUploadConfirmation = false  // Off by default to preserve current flow
     static let startAtLogin = false
     static let hasCompletedOnboarding = false
     static let enableFinderServices = true

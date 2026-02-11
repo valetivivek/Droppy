@@ -312,6 +312,9 @@ private struct DroppyAccentButtonContent: View {
     
     var body: some View {
         configuration.label
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .minimumScaleFactor(0.9)
             .font(.system(size: fontSize, weight: .semibold))
             .foregroundStyle(.white)
             .padding(.horizontal, horizontalPadding)

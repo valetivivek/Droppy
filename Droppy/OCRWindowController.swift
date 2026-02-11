@@ -13,6 +13,8 @@ final class OCRWindowController: NSObject {
     static let shared = OCRWindowController()
     
     private(set) var window: NSPanel?
+    private var escapeMonitor: Any?
+    private var globalEscapeMonitor: Any?
     
     private override init() {
         super.init()
@@ -72,6 +74,7 @@ final class OCRWindowController: NSObject {
         AppKitMotion.animateIn(newWindow, initialScale: 0.9, duration: 0.24)
         
         self.window = newWindow
+        installEscapeMonitors()
     }
 
     func presentExtractedText(_ text: String, targetDisplayID: CGDirectDisplayID? = nil) {
@@ -91,6 +94,7 @@ final class OCRWindowController: NSObject {
     
     func close() {
         guard let panel = window else { return }
+        removeEscapeMonitors()
 
         AppKitMotion.animateOut(panel, targetScale: 0.96, duration: 0.15) { [weak self] in
             panel.close()
@@ -109,6 +113,36 @@ final class OCRWindowController: NSObject {
                 return false
             }
             return screenID == displayID
+        }
+    }
+
+    private func installEscapeMonitors() {
+        removeEscapeMonitors()
+
+        escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53 else { return event }
+            guard let self = self, let panel = self.window, panel.isVisible else { return event }
+            self.close()
+            return nil
+        }
+
+        globalEscapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53 else { return }
+            Task { @MainActor [weak self] in
+                guard let self = self, let panel = self.window, panel.isVisible else { return }
+                self.close()
+            }
+        }
+    }
+
+    private func removeEscapeMonitors() {
+        if let monitor = escapeMonitor {
+            NSEvent.removeMonitor(monitor)
+            escapeMonitor = nil
+        }
+        if let monitor = globalEscapeMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalEscapeMonitor = nil
         }
     }
 }

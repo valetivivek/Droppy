@@ -65,6 +65,18 @@ enum DroppyAnimation {
     private static func shouldPreferLightweightEffects(for screen: NSScreen? = nil) -> Bool {
         prefersReducedMotion || isLowPowerMode || refreshRate(for: screen) <= 60
     }
+
+    /// Keep blur transitions present while scaling cost by device/power context.
+    private static func transitionBlurRadius(base: CGFloat, for screen: NSScreen?) -> CGFloat {
+        guard !prefersReducedMotion else { return 0 }
+        if isLowPowerMode {
+            return max(1, base * 0.33)
+        }
+        if refreshRate(for: screen) <= 60 {
+            return max(1.5, base * 0.5)
+        }
+        return base
+    }
     
     // MARK: - Asymmetric Expand/Collapse (Apple-Style Animation)
     
@@ -505,7 +517,7 @@ enum DroppyAnimation {
     }
 
     static func notchViewTransitionBlurOnly(for screen: NSScreen?) -> AnyTransition {
-        let blurRadius: CGFloat = shouldPreferLightweightEffects(for: screen) ? 0 : 6
+        let blurRadius = transitionBlurRadius(base: 6, for: screen)
 
         return .modifier(
             active: NotchBlurModifier(scale: 1, blur: blurRadius, opacity: 0),
@@ -519,7 +531,7 @@ enum DroppyAnimation {
     }
 
     static func notchButtonTransition(for screen: NSScreen?) -> AnyTransition {
-        let blurRadius: CGFloat = shouldPreferLightweightEffects(for: screen) ? 0 : 3
+        let blurRadius = transitionBlurRadius(base: 3, for: screen)
 
         return .modifier(
             active: NotchBlurModifier(scale: 0.55, blur: blurRadius, opacity: 0),
@@ -533,7 +545,7 @@ enum DroppyAnimation {
     }
 
     static func notchElementTransition(for screen: NSScreen?) -> AnyTransition {
-        let blurRadius: CGFloat = shouldPreferLightweightEffects(for: screen) ? 0 : 4
+        let blurRadius = transitionBlurRadius(base: 4, for: screen)
 
         return .modifier(
             active: NotchBlurModifier(scale: 0.84, blur: blurRadius, opacity: 0),

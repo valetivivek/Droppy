@@ -948,32 +948,30 @@ class ClipboardManager: ObservableObject {
     }
     
     func toggleFavorite(_ item: ClipboardItem) {
-        if let index = history.firstIndex(where: { $0.id == item.id }) {
-            withAnimation(DroppyAnimation.listChange) {
-                history[index].isFavorite.toggle()
-                sortHistory()
-                // Force SwiftUI to detect the isFavorite change on rows
-                objectWillChange.send()
-            }
-            HapticFeedback.toggle()
-        }
+        guard let index = history.firstIndex(where: { $0.id == item.id }) else { return }
+        
+        var updated = history
+        updated[index].isFavorite.toggle()
+        sortHistory(&updated)
+        history = updated
+        
+        HapticFeedback.toggle()
     }
     
     func toggleFlag(_ item: ClipboardItem) {
-        if let index = history.firstIndex(where: { $0.id == item.id }) {
-            withAnimation(DroppyAnimation.listChange) {
-                history[index].isFlagged.toggle()
-                sortHistory()
-                // Force SwiftUI to detect the isFlagged change on rows
-                objectWillChange.send()
-            }
-            HapticFeedback.toggle()
-        }
+        guard let index = history.firstIndex(where: { $0.id == item.id }) else { return }
+        
+        var updated = history
+        updated[index].isFlagged.toggle()
+        sortHistory(&updated)
+        history = updated
+        
+        HapticFeedback.toggle()
     }
     
-    private func sortHistory() {
+    private func sortHistory(_ entries: inout [ClipboardItem]) {
         // Priority order: Flagged > Favorites > Regular (all sorted by date within group)
-        history.sort { (a, b) -> Bool in
+        entries.sort { (a, b) -> Bool in
             // Flagged items always come first
             if a.isFlagged && !b.isFlagged { return true }
             if !a.isFlagged && b.isFlagged { return false }
@@ -1147,4 +1145,3 @@ class ClipboardManager: ObservableObject {
         return data
     }
 }
-

@@ -128,23 +128,21 @@ class TerminalNotchManager: ObservableObject {
     
     /// Toggle terminal visibility
     func toggle() {
-        withAnimation(DroppyAnimation.state) {
-            isVisible.toggle()
-            if isVisible {
-                // CRITICAL: Also expand the shelf - terminal renders inside expanded shelf
-                // Open on the screen where cursor is (consistent with all shelf/island behavior)
-                let mouseLocation = NSEvent.mouseLocation
-                if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) {
-                    DroppyState.shared.expandShelf(for: screen.displayID)
-                } else if let mainScreen = NSScreen.main {
-                    DroppyState.shared.expandShelf(for: mainScreen.displayID)
-                }
-                // Focus the terminal when shown
-                focusTerminal()
-            } else {
-                // Collapse shelf when hiding terminal
-                DroppyState.shared.expandedDisplayID = nil
+        isVisible.toggle()
+        if isVisible {
+            // CRITICAL: Also expand the shelf - terminal renders inside expanded shelf
+            // Open on the screen where cursor is (consistent with all shelf/island behavior)
+            let mouseLocation = NSEvent.mouseLocation
+            if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) {
+                DroppyState.shared.expandShelf(for: screen.displayID)
+            } else if let mainScreen = NSScreen.main {
+                DroppyState.shared.expandShelf(for: mainScreen.displayID)
             }
+            // Focus the terminal when shown
+            focusTerminal()
+        } else {
+            // Collapse shelf when hiding terminal
+            DroppyState.shared.expandedDisplayID = nil
         }
     }
     

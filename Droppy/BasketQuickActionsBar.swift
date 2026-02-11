@@ -18,6 +18,7 @@ struct BasketQuickActionsBar: View {
     @State private var isExpanded = false
     @State private var isHovering = false
     @State private var isBoltTargeted = false  // Track when files are dragged over collapsed bolt
+    @State private var collapseWorkItem: DispatchWorkItem?
     @ObservedObject private var dragMonitor = DragMonitor.shared
     
     private let buttonSize: CGFloat = 48
@@ -35,6 +36,14 @@ struct BasketQuickActionsBar: View {
         let actionCount = isQuickshareEnabled ? 4 : 3
         return (buttonSize * CGFloat(actionCount)) + (spacing * CGFloat(actionCount - 1)) + 16
     }
+
+    private var stableHitFrameWidth: CGFloat {
+        expandedBarWidth + 40
+    }
+
+    private var stableHitFrameHeight: CGFloat {
+        buttonSize + 28
+    }
     
     var body: some View {
         ZStack {
@@ -44,8 +53,8 @@ struct BasketQuickActionsBar: View {
             Capsule()
                 .fill(AdaptiveColors.overlayAuto(0.001)) // Nearly invisible but captures events
                 .frame(
-                    width: isExpanded ? expandedBarWidth : buttonSize + 16,
-                    height: buttonSize + 8
+                    width: isExpanded ? expandedBarWidth + 36 : buttonSize + 22,
+                    height: buttonSize + 24
                 )
                 // Track when drag is over the bar area
                 // Include file promise types for Photos.app compatibility
@@ -55,18 +64,15 @@ struct BasketQuickActionsBar: View {
                 // Keep expanded when drag is over bar area
                 .onChange(of: isBarAreaTargeted) { _, targeted in
                     if targeted && !isExpanded {
+                        cancelScheduledCollapse()
+                        basketState.isQuickActionsTargeted = true
                         // Drag entered bar area while collapsed - expand
                         withAnimation(DroppyAnimation.state) {
                             isExpanded = true
                         }
                         HapticFeedback.expand()
-                    } else if !targeted && !isHovering && !isBoltTargeted && !basketState.isQuickActionsTargeted && !dragMonitor.isDragging {
-                        // Drag left the bar area completely - collapse (only if not dragging)
-                        basketState.isQuickActionsTargeted = false
-                        basketState.hoveredQuickAction = nil
-                        withAnimation(DroppyAnimation.state) {
-                            isExpanded = false
-                        }
+                    } else if !targeted && !isHovering && !isBoltTargeted && !dragMonitor.isDragging {
+                        scheduleCollapse()
                     }
                 }
             
@@ -109,8 +115,10 @@ struct BasketQuickActionsBar: View {
                     }
                     .animation(DroppyAnimation.hoverBouncy, value: isBoltTargeted)
             }
-            .frame(width: isExpanded ? expandedBarWidth : buttonSize, height: buttonSize + 14)
+            .frame(width: isExpanded ? expandedBarWidth + 20 : buttonSize + 8, height: buttonSize + 24)
         }
+        .frame(width: stableHitFrameWidth, height: stableHitFrameHeight)
+        .contentShape(Rectangle())
         .animation(DroppyAnimation.state, value: isExpanded)
         .onHover { hovering in
             isHovering = hovering
@@ -118,52 +126,82 @@ struct BasketQuickActionsBar: View {
         .onChange(of: isHovering) { _, hovering in
             // EXPANDED VIA HOVER: normal expand/collapse on hover
             // But don't collapse if still dragging over bar area
-            if !hovering && (isBarAreaTargeted || dragMonitor.isDragging) {
+            if !hovering && (isBarAreaTargeted || dragMonitor.isDragging || isBoltTargeted) {
                 return  // Keep expanded while dragging anywhere over bar
             }
-            withAnimation(DroppyAnimation.state) {
-                isExpanded = hovering
-            }
-            // Clear hovered action when collapsing
-            if !hovering {
-                basketState.hoveredQuickAction = nil
-            }
-            if hovering && !isExpanded {
-                HapticFeedback.expand()
+            if hovering {
+                cancelScheduledCollapse()
+                basketState.isQuickActionsTargeted = true
+                if !isExpanded {
+                    HapticFeedback.expand()
+                }
+                withAnimation(DroppyAnimation.state) {
+                    isExpanded = true
+                }
+            } else {
+                collapseIfPossible()
             }
         }
         // DRAG-TO-EXPAND: Auto-expand when files are dragged over the collapsed bolt
         .onChange(of: isBoltTargeted) { _, targeted in
             if targeted && !isExpanded {
+                cancelScheduledCollapse()
+                basketState.isQuickActionsTargeted = true
                 withAnimation(DroppyAnimation.state) {
                     isExpanded = true
                 }
                 HapticFeedback.expand()
+            } else if !targeted && !isBarAreaTargeted && !dragMonitor.isDragging {
+                scheduleCollapse()
             }
         }
         .onChange(of: dragMonitor.isDragging) { _, dragging in
             if dragging {
+                cancelScheduledCollapse()
                 return
             }
             if !isHovering && !isBarAreaTargeted && !isBoltTargeted && !basketState.isQuickActionsTargeted {
-                withAnimation(DroppyAnimation.state) {
-                    isExpanded = false
-                }
-                basketState.hoveredQuickAction = nil
+                scheduleCollapse()
             }
         }
         // Note: Main collapse logic is handled by onChange(of: isBarAreaTargeted) above
         // This handler is just for when buttons lose targeting but bar area keeps it
         // COLLAPSE when basket becomes targeted (drag moved to basket area)
         .onChange(of: basketState.isTargeted) { _, targeted in
-            if targeted && isExpanded {
-                // Drag moved to basket - collapse back to bolt and clear quick actions state
-                basketState.isQuickActionsTargeted = false
-                basketState.hoveredQuickAction = nil
-                withAnimation(DroppyAnimation.state) {
-                    isExpanded = false
-                }
+            // While an active drag is in progress, keep quick actions stable and let
+            // button/bar targeting decide collapse. This avoids focus flicker where
+            // basket targeting briefly wins over center action buttons.
+            if targeted && isExpanded && !dragMonitor.isDragging && !isBarAreaTargeted && !basketState.isQuickActionsTargeted {
+                scheduleCollapse()
             }
+        }
+        .onDisappear {
+            cancelScheduledCollapse()
+        }
+    }
+
+    private func cancelScheduledCollapse() {
+        collapseWorkItem?.cancel()
+        collapseWorkItem = nil
+    }
+
+    private func scheduleCollapse() {
+        cancelScheduledCollapse()
+        let workItem = DispatchWorkItem {
+            collapseIfPossible()
+        }
+        collapseWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14, execute: workItem)
+    }
+
+    private func collapseIfPossible() {
+        guard !isHovering, !isBarAreaTargeted, !isBoltTargeted, !dragMonitor.isDragging else {
+            return
+        }
+        basketState.isQuickActionsTargeted = false
+        basketState.hoveredQuickAction = nil
+        withAnimation(DroppyAnimation.state) {
+            isExpanded = false
         }
     }
     
@@ -226,9 +264,19 @@ struct QuickDropActionButton: View {
     
     var body: some View {
         // Use AppKit-based drop target for reliable Photos.app file promise support
-        FilePromiseDropTarget(isTargeted: $isTargeted, onFilesReceived: { urls in
-            shareAction(urls)
-        }) {
+        FilePromiseDropTarget(
+            isTargeted: $isTargeted,
+            onFilesReceived: { urls in
+                shareAction(urls)
+            },
+            onHoverChanged: { hovering in
+                isHovering = hovering
+                if hovering {
+                    basketState.isQuickActionsTargeted = true
+                    basketState.hoveredQuickAction = actionType
+                }
+            }
+        ) {
             Circle()
                 .fill(useTransparent ? AnyShapeStyle(.ultraThinMaterial) : AdaptiveColors.panelBackgroundOpaqueStyle)
                 .frame(width: size, height: size)
@@ -247,15 +295,7 @@ struct QuickDropActionButton: View {
                 .animation(DroppyAnimation.hoverBouncy, value: isTargeted)
                 .animation(DroppyAnimation.hoverBouncy, value: isHovering)
         }
-        .onHover { hovering in
-            isHovering = hovering
-            // Update basket state for explanation overlay
-            if hovering {
-                basketState.hoveredQuickAction = actionType
-            } else if basketState.hoveredQuickAction == actionType {
-                basketState.hoveredQuickAction = nil
-            }
-        }
+        .contentShape(Circle())
         .frame(width: size, height: size)
         // CRITICAL: Update basket state when this button is targeted
         // Only SET the state - clearing is handled by capsule exit or basket targeting
@@ -264,7 +304,7 @@ struct QuickDropActionButton: View {
                 basketState.isQuickActionsTargeted = true
                 basketState.hoveredQuickAction = actionType
             }
-            // Don't clear here - let capsule/basket handle it
+            // Don't clear on false here - let bar-level hover/drag exit handle it.
         }
         .onTapGesture {
             let urls = basketState.items.map(\.url)

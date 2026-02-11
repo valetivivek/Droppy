@@ -408,15 +408,13 @@ struct ClipboardManagerView: View {
         let itemsToDelete = selectedItemsArray
         let remainingItems = manager.history.filter { !selectedItems.contains($0.id) }
         
-        withAnimation(DroppyAnimation.easeInOut) {
-            for item in itemsToDelete {
-                manager.delete(item: item)
-            }
-            if let first = remainingItems.first {
-                selectedItems = [first.id]
-            } else {
-                selectedItems = []
-            }
+        for item in itemsToDelete {
+            manager.delete(item: item)
+        }
+        if let first = remainingItems.first {
+            selectedItems = [first.id]
+        } else {
+            selectedItems = []
         }
     }
     
@@ -701,10 +699,9 @@ struct ClipboardManagerView: View {
                                     )
                                     .frame(width: 360)  // Fixed width to prevent text expansion
                                 }
-                                // CRITICAL: Make view identity depend on selection state
-                                // This forces SwiftUI to recreate the entire DraggableArea (including NSHostingView)
-                                // when selection changes, ensuring the row visual always matches the state
-                                .id("\(item.id.uuidString)-\(selectedItems.contains(item.id) ? "sel" : "unsel")")
+                                // Include selection + item status in identity so DraggableArea rows
+                                // always refresh their status badges after favorite/flag toggles.
+                                .id("\(item.id.uuidString)-\(selectedItems.contains(item.id) ? "sel" : "unsel")-\(item.isFavorite ? "fav" : "nofav")-\(item.isFlagged ? "flag" : "noflag")")
                                 .contextMenu {
                                     if selectedItems.count > 1 {
                                         // Multi-select context menu
@@ -825,12 +822,10 @@ struct ClipboardManagerView: View {
                                             Label("Rename", systemImage: "pencil")
                                         }
                                         Button(role: .destructive) {
-                                            withAnimation(DroppyAnimation.easeInOut) {
-                                                manager.delete(item: item)
-                                                selectedItems.remove(item.id)
-                                                if selectedItems.isEmpty, let first = manager.history.first {
-                                                    selectedItems.insert(first.id)
-                                                }
+                                            manager.delete(item: item)
+                                            selectedItems.remove(item.id)
+                                            if selectedItems.isEmpty, let first = manager.history.first {
+                                                selectedItems.insert(first.id)
                                             }
                                         } label: {
                                             Label("Delete", systemImage: "trash")
@@ -1216,10 +1211,17 @@ struct FlaggedGridItemView: View {
                 
                 Spacer()
                 
-                // Right side: Flag icon (vertically centered)
-                Image(systemName: "flag.fill")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.red)
+                // Right side: status icons (flag + favorite)
+                HStack(spacing: 4) {
+                    Image(systemName: "flag.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.red)
+                    if item.isFavorite {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.yellow)
+                    }
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -3286,6 +3288,11 @@ struct TagFilterPopover: View {
     @Binding var selectedTagFilter: UUID?
     @Binding var showTagManagement: Bool
     @ObservedObject var manager: ClipboardManager
+    @AppStorage(AppPreferenceKey.useTransparentBackground) private var useTransparentBackground = PreferenceDefault.useTransparentBackground
+
+    private var panelBackgroundStyle: AnyShapeStyle {
+        useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AdaptiveColors.panelBackgroundOpaqueStyle
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -3367,11 +3374,11 @@ struct TagFilterPopover: View {
             }
         }
         .frame(width: 200)
-        .background(AdaptiveColors.panelBackgroundOpaqueStyle)
+        .background(panelBackgroundStyle)
         .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.large, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: DroppyRadius.large, style: .continuous)
-                .stroke(AdaptiveColors.overlayAuto(0.08), lineWidth: 1)
+                .stroke(AdaptiveColors.overlayAuto(useTransparentBackground ? 0.14 : 0.08), lineWidth: 1)
         )
     }
 }
@@ -3381,6 +3388,7 @@ struct TagFilterPopover: View {
 struct TagManagementSheet: View {
     @ObservedObject var manager: ClipboardManager
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(AppPreferenceKey.useTransparentBackground) private var useTransparentBackground = PreferenceDefault.useTransparentBackground
     
     @State private var newTagName = ""
     @State private var selectedColorIndex = 0
@@ -3392,6 +3400,10 @@ struct TagManagementSheet: View {
     
     private var selectedColor: Color {
         Color(hex: ClipboardTag.presetColors[selectedColorIndex]) ?? .cyan
+    }
+
+    private var panelBackgroundStyle: AnyShapeStyle {
+        useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AdaptiveColors.panelBackgroundOpaqueStyle
     }
     
     var body: some View {
@@ -3405,6 +3417,7 @@ struct TagManagementSheet: View {
                 
                 Text("Manage Tags")
                     .font(.title2.bold())
+                    .foregroundStyle(AdaptiveColors.primaryTextAuto)
             }
             .padding(.top, 24)
             .padding(.bottom, 16)
@@ -3424,6 +3437,7 @@ struct TagManagementSheet: View {
                     TextField("New tag name...", text: $newTagName)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(AdaptiveColors.primaryTextAuto)
                         .focused($isTextFieldFocused)
                         .onSubmit { addTag() }
                     
@@ -3494,13 +3508,13 @@ struct TagManagementSheet: View {
                 VStack(spacing: 8) {
                     Image(systemName: "tag.slash")
                         .font(.system(size: 28))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AdaptiveColors.secondaryTextAuto)
                     Text("No tags yet")
                         .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AdaptiveColors.secondaryTextAuto)
                     Text("Add a tag above to get started")
                         .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(AdaptiveColors.secondaryTextAuto.opacity(0.75))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -3580,11 +3594,11 @@ struct TagManagementSheet: View {
             .padding(DroppySpacing.lg)
         }
         .frame(width: 340, height: 630)
-        .background(AdaptiveColors.panelBackgroundOpaqueStyle)
+        .background(panelBackgroundStyle)
         .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.large, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: DroppyRadius.large, style: .continuous)
-                .stroke(AdaptiveColors.overlayAuto(0.08), lineWidth: 1)
+                .stroke(AdaptiveColors.overlayAuto(useTransparentBackground ? 0.14 : 0.08), lineWidth: 1)
         )
     }
     

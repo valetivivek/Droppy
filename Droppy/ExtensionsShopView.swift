@@ -392,10 +392,7 @@ struct ExtensionsShopView: View {
                 AnyView(ExtensionInfoView(
                     extensionType: .finder,
                     onAction: {
-                        // Open System Settings → Privacy & Security → Extensions → Finder Extensions
-                        if let url = URL(string: "x-apple.systempreferences:com.apple.ExtensionsPreferences?Finder") {
-                            NSWorkspace.shared.open(url)
-                        }
+                        _ = openFinderServicesSettings()
                     },
                     installCount: extensionCounts["finder"],
                     rating: extensionRatings["finder"]

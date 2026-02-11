@@ -14,6 +14,8 @@ final class ScreenshotEditorWindowController {
     
     private var window: NSWindow?
     private var hostingView: NSHostingView<AnyView>?
+    private var escapeMonitor: Any?
+    private var globalEscapeMonitor: Any?
     
     private init() {}
     
@@ -96,6 +98,7 @@ final class ScreenshotEditorWindowController {
         AppKitMotion.animateIn(newWindow, initialScale: 0.94, duration: 0.2)
         
         self.window = newWindow
+        installEscapeMonitors()
         
         // Close the preview window
         CapturePreviewWindowController.shared.dismiss()
@@ -142,6 +145,7 @@ final class ScreenshotEditorWindowController {
     
     func dismiss() {
         guard let window = window else { return }
+        removeEscapeMonitors()
 
         AppKitMotion.animateOut(window, targetScale: 0.97, duration: 0.16) { [weak self] in
             DispatchQueue.main.async {
@@ -151,9 +155,46 @@ final class ScreenshotEditorWindowController {
     }
     
     private func cleanUp() {
+        removeEscapeMonitors()
         window?.orderOut(nil)
         window?.contentView = nil
         window = nil
         hostingView = nil
+    }
+
+    private func installEscapeMonitors() {
+        removeEscapeMonitors()
+
+        escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53 else { return event }
+            guard let self = self, let window = self.window, window.isVisible else { return event }
+            guard !self.isTextInputActive(in: window) else { return event }
+            self.dismiss()
+            return nil
+        }
+
+        globalEscapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53 else { return }
+            Task { @MainActor [weak self] in
+                guard let self = self, let window = self.window, window.isVisible else { return }
+                guard !self.isTextInputActive(in: window) else { return }
+                self.dismiss()
+            }
+        }
+    }
+
+    private func removeEscapeMonitors() {
+        if let monitor = escapeMonitor {
+            NSEvent.removeMonitor(monitor)
+            escapeMonitor = nil
+        }
+        if let monitor = globalEscapeMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalEscapeMonitor = nil
+        }
+    }
+
+    private func isTextInputActive(in window: NSWindow) -> Bool {
+        window.firstResponder is NSTextView
     }
 }

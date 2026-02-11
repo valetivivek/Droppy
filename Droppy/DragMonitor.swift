@@ -39,6 +39,10 @@ final class DragMonitor: ObservableObject {
     private var jiggleNotified = false
     private var dragEndNotified = false
     
+    /// When true, basket reveal logic is suppressed for the active drag session.
+    /// Used for drags that originate from Droppy's own shelf/basket items.
+    private var suppressBasketRevealForCurrentDrag = false
+    
     // Optional shortcut to reveal basket during active drag
     private var dragRevealHotKey: GlobalHotKey?
     private var dragRevealShortcut: SavedShortcut?
@@ -124,6 +128,14 @@ final class DragMonitor: ObservableObject {
         configureDragRevealHotKeyIfNeeded(force: true)
     }
     
+    /// Suppresses or re-enables basket reveal behavior for the current drag session.
+    /// This should be set to true when a drag starts from Droppy's own items.
+    func setSuppressBasketRevealForCurrentDrag(_ suppress: Bool) {
+        guard suppressBasketRevealForCurrentDrag != suppress else { return }
+        suppressBasketRevealForCurrentDrag = suppress
+        updateDragRevealHotKeyRegistration()
+    }
+    
     /// Manually set dragging state for system-initiated drags (e.g., Dock folder drags)
     /// NSPasteboard(name: .drag) polling doesn't work for Dock folder drags - the changeCount
     /// isn't updated until later in the drag. This allows NotchDragContainer.draggingEntered()
@@ -146,6 +158,7 @@ final class DragMonitor: ObservableObject {
             resetJiggle()
         } else {
             dragActive = false
+            suppressBasketRevealForCurrentDrag = false
             updateDragRevealHotKeyRegistration()
             self.isDragging = false
             dragEndNotified = true
@@ -162,6 +175,7 @@ final class DragMonitor: ObservableObject {
         dragLocation = .zero
         dragStartChangeCount = 0
         dragEndNotified = true
+        suppressBasketRevealForCurrentDrag = false
         resetJiggle()
         updateDragRevealHotKeyRegistration()
         
@@ -237,6 +251,7 @@ final class DragMonitor: ObservableObject {
                         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                             // Only show if drag is still active (user didn't release)
                             guard self?.dragActive == true else { return }
+                            guard self?.suppressBasketRevealForCurrentDrag != true else { return }
                             let enabled = UserDefaults.standard.preference(
                                 AppPreferenceKey.enableFloatingBasket,
                                 default: PreferenceDefault.enableFloatingBasket
@@ -271,6 +286,7 @@ final class DragMonitor: ObservableObject {
             // Detect drag END
             if !mouseIsDown && dragActive {
                 dragActive = false
+                suppressBasketRevealForCurrentDrag = false
                 updateDragRevealHotKeyRegistration()
                 isDragging = false
                 dragEndNotified = true
@@ -286,6 +302,8 @@ final class DragMonitor: ObservableObject {
     }
     
     private func detectJiggle(currentLocation: CGPoint) {
+        guard !suppressBasketRevealForCurrentDrag else { return }
+        
         let dx = currentLocation.x - lastDragLocation.x
         let dy = currentLocation.y - lastDragLocation.y
         let magnitude = sqrt(dx * dx + dy * dy)
@@ -356,7 +374,7 @@ final class DragMonitor: ObservableObject {
     }
     
     private func updateDragRevealHotKeyRegistration() {
-        guard dragActive, let shortcut = dragRevealShortcut else {
+        guard dragActive, !suppressBasketRevealForCurrentDrag, let shortcut = dragRevealShortcut else {
             dragRevealHotKey = nil
             return
         }
@@ -385,6 +403,7 @@ final class DragMonitor: ObservableObject {
                 default: PreferenceDefault.enableFloatingBasket
             )
             guard enabled else { return }
+            guard !self.suppressBasketRevealForCurrentDrag else { return }
             
             FloatingBasketWindowController.shared.onJiggleDetected()
         }

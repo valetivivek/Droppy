@@ -26,6 +26,8 @@ class UpdateChecker: ObservableObject {
     
     /// UserDefaults key for last auto-check timestamp
     private let lastCheckKey = "lastAutoUpdateCheck"
+    private var pendingBackgroundUpdatePrompt = false
+    private var didBecomeActiveObserver: NSObjectProtocol?
     
     /// Current app version
     var currentVersion: String {
@@ -91,8 +93,8 @@ class UpdateChecker: ObservableObject {
                     // Show HUD notification (display-only, user updates through Settings)
                     HUDManager.shared.show(.update)
                 } else {
-                    // HUD disabled - show the traditional update window
-                    showUpdateWindow()
+                    // HUD disabled - present update window only when app is already foreground.
+                    queueBackgroundUpdatePromptIfNeeded()
                 }
             }
         }
@@ -188,6 +190,50 @@ class UpdateChecker: ObservableObject {
     func showUpdateWindow() {
         guard updateAvailable, latestVersion != nil else { return }
         UpdateWindowController.shared.showWindow()
+    }
+
+    private func queueBackgroundUpdatePromptIfNeeded() {
+        guard updateAvailable else { return }
+
+        if canPresentForegroundUI() {
+            showUpdateWindow()
+            return
+        }
+
+        pendingBackgroundUpdatePrompt = true
+        installDidBecomeActiveObserverIfNeeded()
+        print("UpdateChecker: Deferring update window until Droppy is frontmost")
+    }
+
+    private func installDidBecomeActiveObserverIfNeeded() {
+        guard didBecomeActiveObserver == nil else { return }
+
+        didBecomeActiveObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Self.handleDidBecomeActiveNotification()
+        }
+    }
+
+    private nonisolated static func handleDidBecomeActiveNotification() {
+        Task { @MainActor in
+            UpdateChecker.shared.processPendingBackgroundPromptIfPossible()
+        }
+    }
+
+    private func processPendingBackgroundPromptIfPossible() {
+        guard pendingBackgroundUpdatePrompt else { return }
+        guard canPresentForegroundUI() else { return }
+        pendingBackgroundUpdatePrompt = false
+        showUpdateWindow()
+    }
+
+    private func canPresentForegroundUI() -> Bool {
+        guard NSApp.isActive else { return false }
+        guard let frontmost = NSWorkspace.shared.frontmostApplication else { return false }
+        return frontmost.processIdentifier == ProcessInfo.processInfo.processIdentifier
     }
     
     // Removed old update methods as they are replaced by AutoUpdater

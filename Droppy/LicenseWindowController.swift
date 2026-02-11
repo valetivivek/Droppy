@@ -4,6 +4,11 @@ import SwiftUI
 final class LicenseWindowController: NSObject, NSWindowDelegate {
     static let shared = LicenseWindowController()
 
+    enum ActivationMode {
+        case forceForeground
+        case onlyIfAlreadyActive
+    }
+
     private var window: NSWindow?
 
     var isVisible: Bool {
@@ -14,13 +19,14 @@ final class LicenseWindowController: NSObject, NSWindowDelegate {
         super.init()
     }
 
-    func show() {
+    func show(activationMode: ActivationMode = .forceForeground) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            guard self.shouldPresentWindow(for: activationMode) else { return }
 
             // If already visible, bring it to front.
             if let window = self.window, window.isVisible {
-                NSApp.activate(ignoringOtherApps: true)
+                self.activateIfAllowed(for: activationMode)
                 window.makeKeyAndOrderFront(nil)
                 return
             }
@@ -73,7 +79,7 @@ final class LicenseWindowController: NSObject, NSWindowDelegate {
 
             newWindow.orderFront(nil)
             DispatchQueue.main.async {
-                NSApp.activate(ignoringOtherApps: true)
+                self.activateIfAllowed(for: activationMode)
                 newWindow.makeKeyAndOrderFront(nil)
             }
 
@@ -100,5 +106,30 @@ final class LicenseWindowController: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         window = nil
+    }
+
+    private func shouldPresentWindow(for activationMode: ActivationMode) -> Bool {
+        switch activationMode {
+        case .forceForeground:
+            return true
+        case .onlyIfAlreadyActive:
+            return isDroppyFrontmostAndActive
+        }
+    }
+
+    private func activateIfAllowed(for activationMode: ActivationMode) {
+        switch activationMode {
+        case .forceForeground:
+            NSApp.activate(ignoringOtherApps: true)
+        case .onlyIfAlreadyActive:
+            guard isDroppyFrontmostAndActive else { return }
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
+    private var isDroppyFrontmostAndActive: Bool {
+        guard NSApp.isActive else { return false }
+        guard let frontmost = NSWorkspace.shared.frontmostApplication else { return false }
+        return frontmost.processIdentifier == ProcessInfo.processInfo.processIdentifier
     }
 }
