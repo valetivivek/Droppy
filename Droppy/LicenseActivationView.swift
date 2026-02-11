@@ -123,7 +123,7 @@ struct LicenseActivationView: View {
                     focused: focusedField == .email
                 ) {
                     TextField(
-                        "Purchase email (required)",
+                        "Purchase email (optional)",
                         text: $emailInput
                     )
                         .textFieldStyle(.plain)

@@ -176,7 +176,7 @@ struct LicenseSettingsSection: View {
 
             inputField(icon: "envelope.fill", isFocused: focusedField == .email) {
                 LeftAlignedTextField(
-                    placeholder: "Purchase email (required)",
+                    placeholder: "Purchase email (optional)",
                     text: $emailInput,
                     onFocusChanged: { isFocused in
                         focusedField = isFocused ? .email : nil
