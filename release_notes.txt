@@ -1,18 +1,24 @@
 ## 🚀 Droppy v11.1.0
 
-Sorry from Jordy (the developer) for moving Droppy to paid. To make that transition fair, v11.1.0 starts with a full **3-day trial** so you can test everything first.
+Sorry from Jordy (the developer). The move to paid could have been introduced more subtly, so v11.1.0 starts with a full **3-day trial** to give everyone a fair chance to try Droppy first.
 
 ## ⭐ Biggest updates
 - Added a full **3-day Droppy trial**. Try everything free for 3 days, then purchase only if you want to keep it.
+- Added an **all-new Calendar split view**:
+  - See your current tasks and calendar events side by side in one unified view.
+  - Sync is tight and reliable across reminders/tasks and calendar events.
+  - Edit tasks on the fly directly from the split view.
 - Added stronger licensing enforcement and fixes:
   - Fixed a licensing bug.
   - Closed a seat-limit loophole by applying the same seat-limit check during stored-license verification (not only on new activation).
-- Added an **all-new stacked file preview system** across Droppy:
-  - New stacked previews in Shelf and Basket.
+- Added an **all-new stacked file preview system** for Basket:
+  - Updated Basket view with stacked file previews.
   - Updated Basket switcher with stacked files and better responsiveness.
+  - Stacked previews keep existing actions intact, including quick copy of dropped files.
   - Task bar now auto-selects when opening the notch.
 - Added broad animation/feel upgrades:
   - Improved opening/closing animations for Shelf, Media HUD, and more.
+  - Much better lock/unlock animations with smoother transitions and cleaner timing.
   - Improved animation fluidity across Droppy.
   - Stabilized/optimized animations when adding many files to Shelf, including a subtle batch-add animation.
 
@@ -26,6 +32,7 @@ Sorry from Jordy (the developer) for moving Droppy to paid. To make that transit
   - Extension lines now continue fully to the container border.
   - Separator now renders as a neutral vertical line instead of a chevron.
   - When separator is off, hidden delimiter control collapses to zero width.
+  - Main toggle icon sets (including chevron icon sets) remain unchanged.
 - Cleaned up multiple extension windows.
 - Removed forced auto-rename after folder creation (no misleading immediate-cancel flow).
 - Added missing **Show in Finder** action to shelf item context actions.
@@ -57,7 +64,7 @@ Sorry from Jordy (the developer) for moving Droppy to paid. To make that transit
 - Fixed #198: targeted notch-centering fix for external-primary-display setups.
 - Fixed external HUD reveal race where percentage text appeared before notch expansion.
 - Fixed lock-screen HUD jumping position after docking/undocking.
-- Improved lock/unlock lock-screen HUD animations for smoother transitions.
+- Much better lock/unlock lock-screen HUD animations with smoother transitions.
 
 ## 📷 Notchface and Reminders upgrades
 - Notchface now uses smarter camera discovery (external/USB cameras first, then fallback).
