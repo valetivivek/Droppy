@@ -2018,6 +2018,12 @@ final class NotchWindowController: NSObject, ObservableObject {
     /// Routed event handler from monitors
     /// Only routes to the window whose screen contains the mouse - prevents race conditions
     private func handleMouseEvent(_ event: NSEvent) {
+        // Menu windows dispatch a very high volume of mouse-move events.
+        // Skip notch hit-testing while a menu is open to keep menu interactions responsive.
+        if hasActiveContextMenu() {
+            return
+        }
+
         let mouseLocation = NSEvent.mouseLocation
         
         // Find which window should handle this event (the one whose screen contains the mouse)
@@ -2152,6 +2158,11 @@ final class NotchWindowController: NSObject, ObservableObject {
     /// Works both when collapsed (hover state) and when expanded (shelf view)
     /// DISABLED when terminal is visible (terminal takes over the shelf)
     private func handleScrollEvent(_ event: NSEvent) {
+        // Don't spend cycles on shelf/media swipe detection while menus are open.
+        if hasActiveContextMenu() {
+            return
+        }
+
         // Disable swipe when terminal is visible (terminal takes over the shelf)
         if TerminalNotchManager.shared.isInstalled && TerminalNotchManager.shared.isVisible {
             return

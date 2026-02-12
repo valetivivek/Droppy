@@ -10,18 +10,19 @@ import SwiftUI
 struct QuickshareMenuContent: View {
     // Observe QuickshareManager for recent items
     @Bindable private var manager = QuickshareManager.shared
-    @State private var copiedItemId: UUID? = nil
     
     /// When enabled, "Manage Uploads" opens Settings to Quickshare tab instead of standalone window
     @AppStorage(AppPreferenceKey.showQuickshareInSidebar) private var showQuickshareInSidebar = PreferenceDefault.showQuickshareInSidebar
     
     var body: some View {
+        let clipboardURLs = getClipboardURLs()
+
         Button {
-            DroppyQuickshare.share(urls: getClipboardURLs())
+            DroppyQuickshare.share(urls: clipboardURLs)
         } label: {
             Label("Upload from Clipboard", systemImage: "clipboard")
         }
-        .disabled(getClipboardURLs().isEmpty)
+        .disabled(clipboardURLs.isEmpty)
         
         Button {
             selectAndUploadFile()
