@@ -143,6 +143,7 @@ private struct StackedFilePeekView: View {
     }
 
     @State private var thumbnails: [UUID: NSImage] = [:]
+    @State private var loadingThumbnailIDs: Set<UUID> = []
     @State private var hasAppeared = false
     @State private var isHovering = false
 
@@ -184,9 +185,16 @@ private struct StackedFilePeekView: View {
     }
 
     private func loadThumbnails() {
-        for item in displayItems where thumbnails[item.id] == nil {
+        for item in displayItems where thumbnails[item.id] == nil && !loadingThumbnailIDs.contains(item.id) {
+            loadingThumbnailIDs.insert(item.id)
             Task {
-                if let thumbnail = await generateThumbnail(for: item.url, size: style.thumbnailSize) {
+                defer {
+                    Task { @MainActor in
+                        loadingThumbnailIDs.remove(item.id)
+                    }
+                }
+
+                if let thumbnail = await generateThumbnailWithRetry(for: item, size: style.thumbnailSize) {
                     await MainActor.run {
                         withAnimation(.easeOut(duration: 0.2)) {
                             thumbnails[item.id] = thumbnail
@@ -195,6 +203,24 @@ private struct StackedFilePeekView: View {
                 }
             }
         }
+    }
+
+    private func generateThumbnailWithRetry(for item: DroppedItem, size: CGSize) async -> NSImage? {
+        if let thumbnail = await generateThumbnail(for: item.url, size: size) {
+            return thumbnail
+        }
+
+        // Some files briefly fail QuickLook on first paint (for example after fresh drops).
+        // Retry a few times so collapsed mode resolves to the exact preview once available.
+        let retryDelays: [UInt64] = [250_000_000, 800_000_000]
+        for delay in retryDelays {
+            try? await Task.sleep(nanoseconds: delay)
+            if let thumbnail = await generateThumbnail(for: item.url, size: size) {
+                return thumbnail
+            }
+        }
+
+        return nil
     }
 
     /// Uses QuickLook thumbnails with video-frame fallback for movie files.
@@ -221,7 +247,7 @@ private struct StackedFilePeekView: View {
             if let fileType, fileType.conforms(to: .image), let image = NSImage(contentsOf: url) {
                 return image
             }
-            return ThumbnailCache.shared.cachedIcon(forPath: url.path)
+            return nil
         }
     }
 
