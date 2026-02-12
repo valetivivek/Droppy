@@ -82,6 +82,8 @@ final class NotificationHUDManager {
     private var dbConnection: OpaquePointer?
     private let pollingInterval: TimeInterval = 2.0  // Backup polling (file watcher is primary)
     private var dismissWorkItem: DispatchWorkItem?
+    @ObservationIgnored
+    private var dueSoonChimeSound: NSSound?
 
     // File system monitoring for instant notification detection
     private var fileMonitorSource: DispatchSourceFileSystemObject?
@@ -104,6 +106,7 @@ final class NotificationHUDManager {
     ]
     
     private init() {
+        dueSoonChimeSound = Self.makeDueSoonChimeSound()
         // Check FDA on init
         recheckAccess()
     }
@@ -614,9 +617,42 @@ final class NotificationHUDManager {
     }
 
     private func playDueSoonChime() {
-        guard let sound = NSSound(named: "Pop") else { return }
-        sound.volume = 0.4
-        sound.play()
+        guard let sound = dueSoonChimeSound else {
+            NSSound.beep()
+            return
+        }
+        sound.stop()
+        sound.volume = 0.42
+        if !sound.play() {
+            NSSound.beep()
+        }
+    }
+
+    private static func makeDueSoonChimeSound() -> NSSound? {
+        let pathCandidates = [
+            "/System/Library/Sounds/Glass.aiff",
+            "/System/Library/Sounds/Pop.aiff",
+            "/System/Library/Sounds/Funk.aiff"
+        ]
+        for path in pathCandidates {
+            let url = URL(fileURLWithPath: path)
+            if FileManager.default.fileExists(atPath: path),
+               let sound = NSSound(contentsOf: url, byReference: true) {
+                return sound
+            }
+        }
+
+        let nameCandidates: [NSSound.Name] = [
+            NSSound.Name("Glass"),
+            NSSound.Name("Pop"),
+            NSSound.Name("Funk")
+        ]
+        for name in nameCandidates {
+            if let sound = NSSound(named: name) {
+                return sound
+            }
+        }
+        return nil
     }
 
     private func scheduleAutoDismiss() {

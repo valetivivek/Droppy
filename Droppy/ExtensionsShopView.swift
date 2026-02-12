@@ -90,12 +90,8 @@ struct ExtensionsShopView: View {
         VStack(spacing: 12) {
             // Section header
             HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "puzzlepiece.extension.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.cyan)
-                    
-                    Text("Featured Extensions")
+                HStack {
+                    Text("Featured")
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(AdaptiveColors.primaryTextAuto)
                 }
@@ -242,12 +238,8 @@ struct ExtensionsShopView: View {
         VStack(spacing: 12) {
             // Section header
             HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "square.grid.2x2.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(AdaptiveColors.secondaryTextAuto)
-                    
-                    Text("All Extensions")
+                HStack {
+                    Text("Extensions")
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(AdaptiveColors.primaryTextAuto)
                 }

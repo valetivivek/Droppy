@@ -121,11 +121,19 @@ final class ToDoManager {
     private var cleanupTimer: Timer?
     private var externalSyncTimer: Timer?
     private var lastExternalSyncRequestAt: Date?
+    private var isExternalSyncInFlight = false
+    private var hasPendingExternalSync = false
     private var eventStoreObserver: NSObjectProtocol?
+    private var appDidBecomeActiveObserver: NSObjectProtocol?
+    private var workspaceDidWakeObserver: NSObjectProtocol?
+    private var openRefreshWorkItem: DispatchWorkItem?
     private var eventStoreSyncDebounceWorkItem: DispatchWorkItem?
     private var dueSoonNotificationRefreshWorkItem: DispatchWorkItem?
     private var dueSoonNotificationTimer: Timer?
     private var dueSoonDeliveredTokens: Set<String> = []
+    private var persistenceWorkItem: DispatchWorkItem?
+    private let persistenceQueue = DispatchQueue(label: "app.getdroppy.todo.persistence", qos: .utility)
+    private var sortedItemsCache: [ToDoItem]?
     private let remindersSelectedListsKey = AppPreferenceKey.todoSyncRemindersListIDs
     private let calendarSelectedListsKey = AppPreferenceKey.todoSyncCalendarListIDs
     private let dueSoonLeadTimes: [TimeInterval] = [15 * 60, 60]
@@ -144,6 +152,7 @@ final class ToDoManager {
         setupCleanupTimer()
         setupExternalSyncTimer()
         observeEventStoreChanges()
+        observeAppActivity()
         
         // Initial cleanup on launch
         cleanupOldItems()
@@ -157,9 +166,17 @@ final class ToDoManager {
         if let eventStoreObserver {
             NotificationCenter.default.removeObserver(eventStoreObserver)
         }
+        if let appDidBecomeActiveObserver {
+            NotificationCenter.default.removeObserver(appDidBecomeActiveObserver)
+        }
+        if let workspaceDidWakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(workspaceDidWakeObserver)
+        }
+        openRefreshWorkItem?.cancel()
         eventStoreSyncDebounceWorkItem?.cancel()
         dueSoonNotificationRefreshWorkItem?.cancel()
         dueSoonNotificationTimer?.invalidate()
+        persistenceWorkItem?.cancel()
         undoTimer?.invalidate()
         cleanupToastTimer?.invalidate()
     }
@@ -171,15 +188,23 @@ final class ToDoManager {
             isVisible.toggle()
         }
         if isVisible {
-            // Run cleanup when opening
-            cleanupOldItems()
-            syncExternalSourcesNow()
+            // Defer heavier refresh work so opening transition remains responsive.
+            openRefreshWorkItem?.cancel()
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.cleanupOldItems()
+                self.syncExternalSourcesNow(minimumInterval: 1.5)
+            }
+            openRefreshWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: workItem)
         } else {
+            openRefreshWorkItem?.cancel()
             isShelfListExpanded = false
         }
     }
     
     func hide() {
+        openRefreshWorkItem?.cancel()
         withAnimation(.smooth) {
             isVisible = false
         }
@@ -434,8 +459,20 @@ final class ToDoManager {
             return
         }
         lastExternalSyncRequestAt = Date()
+        if isExternalSyncInFlight {
+            hasPendingExternalSync = true
+            return
+        }
+        isExternalSyncInFlight = true
         Task {
             await syncExternalSources()
+            await MainActor.run {
+                self.isExternalSyncInFlight = false
+                if self.hasPendingExternalSync {
+                    self.hasPendingExternalSync = false
+                    self.syncExternalSourcesNow(minimumInterval: 1.0)
+                }
+            }
         }
     }
 
@@ -460,6 +497,24 @@ final class ToDoManager {
             }
             self.eventStoreSyncDebounceWorkItem = workItem
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: workItem)
+        }
+    }
+
+    private func observeAppActivity() {
+        appDidBecomeActiveObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.scheduleDueSoonNotificationsRefresh(debounce: 0)
+        }
+
+        workspaceDidWakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.scheduleDueSoonNotificationsRefresh(debounce: 0)
         }
     }
 
@@ -1072,9 +1127,8 @@ final class ToDoManager {
         let activeTokens = Set(entries.map(\.token))
         dueSoonDeliveredTokens = dueSoonDeliveredTokens.intersection(activeTokens)
 
-        let recentThreshold = now.addingTimeInterval(-90)
         let dueNow = entries
-            .filter { $0.fireDate <= now && $0.fireDate >= recentThreshold }
+            .filter { $0.fireDate <= now }
             .filter { !dueSoonDeliveredTokens.contains($0.token) }
             .sorted { $0.fireDate < $1.fireDate }
 
@@ -1239,7 +1293,9 @@ final class ToDoManager {
         guard item.externalSource != .calendar else { return }
         // If this task is synced from Apple apps, delete the upstream item too.
         // Keep undo local-only to avoid stale external identifiers re-disappearing on next sync.
-        deleteExternalBacking(for: item)
+        DispatchQueue.global(qos: .utility).async {
+            Self.deleteExternalBackingSnapshot(item)
+        }
         var deletedSnapshot = item
         if item.externalSource != nil {
             deletedSnapshot.externalSource = nil
@@ -1294,18 +1350,23 @@ final class ToDoManager {
     
     private func saveItems() {
         guard let url = dataFileURL else { return }
-        
-        do {
-            // Ensure directory exists
-            let directory = url.deletingLastPathComponent()
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            
-            let data = try JSONEncoder().encode(items)
-            try data.write(to: url)
-            scheduleDueSoonNotificationsRefresh()
-        } catch {
-            print("ToDoManager: Failed to save items: \(error)")
+        sortedItemsCache = nil
+        scheduleDueSoonNotificationsRefresh()
+
+        let snapshot = items
+        persistenceWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [url] in
+            do {
+                let directory = url.deletingLastPathComponent()
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                let data = try JSONEncoder().encode(snapshot)
+                try data.write(to: url, options: .atomic)
+            } catch {
+                print("ToDoManager: Failed to save items: \(error)")
+            }
         }
+        persistenceWorkItem = workItem
+        persistenceQueue.asyncAfter(deadline: .now() + 0.08, execute: workItem)
     }
     
     // Public exposure for DropDelegate to commit changes
@@ -1319,6 +1380,7 @@ final class ToDoManager {
         do {
             let data = try Data(contentsOf: url)
             items = try JSONDecoder().decode([ToDoItem].self, from: data)
+            sortedItemsCache = nil
         } catch {
             // File might not exist yet, that's fine
             print("ToDoManager: No saved items loaded: \(error)")
@@ -1475,7 +1537,11 @@ final class ToDoManager {
     // MARK: - Computed Properties for View
     
     var sortedItems: [ToDoItem] {
-        items.sorted {
+        if let sortedItemsCache {
+            return sortedItemsCache
+        }
+
+        let sorted = items.sorted {
             // Always put completed items at the bottom
             if $0.isCompleted != $1.isCompleted {
                 return !$0.isCompleted
@@ -1515,6 +1581,8 @@ final class ToDoManager {
             // Fallback to Date
             return $0.createdAt > $1.createdAt
         }
+        sortedItemsCache = sorted
+        return sorted
     }
 
     var upcomingCalendarItems: [ToDoItem] {
@@ -1592,15 +1660,16 @@ final class ToDoManager {
         }
     }
 
-    private func deleteExternalBacking(for item: ToDoItem) {
+    private static func deleteExternalBackingSnapshot(_ item: ToDoItem) {
         guard let source = item.externalSource, let identifier = item.externalIdentifier else { return }
         guard source == .reminders else { return }
 
         let status = EKEventStore.authorizationStatus(for: .reminder)
         guard status == .fullAccess || status == .writeOnly else { return }
-        guard let reminder = eventStore.calendarItem(withIdentifier: identifier) as? EKReminder else { return }
+        let store = EKEventStore()
+        guard let reminder = store.calendarItem(withIdentifier: identifier) as? EKReminder else { return }
         do {
-            try eventStore.remove(reminder, commit: true)
+            try store.remove(reminder, commit: true)
         } catch {
             print("ToDoManager: Failed to delete reminder for removed task: \(error)")
         }

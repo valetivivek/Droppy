@@ -79,6 +79,7 @@ enum AppPreferenceKey {
     static let autoExpandOnExternalDisplays = "autoExpandOnExternalDisplays"  // Allow hover auto-expand on external displays
     static let autoExpandDelay = "autoExpandDelay"
     static let autoOpenMediaHUDOnShelfExpand = "autoOpenMediaHUDOnShelfExpand"  // Auto-show media HUD when shelf expands
+    static let showMediaShelfSwitchBadge = "showMediaShelfSwitchBadge"  // Show top-left switch badge in shelf/media views
     static let autoShrinkShelf = "autoShrinkShelf"  // Legacy
     static let autoShrinkDelay = "autoShrinkDelay"  // Legacy
     
@@ -271,6 +272,7 @@ enum PreferenceDefault {
     static let autoExpandOnExternalDisplays = true  // Keep legacy behavior by default; users can disable if it conflicts with menu bar usage
     static let autoExpandDelay: Double = 0.25
     static let autoOpenMediaHUDOnShelfExpand = false  // Auto-open media HUD when shelf expands (opt-in)
+    static let showMediaShelfSwitchBadge = true  // Keep media/shelf switch badge visible by default
     static let autoShrinkShelf = true  // Legacy
     static let autoShrinkDelay = 3  // Legacy
     

@@ -78,6 +78,7 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKey.autoExpandOnExternalDisplays) private var autoExpandOnExternalDisplays = PreferenceDefault.autoExpandOnExternalDisplays
     @AppStorage(AppPreferenceKey.autoExpandDelay) private var autoExpandDelay = PreferenceDefault.autoExpandDelay
     @AppStorage(AppPreferenceKey.autoOpenMediaHUDOnShelfExpand) private var autoOpenMediaHUDOnShelfExpand = PreferenceDefault.autoOpenMediaHUDOnShelfExpand
+    @AppStorage(AppPreferenceKey.showMediaShelfSwitchBadge) private var showMediaShelfSwitchBadge = PreferenceDefault.showMediaShelfSwitchBadge
     @AppStorage(AppPreferenceKey.autoHideOnFullscreen) private var autoHideOnFullscreen = PreferenceDefault.autoHideOnFullscreen
     @AppStorage(AppPreferenceKey.hideMediaOnlyOnFullscreen) private var hideMediaOnlyOnFullscreen = PreferenceDefault.hideMediaOnlyOnFullscreen
     @AppStorage(AppPreferenceKey.enableFinderServices) private var enableFinderServices = PreferenceDefault.enableFinderServices
@@ -1091,6 +1092,15 @@ struct SettingsView: View {
                             Image(systemName: "music.note")
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundStyle(autoOpenMediaHUDOnShelfExpand ? Color.blue : AdaptiveColors.overlayAuto(0.5))
+                        }
+                    }
+
+                    Toggle(isOn: $showMediaShelfSwitchBadge) {
+                        VStack(alignment: .leading) {
+                            Text("Media/Shelf Switch Badge")
+                            Text("Show the top-left badge button to switch between media and shelf views")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
                     

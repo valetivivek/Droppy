@@ -270,7 +270,7 @@ final class NotchWindowController: NSObject, ObservableObject {
     ) -> NSRect {
         let expandedWidth = currentExpandedShelfWidth()
         let centerX = effectiveShelfCenterX(for: screen)
-        let expandedHeight = DroppyState.expandedShelfHeight(for: screen)
+        let expandedHeight = expandedShelfInteractionHeight(for: screen)
         let isTodoSplitExpanded = ToDoManager.shared.isShelfListExpanded &&
             ToDoManager.shared.isShelfSplitViewEnabled
         // ToDo split mode lifts top controls upward; extend the interaction zone upward
@@ -285,6 +285,58 @@ final class NotchWindowController: NSObject, ObservableObject {
             width: expandedWidth + (horizontalPadding * 2),
             height: expandedHeight + bottomPadding + topPadding
         )
+    }
+
+    /// Expanded media surface is much shorter than the generic max shelf height.
+    /// Using the true media height prevents sticky hover/collapse behavior.
+    private func expandedMediaInteractionHeight(for screen: NSScreen) -> CGFloat {
+        let hasPhysicalNotch = screen.auxiliaryTopLeftArea != nil && screen.auxiliaryTopRightArea != nil
+        if hasPhysicalNotch {
+            let topInset = screen.safeAreaInsets.top
+            let notchHeight = topInset > 0 ? topInset : NotchLayoutConstants.physicalNotchHeight
+            return notchHeight + 120
+        }
+        return 140
+    }
+
+    private func shouldUseMediaInteractionHeight(on screen: NSScreen) -> Bool {
+        let displayID = screen.displayID
+        guard DroppyState.shared.isExpanded(for: displayID) else { return false }
+        guard !DragMonitor.shared.isDragging, !DroppyState.shared.isDropTargeted else { return false }
+
+        let showMediaPlayer = (UserDefaults.standard.object(forKey: AppPreferenceKey.showMediaPlayer) as? Bool) ?? PreferenceDefault.showMediaPlayer
+        guard showMediaPlayer else { return false }
+        guard DroppyState.shared.shelfDisplaySlotCount == 0 else { return false }
+        guard MusicManager.shared.isMediaAvailable, !MusicManager.shared.isPlayerIdle else { return false }
+
+        // Terminal takes over the expanded surface when active.
+        if TerminalNotchManager.shared.isVisible {
+            return false
+        }
+
+        // To-do editing/list sessions should keep their own interaction zone.
+        let todoManager = ToDoManager.shared
+        if todoManager.isVisible || todoManager.isShelfListExpanded || todoManager.isEditingText || todoManager.isInteractingWithPopover {
+            return false
+        }
+
+        let autoOpenMediaHUD = (UserDefaults.standard.object(forKey: AppPreferenceKey.autoOpenMediaHUDOnShelfExpand) as? Bool) ?? PreferenceDefault.autoOpenMediaHUDOnShelfExpand
+        let mediaHidden = MusicManager.shared.isMediaHUDHidden
+        let forcedMedia = MusicManager.shared.isMediaHUDForced
+        let autoOrSongDriven = (autoOpenMediaHUD && !mediaHidden) ||
+            ((MusicManager.shared.isPlaying || MusicManager.shared.wasRecentlyPlaying) && !mediaHidden)
+
+        return forcedMedia || autoOrSongDriven
+    }
+
+    private func expandedShelfInteractionHeight(for screen: NSScreen) -> CGFloat {
+        let fallbackHeight = DroppyState.expandedShelfHeight(for: screen)
+        guard shouldUseMediaInteractionHeight(on: screen) else { return fallbackHeight }
+        return min(fallbackHeight, expandedMediaInteractionHeight(for: screen))
+    }
+
+    func isMouseInsideExpandedShelfInteractionZone(on screen: NSScreen, at location: NSPoint = NSEvent.mouseLocation) -> Bool {
+        expandedShelfInteractionZone(for: screen).contains(location)
     }
 
     private func currentInteractionWindowWidth() -> CGFloat {
@@ -773,8 +825,9 @@ final class NotchWindowController: NSObject, ObservableObject {
             // Find the window whose screen contains the mouse
             guard let (targetWindow, targetScreen) = self.findWindowForMouseLocation(mouseLocation) else { return }
 
-            // Get the notch rect from the window for that screen
-            let notchRect = targetWindow.getNotchRect()
+            // Use media-aware collapsed hit zone so hover/click behavior matches
+            // the visible mini player wings in notch mode (Issue #213).
+            let notchRect = targetWindow.collapsedInteractionRect()
             // Create a click-friendly zone: ±10px horizontal expansion, upward to screen top
             let screenTopY = targetScreen.frame.maxY
             let upwardExpansion = max(0, screenTopY - notchRect.maxY)
@@ -864,8 +917,8 @@ final class NotchWindowController: NSObject, ObservableObject {
             // Find the window whose screen contains the mouse
             guard let (targetWindow, targetScreen) = self.findWindowForMouseLocation(mouseLocation) else { return }
             
-            // Get the notch rect and create a click zone
-            let notchRect = targetWindow.getNotchRect()
+            // Use media-aware collapsed hit zone so right-click follows visible surface.
+            let notchRect = targetWindow.collapsedInteractionRect()
             let screenTopY = targetScreen.frame.maxY
             let upwardExpansion = max(0, screenTopY - notchRect.maxY)
             
@@ -915,7 +968,7 @@ final class NotchWindowController: NSObject, ObservableObject {
                 // Find window for this click
                 guard let (targetWindow, targetScreen) = self.findWindowForMouseLocation(mouseLocation) else { return event }
                 
-                let notchRect = targetWindow.getNotchRect()
+                let notchRect = targetWindow.collapsedInteractionRect()
                 let screenTopY = targetScreen.frame.maxY
                 let upwardExpansion = max(0, screenTopY - notchRect.maxY)
                 
@@ -949,7 +1002,7 @@ final class NotchWindowController: NSObject, ObservableObject {
                 // Find the window whose screen contains the mouse
                 guard let (targetWindow, targetScreen) = self.findWindowForMouseLocation(mouseLocation) else { return event }
 
-                let notchRect = targetWindow.getNotchRect()
+                let notchRect = targetWindow.collapsedInteractionRect()
 
                 // Notch click zone
                 let screenTopY = targetScreen.frame.maxY
@@ -1169,7 +1222,7 @@ final class NotchWindowController: NSObject, ObservableObject {
                 guard isAtScreenTop else { continue }
                 
                 // Check if cursor is within the notch X range
-                let notchRect = window.getNotchRect()
+                let notchRect = window.collapsedInteractionRect()
                 let isWithinNotchX = window.isWithinTopEdgeHoverBand(
                     x: nsMouseLocation.x,
                     on: screen,
@@ -2056,7 +2109,7 @@ final class NotchWindowController: NSObject, ObservableObject {
 
     /// Hover intent zone for shelf auto-expand.
     private func isMouseInAutoExpandIntentZone(mouseLocation: NSPoint, window: NotchWindow) -> Bool {
-        let notchRect = window.getNotchRect()
+        let notchRect = window.collapsedInteractionRect()
         let screenTopY = window.notchScreen?.frame.maxY ?? notchRect.maxY
         let upwardExpansion = max(0, screenTopY - notchRect.maxY)
         let relaxedZone = NSRect(
@@ -2091,16 +2144,17 @@ final class NotchWindowController: NSObject, ObservableObject {
                 
                 if !alreadyRevealed {
                     // Check if mouse is in the notch area (same logic as normal hover)
-                    let isInNotchArea = window.notchRect.contains(mouseLocation)
+                    let interactionRect = window.collapsedInteractionRect()
+                    let isInNotchArea = interactionRect.contains(mouseLocation)
                     
                     // Check expanded zone - matches normal hover behavior
                     let screenTopY = screen.frame.maxY
-                    let upwardExpansion = (screenTopY - window.notchRect.maxY) + 5
+                    let upwardExpansion = (screenTopY - interactionRect.maxY) + 5
                     let expandedRect = NSRect(
-                        x: window.notchRect.origin.x - 20,
-                        y: window.notchRect.origin.y,
-                        width: window.notchRect.width + 40,
-                        height: window.notchRect.height + upwardExpansion
+                        x: interactionRect.origin.x - 20,
+                        y: interactionRect.origin.y,
+                        width: interactionRect.width + 40,
+                        height: interactionRect.height + upwardExpansion
                     )
                     var isInExpandedZone = expandedRect.contains(mouseLocation)
                     
@@ -2110,7 +2164,7 @@ final class NotchWindowController: NSObject, ObservableObject {
                     let isWithinNotchX = window.isWithinTopEdgeHoverBand(
                         x: mouseLocation.x,
                         on: screen,
-                        notchRect: window.notchRect
+                        notchRect: interactionRect
                     )
                     if isAtScreenTop && isWithinNotchX {
                         isInExpandedZone = true
@@ -2543,6 +2597,43 @@ class NotchWindow: NSPanel {
         return notchRect
     }
 
+    /// Collapsed interaction surface used for hover/click hit-testing.
+    /// In built-in notch mode, the mini media HUD renders 50pt wings on each side
+    /// of the physical notch. Expand hit-testing to match that visible surface.
+    func collapsedInteractionRect() -> NSRect {
+        var rect = notchRect
+        guard shouldUseMediaWingInteractionRect else { return rect }
+
+        let mediaWingWidth: CGFloat = 50
+        rect.origin.x -= mediaWingWidth
+        rect.size.width += (mediaWingWidth * 2)
+        return rect
+    }
+
+    /// Mirrors collapsed mini-media visibility conditions closely enough for hit-testing.
+    private var shouldUseMediaWingInteractionRect: Bool {
+        guard let screen = notchScreen else { return false }
+        guard !needsDynamicIsland else { return false }
+        guard screen.isBuiltIn else { return false }
+        guard screen.auxiliaryTopLeftArea != nil, screen.auxiliaryTopRightArea != nil else { return false }
+
+        let showMediaPlayer = (UserDefaults.standard.object(forKey: AppPreferenceKey.showMediaPlayer) as? Bool)
+            ?? PreferenceDefault.showMediaPlayer
+        guard showMediaPlayer else { return false }
+
+        let displayID = targetDisplayID != 0 ? targetDisplayID : screen.displayID
+        guard !DroppyState.shared.isExpanded(for: displayID) else { return false }
+        guard !NotchWindowController.shared.fullscreenDisplayIDs.contains(displayID) else { return false }
+
+        let music = MusicManager.shared
+        guard music.isMediaAvailable else { return false }
+        guard !music.isPlayerIdle else { return false }
+
+        // Forced mode stays visible when user swipes it in; otherwise require active playback
+        // and not manually hidden.
+        return music.isMediaHUDForced || (music.isPlaying && !music.isMediaHUDHidden)
+    }
+
     /// Built-in notch displays can report cursor positions that "skip" across the cutout
     /// at the top edge. Use a stable center-aligned band for top-edge hover intent.
     func isWithinTopEdgeHoverBand(
@@ -2556,7 +2647,7 @@ class NotchWindow: NSPanel {
             screen.auxiliaryTopRightArea != nil
 
         if hasPhysicalNotch {
-            let centerX = screen.frame.midX
+            let centerX = screen.notchAlignedCenterX
             // Keep the top-edge helper close to the actual notch. A very wide
             // band can cause accidental hover activation while using menu-bar items.
             let halfWidth = (notchRect.width / 2) + 28 + extraPadding
@@ -2689,7 +2780,8 @@ class NotchWindow: NSPanel {
             PastGuardDebugCounter.lastLog = Date()
         }
 
-        let isOverExactNotch = notchRect.contains(mouseLocation)
+        let collapsedRect = collapsedInteractionRect()
+        let isOverExactNotch = collapsedRect.contains(mouseLocation)
         var isOverExpandedZone: Bool
 
 
@@ -2703,20 +2795,20 @@ class NotchWindow: NSPanel {
             let screenTopY = targetScreen.frame.maxY
 
             // Extend all the way to screen top (covers the gap above the floating island)
-            let upwardExpansion = max(0, screenTopY - notchRect.maxY)
+            let upwardExpansion = max(0, screenTopY - collapsedRect.maxY)
 
             let expandedNotchRect = NSRect(
-                x: notchRect.origin.x - 20,                     // 20px expansion on left
-                y: notchRect.origin.y,                          // Keep bottom edge EXACT (no downward expansion!)
-                width: notchRect.width + 40,                    // 20px expansion on each side = 40px total
-                height: notchRect.height + upwardExpansion      // Extend upward to screen top (covers the gap)
+                x: collapsedRect.origin.x - 20,                     // 20px expansion on left
+                y: collapsedRect.origin.y,                          // Keep bottom edge EXACT (no downward expansion!)
+                width: collapsedRect.width + 40,                    // 20px expansion on each side = 40px total
+                height: collapsedRect.height + upwardExpansion      // Extend upward to screen top (covers the gap)
             )
             isOverExpandedZone = expandedNotchRect.contains(mouseLocation)
 
             // Special case: If cursor is at the absolute screen top edge within island X range,
             // always treat it as hovering (Fitt's Law - user slamming cursor to top)
             let isAtScreenTop = mouseLocation.y >= targetScreen.frame.maxY - 20  // Within 20px
-            let isWithinIslandX = mouseLocation.x >= notchRect.minX - 30 && mouseLocation.x <= notchRect.maxX + 30
+            let isWithinIslandX = mouseLocation.x >= collapsedRect.minX - 30 && mouseLocation.x <= collapsedRect.maxX + 30
             if isAtScreenTop && isWithinIslandX {
                 isOverExpandedZone = true
             }
@@ -2727,13 +2819,13 @@ class NotchWindow: NSPanel {
             // - Upward: Extend to absolute screen top (Fitt's Law - infinite edge target)
             // - Downward: NO expansion (avoid blocking bookmark bars, URL fields)
             let screenTopY = targetScreen.frame.maxY
-            let upwardExpansion = (screenTopY - notchRect.maxY) + 5  // +5px buffer to capture absolute edge
+            let upwardExpansion = (screenTopY - collapsedRect.maxY) + 5  // +5px buffer to capture absolute edge
 
             let expandedNotchRect = NSRect(
-                x: notchRect.origin.x - 20,                     // 20px expansion on left
-                y: notchRect.origin.y,                          // Keep bottom edge exact (no downward expansion)
-                width: notchRect.width + 40,                    // 20px expansion on each side = 40px total
-                height: notchRect.height + upwardExpansion      // Extend to screen top edge + buffer
+                x: collapsedRect.origin.x - 20,                     // 20px expansion on left
+                y: collapsedRect.origin.y,                          // Keep bottom edge exact (no downward expansion)
+                width: collapsedRect.width + 40,                    // 20px expansion on each side = 40px total
+                height: collapsedRect.height + upwardExpansion      // Extend to screen top edge + buffer
             )
             isOverExpandedZone = expandedNotchRect.contains(mouseLocation)
 
@@ -2747,7 +2839,7 @@ class NotchWindow: NSPanel {
             let isWithinNotchX = isWithinTopEdgeHoverBand(
                 x: mouseLocation.x,
                 on: targetScreen,
-                notchRect: notchRect
+                notchRect: collapsedRect
             )
             if isAtScreenTop && isWithinNotchX {
                 isOverExpandedZone = true
@@ -2765,7 +2857,7 @@ class NotchWindow: NSPanel {
         let isWithinNotchX = isWithinTopEdgeHoverBand(
             x: mouseLocation.x,
             on: targetScreen,
-            notchRect: notchRect
+            notchRect: collapsedRect
         )
         if isAtScreenTop && isWithinNotchX {
             isOverExactOrEdge = true

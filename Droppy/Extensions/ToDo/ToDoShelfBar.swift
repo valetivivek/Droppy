@@ -39,6 +39,7 @@ struct ToDoShelfBar: View {
     @AppStorage(AppPreferenceKey.todoShelfSplitViewEnabled) private var isSplitViewEnabled = PreferenceDefault.todoShelfSplitViewEnabled
     @AppStorage(AppPreferenceKey.todoShowTaskWeekNumber) private var showTaskWeekNumber = PreferenceDefault.todoShowTaskWeekNumber
     @AppStorage(AppPreferenceKey.todoShowTaskViewTimezone) private var showTaskViewTimezone = PreferenceDefault.todoShowTaskViewTimezone
+    @AppStorage(AppPreferenceKey.todoSyncCalendarEnabled) private var calendarSyncEnabled = PreferenceDefault.todoSyncCalendarEnabled
 
     @State private var inputText: String = ""
     @State private var inputPriority: ToDoPriority = .normal
@@ -60,6 +61,9 @@ struct ToDoShelfBar: View {
     @State private var suppressStripSelectionFromScroll = false
     @State private var stripScrollSyncWorkItem: DispatchWorkItem?
     @State private var splitToggleInteractionWorkItem: DispatchWorkItem?
+    @State private var detailTitleCommitWorkItem: DispatchWorkItem?
+    @State private var timelineSnapshot = TimelineSnapshot.empty
+    @State private var skipNextExpandedResizeRecalc = false
     @FocusState private var isDetailTitleFieldFocused: Bool
 
     private var useAdaptiveForegrounds: Bool {
@@ -93,6 +97,24 @@ struct ToDoShelfBar: View {
         static let undoToastBottomPadding: CGFloat = 56
         static let undoToastTopPadding: CGFloat = 8
         static let undoToastEmptyStateClearance: CGFloat = 38
+    }
+
+    private struct TimelineSnapshot {
+        let mode: TimelineContentMode
+        let hasVisibleTaskItems: Bool
+        let visibleItems: [ToDoItem]
+        let daySections: [TimelineDaySection]
+        let selectionSignature: Int
+        let daySectionSignature: Int
+
+        static let empty = TimelineSnapshot(
+            mode: .tasksOnly,
+            hasVisibleTaskItems: false,
+            visibleItems: [],
+            daySections: [],
+            selectionSignature: 0,
+            daySectionSignature: 0
+        )
     }
 
     var body: some View {
@@ -145,10 +167,15 @@ struct ToDoShelfBar: View {
         .animation(DroppyAnimation.transition, value: manager.showUndoToast)
         .animation(DroppyAnimation.transition, value: manager.showCleanupToast)
         .onAppear {
+            if isListExpanded {
+                refreshTimelineSnapshot()
+            }
             manager.setShelfSplitViewEnabled(isSplitViewEnabled)
             stripWindowStartDay = selectedStripDayStart
             if manager.isRemindersSyncEnabled || manager.isCalendarSyncEnabled {
-                manager.syncExternalSourcesNow(minimumInterval: 1.5)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    manager.syncExternalSourcesNow(minimumInterval: 12)
+                }
             }
             if manager.isRemindersSyncEnabled {
                 manager.refreshReminderListsNow()
@@ -164,8 +191,13 @@ struct ToDoShelfBar: View {
         }
         .onChange(of: isListExpanded) { _, expanded in
             manager.isShelfListExpanded = expanded
-            NotchWindowController.shared.recalculateAllWindowSizesCoalesced()
+            if skipNextExpandedResizeRecalc {
+                skipNextExpandedResizeRecalc = false
+            } else {
+                NotchWindowController.shared.recalculateAllWindowSizesCoalesced()
+            }
             guard expanded else { return }
+            refreshTimelineSnapshot()
             let today = Calendar.current.startOfDay(for: Date())
             selectedStripDayStart = today
             ensureSelectedDayVisibleInStrip()
@@ -177,14 +209,25 @@ struct ToDoShelfBar: View {
             syncTimelineSelection()
             syncDetailDraftFromSelection()
             if manager.isRemindersSyncEnabled || manager.isCalendarSyncEnabled {
-                manager.syncExternalSourcesNow(minimumInterval: 1.5)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    manager.syncExternalSourcesNow(minimumInterval: 12)
+                }
             }
         }
         .onDisappear {
             stripScrollSyncWorkItem?.cancel()
             splitToggleInteractionWorkItem?.cancel()
+            commitPendingDetailTitleEdit()
             manager.isInteractingWithPopover = false
             manager.isEditingText = false
+        }
+        .onChange(of: manager.items) { _, _ in
+            guard isListExpanded else { return }
+            refreshTimelineSnapshot()
+        }
+        .onChange(of: calendarSyncEnabled) { _, _ in
+            guard isListExpanded else { return }
+            refreshTimelineSnapshot()
         }
         .onChange(of: inputText) { _, newValue in
             refreshListMentionState(for: newValue)
@@ -208,6 +251,7 @@ struct ToDoShelfBar: View {
         }
         .onChange(of: selectedTimelineItemID) { _, _ in
             isDetailTitleFieldFocused = false
+            commitPendingDetailTitleEdit()
             syncDetailDraftFromSelection()
         }
         .onReceive(NotificationCenter.default.publisher(for: .todoShelfNavigateTimeline)) { note in
@@ -222,7 +266,12 @@ struct ToDoShelfBar: View {
             guard isSplitViewEnabled, let item = selectedTimelineItem, !isCalendarEvent(item) else { return }
             let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty, trimmed != item.title else { return }
-            manager.updateTitle(for: item, to: trimmed)
+            detailTitleCommitWorkItem?.cancel()
+            let workItem = DispatchWorkItem {
+                manager.updateTitle(for: item, to: trimmed)
+            }
+            detailTitleCommitWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16, execute: workItem)
         }
         .onChange(of: detailDueDateDraft) { _, newValue in
             guard isSplitViewEnabled, let item = selectedTimelineItem, !isCalendarEvent(item) else { return }
@@ -391,6 +440,7 @@ struct ToDoShelfBar: View {
             // Keep the window-size source of truth in sync BEFORE animating the visual expansion,
             // so physical-notch layouts stay top-pinned without a one-frame top gap.
             manager.isShelfListExpanded = nextExpanded
+            skipNextExpandedResizeRecalc = true
             NotchWindowController.shared.forceRecalculateAllWindowSizes()
             withAnimation(DroppyAnimation.smoothContent) {
                 isListExpanded = nextExpanded
@@ -681,13 +731,15 @@ struct ToDoShelfBar: View {
                                     },
                                     onToggleCompletion: {
                                         manager.toggleCompletion(for: item)
+                                        refreshTimelineSnapshot()
+                                        syncTimelineSelection()
+                                        syncDetailDraftFromSelection()
                                     },
                                     onDelete: {
                                         manager.removeItem(item)
-                                        DispatchQueue.main.async {
-                                            syncTimelineSelection()
-                                            syncDetailDraftFromSelection()
-                                        }
+                                        refreshTimelineSnapshot()
+                                        syncTimelineSelection()
+                                        syncDetailDraftFromSelection()
                                     }
                                 )
                                 .id(
@@ -874,6 +926,9 @@ struct ToDoShelfBar: View {
                         HStack(spacing: 8) {
                             Button {
                                 manager.toggleCompletion(for: item)
+                                refreshTimelineSnapshot()
+                                syncTimelineSelection()
+                                syncDetailDraftFromSelection()
                             } label: {
                                 Text(item.isCompleted ? "Mark Pending" : "Mark Complete")
                                     .frame(maxWidth: .infinity)
@@ -882,10 +937,9 @@ struct ToDoShelfBar: View {
 
                             Button(role: .destructive) {
                                 manager.removeItem(item)
-                                DispatchQueue.main.async {
-                                    syncTimelineSelection()
-                                    syncDetailDraftFromSelection()
-                                }
+                                refreshTimelineSnapshot()
+                                syncTimelineSelection()
+                                syncDetailDraftFromSelection()
                             } label: {
                                 Text("Delete")
                                     .frame(maxWidth: .infinity)
@@ -1034,6 +1088,11 @@ struct ToDoShelfBar: View {
                 dueDate: resolvedDueDate,
                 reminderListID: resolvedReminderListID
             )
+        }
+        if isListExpanded {
+            refreshTimelineSnapshot()
+            syncTimelineSelection()
+            syncDetailDraftFromSelection()
         }
 
         // Reset with animation
@@ -2491,13 +2550,7 @@ private extension ToDoShelfBar {
     }
 
     var timelineContentMode: TimelineContentMode {
-        if manager.isCalendarSyncEnabled && hasVisibleTaskItems {
-            return .combined
-        }
-        if manager.isCalendarSyncEnabled {
-            return .calendarOnly
-        }
-        return .tasksOnly
+        timelineSnapshot.mode
     }
 
     var timelineModeTitle: String {
@@ -2534,18 +2587,82 @@ private extension ToDoShelfBar {
     }
 
     var timelineVisibleItems: [ToDoItem] {
-        let activeItems = manager.sortedItems.filter { !$0.isCompleted }
-        switch timelineContentMode {
-        case .tasksOnly:
-            return activeItems.filter { $0.externalSource != .calendar }
-        case .calendarOnly:
-            return activeItems.filter { $0.externalSource == .calendar }
-        case .combined:
-            return activeItems
-        }
+        timelineSnapshot.visibleItems
     }
 
     var timelineDaySections: [TimelineDaySection] {
+        timelineSnapshot.daySections
+    }
+
+    var timelineSelectionSignature: Int {
+        timelineSnapshot.selectionSignature
+    }
+
+    var timelineDaySectionSignature: Int {
+        timelineSnapshot.daySectionSignature
+    }
+
+    var hasVisibleTaskItems: Bool {
+        timelineSnapshot.hasVisibleTaskItems
+    }
+
+    func refreshTimelineSnapshot() {
+        let activeItems = manager.sortedItems.filter { !$0.isCompleted }
+        let hasTaskItems = activeItems.contains { $0.externalSource != .calendar }
+        let mode: TimelineContentMode
+        if calendarSyncEnabled && hasTaskItems {
+            mode = .combined
+        } else if calendarSyncEnabled {
+            mode = .calendarOnly
+        } else {
+            mode = .tasksOnly
+        }
+
+        let visibleItems: [ToDoItem]
+        switch mode {
+        case .tasksOnly:
+            visibleItems = activeItems.filter { $0.externalSource != .calendar }
+        case .calendarOnly:
+            visibleItems = activeItems.filter { $0.externalSource == .calendar }
+        case .combined:
+            visibleItems = activeItems
+        }
+
+        let sections = buildTimelineDaySections(from: visibleItems)
+
+        var selectionHasher = Hasher()
+        selectionHasher.combine(visibleItems.count)
+        for item in visibleItems {
+            selectionHasher.combine(item.id)
+            selectionHasher.combine(item.isCompleted)
+            selectionHasher.combine(item.priority.rawValue)
+            selectionHasher.combine(item.dueDate?.timeIntervalSince1970 ?? 0)
+        }
+
+        var hasher = Hasher()
+        hasher.combine(sections.count)
+        for section in sections {
+            hasher.combine(section.dayStart.timeIntervalSince1970)
+            hasher.combine(section.items.count)
+            if let first = section.items.first?.id {
+                hasher.combine(first)
+            }
+            if let last = section.items.last?.id {
+                hasher.combine(last)
+            }
+        }
+
+        timelineSnapshot = TimelineSnapshot(
+            mode: mode,
+            hasVisibleTaskItems: hasTaskItems,
+            visibleItems: visibleItems,
+            daySections: sections,
+            selectionSignature: selectionHasher.finalize(),
+            daySectionSignature: hasher.finalize()
+        )
+    }
+
+    private func buildTimelineDaySections(from visibleItems: [ToDoItem]) -> [TimelineDaySection] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let maxVisibleDays = 120
@@ -2553,7 +2670,7 @@ private extension ToDoShelfBar {
 
         var undatedItems: [ToDoItem] = []
         var datedMap: [Date: [ToDoItem]] = [:]
-        for item in timelineVisibleItems {
+        for item in visibleItems {
             guard let dueDate = item.dueDate else {
                 undatedItems.append(item)
                 continue
@@ -2602,40 +2719,6 @@ private extension ToDoShelfBar {
         return sections
     }
 
-    var timelineSelectionSignature: Int {
-        var hasher = Hasher()
-        hasher.combine(timelineVisibleItems.count)
-        for item in timelineVisibleItems {
-            hasher.combine(item.id)
-            hasher.combine(item.isCompleted)
-            hasher.combine(item.priority.rawValue)
-            hasher.combine(item.dueDate?.timeIntervalSince1970 ?? 0)
-        }
-        return hasher.finalize()
-    }
-
-    var timelineDaySectionSignature: Int {
-        var hasher = Hasher()
-        hasher.combine(timelineDaySections.count)
-        for section in timelineDaySections {
-            hasher.combine(section.dayStart.timeIntervalSince1970)
-            hasher.combine(section.items.count)
-            if let first = section.items.first?.id {
-                hasher.combine(first)
-            }
-            if let last = section.items.last?.id {
-                hasher.combine(last)
-            }
-        }
-        return hasher.finalize()
-    }
-
-    var hasVisibleTaskItems: Bool {
-        manager.sortedItems.contains { item in
-            !item.isCompleted && item.externalSource != .calendar
-        }
-    }
-
     var selectedTimelineItem: ToDoItem? {
         guard let selectedTimelineItemID else { return nil }
         return timelineVisibleItems.first(where: { $0.id == selectedTimelineItemID })
@@ -2671,17 +2754,15 @@ private extension ToDoShelfBar {
         guard !timelineDaySections.isEmpty else { return nil }
         let calendar = Calendar.current
         let desired = calendar.startOfDay(for: targetDay)
+        let orderedDays = timelineDaySections.map(\.dayStart)
 
-        if let exact = timelineDaySections.first(where: { calendar.isDate($0.dayStart, inSameDayAs: desired) }) {
-            return exact.dayStart
+        if let exact = orderedDays.first(where: { calendar.isDate($0, inSameDayAs: desired) }) {
+            return exact
         }
-        if let next = timelineDaySections
-            .map(\.dayStart)
-            .sorted()
-            .first(where: { $0 > desired }) {
+        if let next = orderedDays.first(where: { $0 > desired }) {
             return next
         }
-        return timelineDaySections.map(\.dayStart).sorted().last
+        return orderedDays.last
     }
 
     func ensureSelectedDayVisibleInStrip() {
@@ -2717,7 +2798,7 @@ private extension ToDoShelfBar {
         }
     }
 
-    func suspendStripSelectionSyncDuringProgrammaticScroll(duration: TimeInterval = 0.32) {
+    func suspendStripSelectionSyncDuringProgrammaticScroll(duration: TimeInterval = 0.5) {
         stripScrollSyncWorkItem?.cancel()
         suppressStripSelectionFromScroll = true
         let workItem = DispatchWorkItem {
@@ -2778,6 +2859,13 @@ private extension ToDoShelfBar {
             isCompleted: nextItem.isCompleted,
             priority: nextItem.priority
         )
+    }
+
+    func commitPendingDetailTitleEdit() {
+        guard let detailTitleCommitWorkItem else { return }
+        self.detailTitleCommitWorkItem = nil
+        guard !detailTitleCommitWorkItem.isCancelled else { return }
+        detailTitleCommitWorkItem.perform()
     }
 
     func syncDetailDraftFromSelection() {

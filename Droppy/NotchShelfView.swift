@@ -48,6 +48,7 @@ struct NotchShelfView: View {
     @AppStorage(AppPreferenceKey.autoCollapseShelf) private var autoCollapseShelf = PreferenceDefault.autoCollapseShelf
     @AppStorage(AppPreferenceKey.autoExpandDelay) private var autoExpandDelay = PreferenceDefault.autoExpandDelay
     @AppStorage(AppPreferenceKey.autoOpenMediaHUDOnShelfExpand) private var autoOpenMediaHUDOnShelfExpand = PreferenceDefault.autoOpenMediaHUDOnShelfExpand
+    @AppStorage(AppPreferenceKey.showMediaShelfSwitchBadge) private var showMediaShelfSwitchBadge = PreferenceDefault.showMediaShelfSwitchBadge
     @AppStorage(AppPreferenceKey.showClipboardButton) private var showClipboardButton = PreferenceDefault.showClipboardButton
     @AppStorage(AppPreferenceKey.showDropIndicator) private var showDropIndicator = PreferenceDefault.showDropIndicator  // Legacy, not migrated
     @AppStorage(AppPreferenceKey.useDynamicIslandStyle) private var useDynamicIslandStyle = PreferenceDefault.useDynamicIslandStyle
@@ -538,6 +539,104 @@ struct NotchShelfView: View {
         !isCaffeineViewVisible &&
         !isCameraViewVisible &&
         !isMediaPlayerVisibleInShelf
+    }
+
+    private enum ExpandedSurfaceToggleMode {
+        case showShelf
+        case showMedia
+    }
+
+    private var expandedSurfaceToggleMode: ExpandedSurfaceToggleMode? {
+        guard showMediaShelfSwitchBadge else { return nil }
+        guard showMediaPlayer else { return nil }
+        guard musicManager.isMediaAvailable, !musicManager.isPlayerIdle else { return nil }
+        guard !dragMonitor.isDragging, !state.isDropTargeted else { return nil }
+        guard !isTerminalViewVisible, !isCaffeineViewVisible, !isCameraViewVisible else { return nil }
+
+        if isMediaPlayerVisibleInShelf {
+            return .showShelf
+        }
+
+        guard !shouldLockMediaForTodo else { return nil }
+        return .showMedia
+    }
+
+    private var expandedSurfaceToggleInsets: EdgeInsets {
+        NotchLayoutConstants.contentEdgeInsets(
+            notchHeight: contentLayoutNotchHeight,
+            isExternalWithNotchStyle: isExternalDisplay && !externalDisplayUseDynamicIsland
+        )
+    }
+
+    private var expandedSurfaceToggleTopPadding: CGFloat {
+        contentLayoutNotchHeight > 0 ? 6 : 8
+    }
+
+    private func switchExpandedSurface(to mode: ExpandedSurfaceToggleMode) {
+        HapticFeedback.tap()
+        withAnimation(displayUnifiedOpenCloseAnimation) {
+            switch mode {
+            case .showShelf:
+                musicManager.isMediaHUDForced = false
+                musicManager.isMediaHUDHidden = true
+            case .showMedia:
+                musicManager.isMediaHUDForced = true
+                musicManager.isMediaHUDHidden = false
+                isTodoListExpanded = false
+                todoManager.isShelfListExpanded = false
+            }
+        }
+        notchController.recalculateAllWindowSizesCoalesced()
+    }
+
+    @ViewBuilder
+    private func expandedSurfaceToggleButton(for mode: ExpandedSurfaceToggleMode) -> some View {
+        let title = mode == .showMedia ? "Media" : "Shelf"
+        let helpText = mode == .showMedia ? "Show media player" : "Show shelf"
+
+        Button {
+            switchExpandedSurface(to: mode)
+        } label: {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(
+                shouldUseExternalNotchTransparent
+                    ? AdaptiveColors.secondaryTextAuto.opacity(0.9)
+                    : .white.opacity(0.74)
+            )
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(
+                        shouldUseExternalNotchTransparent
+                            ? AdaptiveColors.overlayAuto(0.08)
+                            : Color.white.opacity(0.08)
+                    )
+            )
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(helpText)
+        .accessibilityLabel(helpText)
+    }
+
+    @ViewBuilder
+    private func expandedSurfaceToggleOverlay(for mode: ExpandedSurfaceToggleMode) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                expandedSurfaceToggleButton(for: mode)
+                Spacer(minLength: 0)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.top, expandedSurfaceToggleTopPadding)
+        .padding(.leading, expandedSurfaceToggleInsets.leading)
+        .padding(.trailing, expandedSurfaceToggleInsets.trailing)
+        .padding(.bottom, expandedSurfaceToggleInsets.bottom)
+        .zIndex(40)
+        .transition(displayButtonTransition)
     }
     
     /// Current expanded width based on what's shown
@@ -1540,7 +1639,7 @@ struct NotchShelfView: View {
                 }
             }
             .onChange(of: isHoveringOnThisScreen) { wasHovering, isHovering in
-                if wasHovering && !isHovering && isExpandedOnThisScreen && !isHoveringExpandedContent {
+                if wasHovering && !isHovering && isExpandedOnThisScreen {
                     startAutoShrinkTimer()
                 }
             }
@@ -1725,24 +1824,13 @@ struct NotchShelfView: View {
             var isMouseInExpandedZone = false
             if let screen = targetScreen {
                 let mouseLocation = NSEvent.mouseLocation
-                let expandedHeight = DroppyState.expandedShelfHeight(for: screen)
-                let todoSplitTopExtension: CGFloat = (isTodoListExpanded && todoShelfSplitViewEnabled) ? 36 : 0
-                // Match the expanded zone calculation from NotchWindow.handleGlobalMouseEvent
-                // NOTE: expandedHeight already includes floating controls reserve via DroppyState SSOT.
-                // Do not add another floating button zone here or hover will stick and collapse won't trigger.
-                let expandedZone = CGRect(
-                    x: screen.notchAlignedCenterX - (expandedWidth / 2) - 20,
-                    y: screen.frame.maxY - expandedHeight - 20,
-                    width: expandedWidth + 40,
-                    height: expandedHeight + 40 + todoSplitTopExtension
-                )
-                isMouseInExpandedZone = expandedZone.contains(mouseLocation)
-                notchShelfDebugLog("⏳ GEOMETRIC CHECK: mouse=\(mouseLocation), zone=\(expandedZone), isInZone=\(isMouseInExpandedZone)")
+                isMouseInExpandedZone = notchController.isMouseInsideExpandedShelfInteractionZone(on: screen, at: mouseLocation)
+                notchShelfDebugLog("⏳ GEOMETRIC CHECK: mouse=\(mouseLocation), isInZone=\(isMouseInExpandedZone)")
             }
             
             // Only shrink if still expanded and not hovering over the content
             // Check BOTH SwiftUI hover state AND geometric fallback
-            let isHoveringAnyMethod = isHoveringExpandedContent || isHoveringOnThisScreen || isMouseInExpandedZone
+            let isHoveringAnyMethod = isHoveringOnThisScreen || isMouseInExpandedZone
             let isTodoPopoverInteractionActive = ToDoManager.shared.isInteractingWithPopover
             guard isExpandedOnThisScreen && !isHoveringAnyMethod && !state.isDropTargeted && !isTodoPopoverInteractionActive else {
                 notchShelfDebugLog("⏳ AUTO-SHRINK SKIPPED: conditions not met (isHoveringAnyMethod=\(isHoveringAnyMethod))")
@@ -1833,6 +1921,10 @@ struct NotchShelfView: View {
             morphingTitleOverlay
                 .zIndex(12)  // Above visualizer for visibility
                 .allowsHitTesting(isExpandedOnThisScreen)  // FIX #126: Pass through hover when collapsed
+
+            if isExpandedOnThisScreen && enableNotchShelf, let toggleMode = expandedSurfaceToggleMode {
+                expandedSurfaceToggleOverlay(for: toggleMode)
+            }
         }
         .opacity(notchController.isTemporarilyHidden ? 0 : 1)
         .frame(width: currentNotchWidth, height: currentNotchHeight, alignment: .top)
@@ -2948,6 +3040,7 @@ struct NotchShelfView: View {
                 .padding(.bottom, ToDoShelfBar.hostBottomInset)
                 .transition(displayContentSwapTransition)
             }
+
         }
         // NOTE: .drawingGroup() removed - breaks NSViewRepresentable views like AudioSpectrumView
         // which cannot be rasterized into Metal textures (Issue #81 partial rollback)
