@@ -990,6 +990,7 @@ final class ElementCaptureManager: ObservableObject {
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
             return nil
         }
+        let excludedWindowIDs = excludedCaptureHelperWindowIDs()
         
         // Find the topmost window containing the point
         for windowInfo in windowList {
@@ -1000,6 +1001,10 @@ final class ElementCaptureManager: ObservableObject {
                   let height = boundsDict["Height"] else {
                 continue
             }
+            let windowID = (windowInfo[kCGWindowNumber as String] as? NSNumber).map { CGWindowID($0.uint32Value) }
+            if let windowID, excludedWindowIDs.contains(windowID) {
+                continue
+            }
             
             let windowFrame = CGRect(x: x, y: y, width: width, height: height)
             
@@ -1007,12 +1012,6 @@ final class ElementCaptureManager: ObservableObject {
             if windowFrame.contains(point) {
                 // Skip windows that are too small (likely decorations) or our own overlay
                 guard width > 50 && height > 50 else { continue }
-                
-                // Skip Droppy's own windows
-                if let ownerName = windowInfo[kCGWindowOwnerName as String] as? String,
-                   ownerName == "Droppy" {
-                    continue
-                }
                 
                 return windowFrame
             }
@@ -1441,10 +1440,10 @@ final class ElementCaptureManager: ObservableObject {
             throw CaptureError.noElement
         }
 
-        // Exclude Droppy's own windows (selection/highlight/preview/editor) from capture.
-        let ownPID = ProcessInfo.processInfo.processIdentifier
+        // Exclude only active Element Capture helper windows.
+        let excludedWindowIDs = excludedCaptureHelperWindowIDs()
         let windowsToExclude = content.windows.filter { window in
-            window.owningApplication?.processID == ownPID
+            excludedWindowIDs.contains(CGWindowID(window.windowID))
         }
         let filter = SCContentFilter(display: display, excludingWindows: windowsToExclude)
         let config = SCStreamConfiguration()
@@ -1491,9 +1490,9 @@ final class ElementCaptureManager: ObservableObject {
             throw CaptureError.noElement
         }
 
-        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let excludedWindowIDs = excludedCaptureHelperWindowIDs()
         let windowsToExclude = content.windows.filter { window in
-            window.owningApplication?.processID == ownPID
+            excludedWindowIDs.contains(CGWindowID(window.windowID))
         }
         let filter = SCContentFilter(display: display, excludingWindows: windowsToExclude)
         let config = SCStreamConfiguration()
@@ -1537,6 +1536,24 @@ final class ElementCaptureManager: ObservableObject {
         }
 
         print("[ElementCapture] Screen parameters changed; resynced capture surfaces")
+    }
+
+    /// Window IDs for transient capture helper UI that should never appear in screenshots.
+    private func excludedCaptureHelperWindowIDs() -> Set<CGWindowID> {
+        var ids = Set<CGWindowID>()
+        if let number = highlightWindow?.windowNumber, number > 0 {
+            ids.insert(CGWindowID(number))
+        }
+        if let number = areaSelectionWindow?.windowNumber, number > 0 {
+            ids.insert(CGWindowID(number))
+        }
+        if let number = CapturePreviewWindowController.shared.currentWindowNumber, number > 0 {
+            ids.insert(CGWindowID(number))
+        }
+        if let number = ScreenshotEditorWindowController.shared.currentWindowNumber, number > 0 {
+            ids.insert(CGWindowID(number))
+        }
+        return ids
     }
     
     private func copyToClipboard(_ image: CGImage) {
@@ -1836,6 +1853,8 @@ final class CapturePreviewWindowController {
     private var autoDismissTimer: Timer?
     private var escapeMonitor: Any?
     private var globalEscapeMonitor: Any?
+
+    var currentWindowNumber: Int? { window?.windowNumber }
     
     private init() {}
     

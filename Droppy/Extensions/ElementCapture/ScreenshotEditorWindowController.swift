@@ -16,6 +16,8 @@ final class ScreenshotEditorWindowController {
     private var hostingView: NSHostingView<AnyView>?
     private var escapeMonitor: Any?
     private var globalEscapeMonitor: Any?
+
+    var currentWindowNumber: Int? { window?.windowNumber }
     
     private init() {}
     
