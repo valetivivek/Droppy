@@ -1374,18 +1374,9 @@
             </div>
 
             <div class="credits-section">
-                <h3>✨ Alcove</h3>
-                <p>Alcove has been a great inspiration for creating a beautiful notch app with smooth animations. One of
-                    the founding fathers of good-looking notch apps on macOS. The developer has been supportive and is
-                    behind this project.</p>
-                <a href="https://tryalcove.com/" target="_blank">tryalcove.com →</a>
-            </div>
-
-            <div class="credits-section">
-                <h3>🎯 Boringnotch</h3>
-                <p>Thank you for pioneering notch creativity on macOS and laying the groundwork for the community.</p>
-                <a href="https://github.com/TheBoredTeam/boring.notch"
-                    target="_blank">github.com/TheBoredTeam/boring.notch →</a>
+                <h3>✨ Community Inspiration</h3>
+                <p>Thanks to the macOS productivity community for inspiring smoother interactions, better notch ergonomics,
+                    and higher-quality interface design.</p>
             </div>
         </div>
     </div>

@@ -156,7 +156,6 @@ This license is not OSI open source and restricts selling the software.
 <summary><sub>Credits & Acknowledgements</sub></summary>
 <sub>
 <br>
-<b>Alcove</b> — Inspiration for beautiful notch design (<a href="https://tryalcove.com/">tryalcove.com</a>)<br>
-<b>Boringnotch</b> — Pioneered notch creativity on macOS (<a href="https://github.com/TheBoredTeam/boring.notch">github</a>)
+<b>macOS Productivity Community</b> — Thanks to the developers and contributors who inspired better notch and menu bar experiences.
 </sub>
 </details>
