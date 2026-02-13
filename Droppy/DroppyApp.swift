@@ -27,6 +27,8 @@ struct DroppyApp: App {
 struct DroppyMenuContent: View {
     // Track shortcut changes via notification
     @State private var shortcutRefreshId = UUID()
+    @State private var clipboardMenuItems: [ClipboardItem] = []
+    @State private var clipboardMenuTitles: [UUID: String] = [:]
     
     // Observe NotchWindowController for hide state
     @ObservedObject private var notchController = NotchWindowController.shared
@@ -40,7 +42,6 @@ struct DroppyMenuContent: View {
 
     // Check if Clipboard menu bar is enabled
     @AppStorage(AppPreferenceKey.showClipboardInMenuBar) private var showClipboardInMenuBar = PreferenceDefault.showClipboardInMenuBar
-    @ObservedObject private var clipboardManager = ClipboardManager.shared
     @ObservedObject private var licenseManager = LicenseManager.shared
     
     // Check if extensions are disabled
@@ -110,6 +111,7 @@ struct DroppyMenuContent: View {
             }
             .keyboardShortcut("q", modifiers: .command)
         } else {
+            Group {
             if licenseManager.requiresLicenseEnforcement && licenseManager.isTrialActive && !licenseManager.isActivated {
                 Text(licenseManager.trialStatusText)
                     .font(.caption)
@@ -160,26 +162,24 @@ struct DroppyMenuContent: View {
             // Clipboard Menu (New)
             if showClipboardInMenuBar {
                 Menu {
-                    // Recent History
-                    let history = clipboardManager.history.prefix(15)
-                    
-                    if history.isEmpty {
+                    if clipboardMenuItems.isEmpty {
                         Text("Clipboard is empty")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(history) { item in
+                        ForEach(clipboardMenuItems) { item in
                             Button {
-                                clipboardManager.paste(item: item)
+                                ClipboardManager.shared.paste(item: item)
                             } label: {
                                 // Show icon based on type
-                                Label(item.title, systemImage: iconFor(item: item))
+                                Label(clipboardMenuTitle(for: item), systemImage: iconFor(item: item))
                             }
                         }
                         
                         Divider()
                         
                         Button(role: .destructive) {
-                            clipboardManager.history.removeAll()
+                            ClipboardManager.shared.history.removeAll()
+                            refreshClipboardMenuSnapshot()
                         } label: {
                             Label("Clear History", systemImage: "trash")
                         }
@@ -265,6 +265,10 @@ struct DroppyMenuContent: View {
                 // Refresh when extension is disabled/enabled
                 shortcutRefreshId = UUID()
             }
+            }
+            .onAppear {
+                refreshClipboardMenuSnapshot()
+            }
         }
     }
     
@@ -295,6 +299,22 @@ struct DroppyMenuContent: View {
         case .url: return "link"
         case .color: return "paintpalette"
         }
+    }
+
+    private func refreshClipboardMenuSnapshot() {
+        let items = Array(ClipboardManager.shared.history.prefix(15))
+        clipboardMenuItems = items
+
+        var titles: [UUID: String] = [:]
+        titles.reserveCapacity(items.count)
+        for item in items {
+            titles[item.id] = item.title
+        }
+        clipboardMenuTitles = titles
+    }
+
+    private func clipboardMenuTitle(for item: ClipboardItem) -> String {
+        clipboardMenuTitles[item.id] ?? item.title
     }
 }
 

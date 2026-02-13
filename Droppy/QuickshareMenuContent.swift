@@ -10,69 +10,71 @@ import SwiftUI
 struct QuickshareMenuContent: View {
     // Observe QuickshareManager for recent items
     @Bindable private var manager = QuickshareManager.shared
+    @State private var clipboardURLs: [URL] = []
     
     /// When enabled, "Manage Uploads" opens Settings to Quickshare tab instead of standalone window
     @AppStorage(AppPreferenceKey.showQuickshareInSidebar) private var showQuickshareInSidebar = PreferenceDefault.showQuickshareInSidebar
     
     var body: some View {
-        let clipboardURLs = getClipboardURLs()
-
-        Button {
-            DroppyQuickshare.share(urls: clipboardURLs)
-        } label: {
-            Label("Upload from Clipboard", systemImage: "clipboard")
-        }
-        .disabled(clipboardURLs.isEmpty)
-        
-        Button {
-            selectAndUploadFile()
-        } label: {
-            Label("Select File to Upload...", systemImage: "doc.badge.plus")
-        }
-        
-        Divider()
-        
-        if !manager.items.isEmpty {
-            Text("Recent Uploads")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        Group {
+            Button {
+                DroppyQuickshare.share(urls: clipboardURLs)
+            } label: {
+                Label("Upload from Clipboard", systemImage: "clipboard")
+            }
+            .disabled(clipboardURLs.isEmpty)
             
-            ForEach(manager.items.prefix(5)) { item in
-                Button {
-                    manager.copyToClipboard(item)
-                    // Haptic feedback?
-                } label: {
-                    HStack {
-                        // Truncate filename nicely
-                        Text(item.filename)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Spacer()
-                        if item.itemCount > 1 {
-                             Text("\(item.itemCount)")
-                                .foregroundStyle(.secondary)
-                                .font(.caption)
-                        }
-                    }
-                }
+            Button {
+                selectAndUploadFile()
+            } label: {
+                Label("Select File to Upload...", systemImage: "doc.badge.plus")
             }
             
             Divider()
-        }
-        
-        Button {
-            if showQuickshareInSidebar {
-                // Open Settings to Quickshare tab
-                SettingsWindowController.shared.showSettings(tab: .quickshare)
-            } else {
-                // Open standalone manager window
-                QuickshareManagerWindowController.show()
+            
+            if !manager.items.isEmpty {
+                Text("Recent Uploads")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                ForEach(manager.items.prefix(5)) { item in
+                    Button {
+                        manager.copyToClipboard(item)
+                        // Haptic feedback?
+                    } label: {
+                        HStack {
+                            // Truncate filename nicely
+                            Text(item.filename)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer()
+                            if item.itemCount > 1 {
+                                 Text("\(item.itemCount)")
+                                    .foregroundStyle(.secondary)
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                }
+                
+                Divider()
             }
-        } label: {
-            Label("Manage Uploads...", systemImage: "list.bullet")
+            
+            Button {
+                if showQuickshareInSidebar {
+                    // Open Settings to Quickshare tab
+                    SettingsWindowController.shared.showSettings(tab: .quickshare)
+                } else {
+                    // Open standalone manager window
+                    QuickshareManagerWindowController.show()
+                }
+            } label: {
+                Label("Manage Uploads...", systemImage: "list.bullet")
+            }
         }
-        
-
+        .onAppear {
+            clipboardURLs = getClipboardURLs()
+        }
     }
     
     // MARK: - Helpers

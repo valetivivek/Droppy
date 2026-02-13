@@ -8,6 +8,7 @@
 
 import SwiftUI
 import AppKit
+import QuartzCore
 
 private enum ToDoShelfFormatters {
     static let parseTimeFormatters: [DateFormatter] = {
@@ -120,6 +121,9 @@ struct ToDoShelfBar: View {
     @State private var timelineScrollTargetItemID: TimelineRowRenderID?
     @State private var suppressStripSelectionFromScroll = false
     @State private var stripScrollSyncWorkItem: DispatchWorkItem?
+    @State private var stripSelectionUpdateWorkItem: DispatchWorkItem?
+    @State private var pendingStripSelectionOffsets: [Date: CGFloat] = [:]
+    @State private var lastStripSelectionUpdateAt: TimeInterval = 0
     @State private var splitToggleInteractionWorkItem: DispatchWorkItem?
     @State private var detailTitleCommitWorkItem: DispatchWorkItem?
     @State private var timelineSnapshot = TimelineSnapshot.empty
@@ -277,6 +281,7 @@ struct ToDoShelfBar: View {
         }
         .onDisappear {
             stripScrollSyncWorkItem?.cancel()
+            stripSelectionUpdateWorkItem?.cancel()
             splitToggleInteractionWorkItem?.cancel()
             commitPendingDetailTitleEdit()
             manager.isInteractingWithPopover = false
@@ -823,7 +828,7 @@ struct ToDoShelfBar: View {
             }
             .coordinateSpace(name: "timeline-scroll")
             .onPreferenceChange(TimelineSectionOffsetPreferenceKey.self) { offsets in
-                updateStripSelectionFromScroll(offsets)
+                scheduleStripSelectionUpdate(with: offsets)
             }
             .onChange(of: timelineScrollTargetDay) { _, targetDay in
                 guard let targetDay, let resolvedDay = resolvedTimelineScrollDay(for: targetDay) else { return }
@@ -1472,29 +1477,43 @@ struct ToDoStableTextField: NSViewRepresentable {
 private struct ToDoShelfScrollViewResolver: NSViewRepresentable {
     let onResolve: (NSScrollView) -> Void
 
+    final class Coordinator {
+        var didResolve = false
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
-            resolveScrollView(from: view)
+            if !context.coordinator.didResolve {
+                context.coordinator.didResolve = resolveScrollView(from: view)
+            }
         }
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
+        guard !context.coordinator.didResolve else { return }
         DispatchQueue.main.async {
-            resolveScrollView(from: nsView)
+            if !context.coordinator.didResolve {
+                context.coordinator.didResolve = resolveScrollView(from: nsView)
+            }
         }
     }
 
-    private func resolveScrollView(from view: NSView) {
+    private func resolveScrollView(from view: NSView) -> Bool {
         var current: NSView? = view
         while let candidate = current {
             if let scroll = candidate.enclosingScrollView {
                 onResolve(scroll)
-                return
+                return true
             }
             current = candidate.superview
         }
+        return false
     }
 }
 
@@ -2908,6 +2927,32 @@ private extension ToDoShelfBar {
             selectedStripDayStart = candidate
             ensureSelectedDayVisibleInStrip()
         }
+    }
+
+    func scheduleStripSelectionUpdate(with offsets: [Date: CGFloat]) {
+        pendingStripSelectionOffsets = offsets
+
+        let now = CACurrentMediaTime()
+        let minInterval: TimeInterval = 1.0 / 120.0
+        let elapsed = now - lastStripSelectionUpdateAt
+
+        if elapsed >= minInterval {
+            stripSelectionUpdateWorkItem?.cancel()
+            stripSelectionUpdateWorkItem = nil
+            lastStripSelectionUpdateAt = now
+            updateStripSelectionFromScroll(offsets)
+            return
+        }
+
+        guard stripSelectionUpdateWorkItem == nil else { return }
+        let delay = max(0.005, minInterval - elapsed)
+        let workItem = DispatchWorkItem {
+            stripSelectionUpdateWorkItem = nil
+            lastStripSelectionUpdateAt = CACurrentMediaTime()
+            updateStripSelectionFromScroll(pendingStripSelectionOffsets)
+        }
+        stripSelectionUpdateWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 
     func suspendStripSelectionSyncDuringProgrammaticScroll(duration: TimeInterval = 0.5) {

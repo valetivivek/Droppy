@@ -798,6 +798,15 @@ final class MenuBarManager: ObservableObject {
 
     /// Last processed mouse-move timestamp for hover handling.
     private var lastMouseMoveProcessTime: TimeInterval = 0
+
+    /// Cached result for active menu-window detection to avoid scanning NSApp.windows on every mouse event.
+    private var cachedHasActiveMenuWindow = false
+
+    /// Timestamp for the menu-window cache.
+    private var lastActiveMenuWindowCheckTime: TimeInterval = 0
+
+    /// Tracks whether hover logic is currently paused because a menu is open.
+    private var isHoverPausedForActiveMenu = false
     
     /// Auto-hide timer
     private var autoHideTimer: Timer?
@@ -983,6 +992,7 @@ final class MenuBarManager: ObservableObject {
         guard showOnHover else {
             cancelAutoHide()
             cancelPendingHoverHide()
+            resetMenuWindowDetectionState()
             return
         }
 
@@ -995,19 +1005,23 @@ final class MenuBarManager: ObservableObject {
     private func handleMouseMoved() {
         guard showOnHover else { return }
 
-        // Keep menu interactions smooth by pausing hover logic while any menu is open.
-        if hasActiveMenuWindow() {
-            cancelAutoHide()
-            cancelPendingHoverHide()
-            return
-        }
-
         // High-frequency global mouse events can flood this path.
         // Cap processing to ~120 Hz to reduce CPU churn.
         let now = ProcessInfo.processInfo.systemUptime
         let minInterval: TimeInterval = 1.0 / 120.0
         guard now - lastMouseMoveProcessTime >= minInterval else { return }
         lastMouseMoveProcessTime = now
+
+        // Keep menu interactions smooth by pausing hover logic while any menu is open.
+        if hasActiveMenuWindow(now: now) {
+            if !isHoverPausedForActiveMenu {
+                cancelAutoHide()
+                cancelPendingHoverHide()
+                isHoverPausedForActiveMenu = true
+            }
+            return
+        }
+        isHoverPausedForActiveMenu = false
         
         // When icons are locked visible via eye click, skip hover behavior
         guard !isLockedVisible else { return }
@@ -1078,13 +1092,29 @@ final class MenuBarManager: ObservableObject {
         }
     }
 
-    private func hasActiveMenuWindow() -> Bool {
-        NSApp.windows.contains { window in
+    private func hasActiveMenuWindow(now: TimeInterval) -> Bool {
+        // Re-check at most ~30 Hz; active menu windows don't need per-event detection fidelity.
+        let checkInterval: TimeInterval = 1.0 / 30.0
+        if now - lastActiveMenuWindowCheckTime < checkInterval {
+            return cachedHasActiveMenuWindow
+        }
+        lastActiveMenuWindowCheckTime = now
+
+        let hasActiveMenu = NSApp.windows.contains { window in
             guard window.isVisible else { return false }
             guard window.level.rawValue >= NSWindow.Level.popUpMenu.rawValue else { return false }
             let className = NSStringFromClass(type(of: window)).lowercased()
             return className.contains("menu")
         }
+
+        cachedHasActiveMenuWindow = hasActiveMenu
+        return hasActiveMenu
+    }
+
+    private func resetMenuWindowDetectionState() {
+        cachedHasActiveMenuWindow = false
+        lastActiveMenuWindowCheckTime = 0
+        isHoverPausedForActiveMenu = false
     }
     
     /// Returns the menu bar section with the given name.
@@ -1122,6 +1152,7 @@ final class MenuBarManager: ObservableObject {
     func disable() {
         cancelAutoHide()
         cancelPendingHoverHide()
+        resetMenuWindowDetectionState()
         if let mouseMonitor {
             NSEvent.removeMonitor(mouseMonitor)
             self.mouseMonitor = nil
@@ -1148,6 +1179,7 @@ final class MenuBarManager: ObservableObject {
         disable()
         cancelAutoHide()
         cancelPendingHoverHide()
+        resetMenuWindowDetectionState()
         if let mouseMonitor {
             NSEvent.removeMonitor(mouseMonitor)
             self.mouseMonitor = nil

@@ -130,12 +130,9 @@ final class VoiceTranscribeMenuBar {
         if isRecording {
             stopRecording()
         } else {
-            // Show menu
-            statusItem?.menu = menu
-            statusItem?.button?.performClick(nil)
-            // Remove menu reference so click handler works next time
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                self?.statusItem?.menu = nil
+            // Pop up directly to avoid extra menu assignment/removal churn on every open.
+            if let menu = menu {
+                statusItem?.popUpMenu(menu)
             }
         }
     }
