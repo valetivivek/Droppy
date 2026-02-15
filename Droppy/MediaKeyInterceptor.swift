@@ -30,6 +30,23 @@ private let NX_KEYTYPE_PREVIOUS: UInt32 = 19   // Previous track (other keyboard
 final class MediaKeyInterceptor {
     static let shared = MediaKeyInterceptor()
     
+    static func shouldRunForCurrentPreferences() -> Bool {
+        let defaults = UserDefaults.standard
+        let hudEnabled = defaults.preference(
+            AppPreferenceKey.enableHUDReplacement,
+            default: PreferenceDefault.enableHUDReplacement
+        )
+        let volumeEnabled = defaults.preference(
+            AppPreferenceKey.enableVolumeHUDReplacement,
+            default: PreferenceDefault.enableVolumeHUDReplacement
+        )
+        let brightnessEnabled = defaults.preference(
+            AppPreferenceKey.enableBrightnessHUDReplacement,
+            default: PreferenceDefault.enableBrightnessHUDReplacement
+        )
+        return hudEnabled && (volumeEnabled || brightnessEnabled)
+    }
+    
     // Made internal for callback access
     var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -149,6 +166,14 @@ final class MediaKeyInterceptor {
         print("MediaKeyInterceptor: Stopped")
     }
     
+    func refreshForCurrentPreferences() {
+        if Self.shouldRunForCurrentPreferences() {
+            _ = start()
+        } else {
+            stop()
+        }
+    }
+    
     /// Handle a media key event
     /// Returns true if the event was handled (should be suppressed)
     /// Returns false if the event should pass through to the system
@@ -156,10 +181,27 @@ final class MediaKeyInterceptor {
         let mouseLocation = NSEvent.mouseLocation
         let screenUnderMouse = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) })
         
+        let hudEnabled = UserDefaults.standard.preference(
+            AppPreferenceKey.enableHUDReplacement,
+            default: PreferenceDefault.enableHUDReplacement
+        )
+        let volumeReplacementEnabled = UserDefaults.standard.preference(
+            AppPreferenceKey.enableVolumeHUDReplacement,
+            default: PreferenceDefault.enableVolumeHUDReplacement
+        )
+        let brightnessReplacementEnabled = UserDefaults.standard.preference(
+            AppPreferenceKey.enableBrightnessHUDReplacement,
+            default: PreferenceDefault.enableBrightnessHUDReplacement
+        )
+        
         // Check if this is a volume key and device doesn't support software control
         let isVolumeKey = keyCode == NX_KEYTYPE_SOUND_UP ||
                           keyCode == NX_KEYTYPE_SOUND_DOWN ||
                           keyCode == NX_KEYTYPE_MUTE
+        
+        if isVolumeKey && (!hudEnabled || !volumeReplacementEnabled) {
+            return false
+        }
         
         if isVolumeKey && !VolumeManager.shared.supportsVolumeControl {
             // Let the system handle volume for USB devices without software volume control
@@ -169,7 +211,18 @@ final class MediaKeyInterceptor {
         let isBrightnessKey = keyCode == NX_KEYTYPE_BRIGHTNESS_UP ||
                               keyCode == NX_KEYTYPE_BRIGHTNESS_DOWN
         
+        if isBrightnessKey && (!hudEnabled || !brightnessReplacementEnabled) {
+            return false
+        }
+        
         if isBrightnessKey {
+            // BetterDisplay compatibility path:
+            // let BetterDisplay/system process brightness keys, then Droppy mirrors the
+            // resulting brightness via polling-based HUD bridge in BrightnessManager.
+            if BrightnessManager.shared.shouldPassthroughBrightnessKeyToSystem(on: screenUnderMouse) {
+                return false
+            }
+            
             // Let system handle brightness when Droppy cannot control the selected target.
             if !BrightnessManager.shared.canHandleBrightness(on: screenUnderMouse) {
                 return false

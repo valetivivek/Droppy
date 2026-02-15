@@ -183,13 +183,16 @@ final class BrightnessManager: ObservableObject {
     private var pollFailCount: Int = 0
     private var isPollingInProgress = false // Mutex to prevent overlapping XPC calls
     
-    // Lunar compatibility:
-    // when Lunar owns brightness keys, we can only observe changes via polling.
-    // Keep polling silent by default, but allow HUD updates for meaningful Lunar-driven deltas.
+    // Compatibility bridges:
+    // when companion display apps own brightness keys, we observe changes via polling
+    // and re-surface them to Droppy's HUD.
     private var cachedLunarRunning = false
     private var lastLunarRunningCheckAt: Date = .distantPast
     private let lunarRunningCheckInterval: TimeInterval = 2.0
-    private let lunarPollingHUDDeltaThreshold: Float = 0.01
+    private var cachedBetterDisplayRunning = false
+    private var lastBetterDisplayRunningCheckAt: Date = .distantPast
+    private let betterDisplayRunningCheckInterval: TimeInterval = 2.0
+    private let compatibilityPollingHUDDeltaThreshold: Float = 0.01
     
     // MARK: - Lazy Re-initialization (Bug #125)
     // After reboot, display detection may fail initially due to timing
@@ -386,6 +389,18 @@ final class BrightnessManager: ObservableObject {
         return true
     }
     
+    /// When BetterDisplay compatibility is active, let BetterDisplay/system handle
+    /// brightness-key input and rely on polling to mirror values into Droppy's HUD.
+    func shouldPassthroughBrightnessKeyToSystem(on screenHint: NSScreen? = nil) -> Bool {
+        guard isBetterDisplayCompatibilityEnabled else { return false }
+        guard isBetterDisplayRunning() else { return false }
+        
+        // If Droppy can't resolve this target at all, passthrough is still safest.
+        // This avoids intercepting keys Droppy may not be able to apply reliably.
+        guard resolveBrightnessTarget(screenHint: screenHint) != nil else { return true }
+        return true
+    }
+    
     /// Increase brightness by one step
     func increase(stepDivisor: Float = 1.0, screenHint: NSScreen? = nil) {
         let divisor = max(stepDivisor, 0.25)
@@ -570,12 +585,89 @@ final class BrightnessManager: ObservableObject {
         return cachedLunarRunning
     }
     
+    private var isBetterDisplayCompatibilityEnabled: Bool {
+        UserDefaults.standard.preference(
+            AppPreferenceKey.enableBetterDisplayCompatibility,
+            default: PreferenceDefault.enableBetterDisplayCompatibility
+        )
+    }
+    
+    private func isBetterDisplayRunning() -> Bool {
+        let now = Date()
+        if now.timeIntervalSince(lastBetterDisplayRunningCheckAt) < betterDisplayRunningCheckInterval {
+            return cachedBetterDisplayRunning
+        }
+        
+        // BetterDisplay bundle identifiers can vary by release lineage,
+        // so we support exact IDs and resilient partial matching.
+        let knownBundleIDs: Set<String> = [
+            "com.betterdisplay.BetterDisplay",
+            "pro.betterdisplay.BetterDisplay",
+            "org.BetterDisplay.BetterDisplay"
+        ]
+        
+        cachedBetterDisplayRunning = NSWorkspace.shared.runningApplications.contains { app in
+            if app.isTerminated { return false }
+            
+            if let bundleID = app.bundleIdentifier {
+                let normalized = bundleID.lowercased()
+                if knownBundleIDs.contains(bundleID) || normalized.contains("betterdisplay") {
+                    return true
+                }
+            }
+            
+            if let localizedName = app.localizedName?.lowercased(),
+               localizedName.contains("betterdisplay") {
+                return true
+            }
+            
+            return false
+        }
+        lastBetterDisplayRunningCheckAt = now
+        return cachedBetterDisplayRunning
+    }
+    
+    private func resolvePolledBrightnessSample() -> (brightness: Float, displayID: CGDirectDisplayID?)? {
+        if isBetterDisplayCompatibilityEnabled,
+           isBetterDisplayRunning(),
+           let target = resolveBrightnessTarget() {
+            if target.isBuiltIn {
+                if let builtInBrightness = getBuiltInBrightness(displayID: target.displayID) {
+                    return (brightness: builtInBrightness, displayID: target.displayID)
+                }
+            } else if externalHardwareController.canControl(displayID: target.displayID),
+                      let externalBrightness = externalHardwareController.brightness(displayID: target.displayID) {
+                return (brightness: externalBrightness, displayID: target.displayID)
+            }
+        }
+        
+        if let current = getCurrentBrightness() {
+            return (brightness: current, displayID: mainDisplayID)
+        }
+        
+        return nil
+    }
+    
+    private func shouldBridgePolledDeltaToHUD(delta: Float) -> Bool {
+        guard delta >= compatibilityPollingHUDDeltaThreshold else { return false }
+        
+        if isLunarRunning() {
+            return true
+        }
+        
+        if isBetterDisplayCompatibilityEnabled && isBetterDisplayRunning() {
+            return true
+        }
+        
+        return false
+    }
+    
     // MARK: - Brightness Polling
     
     private func startBrightnessPolling() {
         guard isSupported else { return }
         
-        print("BrightnessManager: Starting brightness polling (silent by default, Lunar bridge enabled)")
+        print("BrightnessManager: Starting brightness polling (silent by default, compatibility bridge enabled)")
         // CRITICAL: Poll on main thread to avoid XPC/DisplayServices thread safety crashes
         // DisplayServicesGetBrightness makes XPC calls that are not thread-safe
         let timer = DispatchSource.makeTimerSource(queue: .main)
@@ -589,14 +681,16 @@ final class BrightnessManager: ObservableObject {
                 self.isPollingInProgress = true
                 defer { self.isPollingInProgress = false }
                 
-                if let current = self.getCurrentBrightness() {
+                if let sample = self.resolvePolledBrightnessSample() {
+                    let current = sample.brightness
                     self.pollFailCount = 0
                     let delta = abs(current - self.lastPolledBrightness)
                     if delta > 0.001 {
                         // Keep polling silent in normal mode to avoid ambient auto-brightness noise.
-                        // Lunar handles brightness keys itself, so we bridge polled deltas back into HUD updates.
-                        if self.isLunarRunning(), delta >= self.lunarPollingHUDDeltaThreshold {
-                            self.publish(brightness: current, touchDate: true, displayID: self.mainDisplayID)
+                        // Companion apps can own brightness keys, so we bridge polled deltas
+                        // back into Droppy's HUD updates.
+                        if self.shouldBridgePolledDeltaToHUD(delta: delta) {
+                            self.publish(brightness: current, touchDate: true, displayID: sample.displayID)
                         } else {
                             self.rawBrightness = current
                         }

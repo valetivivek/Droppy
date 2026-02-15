@@ -80,6 +80,7 @@ final class MenuBarSection {
     enum Name: String, CaseIterable {
         case visible = "Visible"
         case hidden = "Hidden"
+        case alwaysHidden = "Always Hidden"
     }
     
     /// The name of the section.
@@ -94,7 +95,7 @@ final class MenuBarSection {
     /// A Boolean value that indicates whether the section is hidden.
     var isHidden: Bool {
         switch name {
-        case .visible, .hidden:
+        case .visible, .hidden, .alwaysHidden:
             return controlItem.state == .hideItems
         }
     }
@@ -106,6 +107,8 @@ final class MenuBarSection {
             ControlItem(identifier: .iceIcon, manager: manager)
         case .hidden:
             ControlItem(identifier: .hidden, manager: manager)
+        case .alwaysHidden:
+            ControlItem(identifier: .alwaysHidden, manager: manager)
         }
         self.name = name
         self.controlItem = controlItem
@@ -120,14 +123,25 @@ final class MenuBarSection {
         guard let manager else { return }
         
         switch name {
-        case .visible:
-            guard let hiddenSection = manager.section(withName: .hidden) else { return }
-            controlItem.state = .showItems
-            hiddenSection.controlItem.state = .showItems
-        case .hidden:
-            guard let visibleSection = manager.section(withName: .visible) else { return }
-            controlItem.state = .showItems
+        case .visible, .hidden:
+            guard let visibleSection = manager.section(withName: .visible),
+                  let hiddenSection = manager.section(withName: .hidden),
+                  let alwaysHiddenSection = manager.section(withName: .alwaysHidden) else {
+                return
+            }
             visibleSection.controlItem.state = .showItems
+            hiddenSection.controlItem.state = .showItems
+            // Always-hidden stays collapsed during normal menu-bar hover reveal.
+            alwaysHiddenSection.controlItem.state = .hideItems
+        case .alwaysHidden:
+            guard let visibleSection = manager.section(withName: .visible),
+                  let hiddenSection = manager.section(withName: .hidden),
+                  let alwaysHiddenSection = manager.section(withName: .alwaysHidden) else {
+                return
+            }
+            visibleSection.controlItem.state = .showItems
+            hiddenSection.controlItem.state = .showItems
+            alwaysHiddenSection.controlItem.state = .showItems
         }
         // Note: Auto-hide is now scheduled when cursor leaves menu bar, not when showing
     }
@@ -141,14 +155,17 @@ final class MenuBarSection {
         manager.cancelAutoHide()
         
         switch name {
-        case .visible:
-            guard let hiddenSection = manager.section(withName: .hidden) else { return }
-            controlItem.state = .hideItems
-            hiddenSection.controlItem.state = .hideItems
-        case .hidden:
-            guard let visibleSection = manager.section(withName: .visible) else { return }
-            controlItem.state = .hideItems
+        case .visible, .hidden:
+            guard let visibleSection = manager.section(withName: .visible),
+                  let hiddenSection = manager.section(withName: .hidden),
+                  let alwaysHiddenSection = manager.section(withName: .alwaysHidden) else {
+                return
+            }
             visibleSection.controlItem.state = .hideItems
+            hiddenSection.controlItem.state = .hideItems
+            alwaysHiddenSection.controlItem.state = .hideItems
+        case .alwaysHidden:
+            controlItem.state = .hideItems
         }
     }
     
@@ -171,6 +188,7 @@ final class ControlItem {
     enum Identifier: String, CaseIterable {
         case iceIcon = "DroppyMBM_Icon"
         case hidden = "DroppyMBM_Hidden"
+        case alwaysHidden = "DroppyMBM_AlwaysHidden"
     }
     
     /// Possible lengths for control items.
@@ -261,6 +279,8 @@ final class ControlItem {
                 StatusItemDefaults[.preferredPosition, autosaveName] = 0
             case .hidden:
                 StatusItemDefaults[.preferredPosition, autosaveName] = 1
+            case .alwaysHidden:
+                StatusItemDefaults[.preferredPosition, autosaveName] = 2
             }
         }
         
@@ -315,7 +335,7 @@ final class ControlItem {
                 if isVisible {
                     statusItem.length = switch section.name {
                     case .visible: Lengths.standard
-                    case .hidden:
+                    case .hidden, .alwaysHidden:
                         switch state {
                         case .hideItems: Lengths.expanded
                         case .showItems: Lengths.standard
@@ -441,6 +461,14 @@ final class ControlItem {
                     button.image = image
                 }
             }
+        case .alwaysHidden:
+            isVisible = true
+            button.cell?.isEnabled = false
+            button.isHighlighted = false
+            // Keep this divider functionally present for section layout,
+            // but visually hidden in normal usage.
+            button.alphaValue = 0
+            button.image = nil
         }
     }
     
@@ -524,7 +552,7 @@ final class ControlItem {
         // Set the length based on section
         statusItem.length = switch section.name {
         case .visible: Lengths.standard
-        case .hidden:
+        case .hidden, .alwaysHidden:
             switch state {
             case .hideItems: Lengths.expanded
             case .showItems: Lengths.standard
@@ -704,6 +732,9 @@ final class MenuBarManager: ObservableObject {
 
     /// Cache for rendered toggle icons so hover/show-hide doesn't redraw every transition.
     private var toggleIconCache: [String: NSImage] = [:]
+
+    /// Prevent cross-singleton callbacks while shared singletons are still initializing.
+    private var isInitializing = true
     
     /// Default spacing value used by macOS
     private let defaultSpacingValue = 16
@@ -838,6 +869,9 @@ final class MenuBarManager: ObservableObject {
     /// NSMenu tracking depth for fast early-out while any menu is open.
     private var activeMenuTrackingDepth: Int = 0
 
+    /// Uptime timestamp for the latest NSMenu tracking notification.
+    private var lastMenuTrackingEventTime: TimeInterval = 0
+
     /// Cached result for active menu-window detection to avoid scanning NSApp.windows on every mouse event.
     private var cachedHasActiveMenuWindow = false
 
@@ -871,6 +905,11 @@ final class MenuBarManager: ObservableObject {
             guard let strongSelf = self else { return }
             Task { @MainActor in
                 print("[MenuBarManager] Auto-hide timer fired")
+                let now = ProcessInfo.processInfo.systemUptime
+                if strongSelf.shouldDeferAutoHide(now: now) {
+                    strongSelf.scheduleAutoHideRetry()
+                    return
+                }
                 strongSelf.hideAllSections()
             }
         }
@@ -894,6 +933,82 @@ final class MenuBarManager: ObservableObject {
         for section in sections {
             section.hide()
         }
+    }
+
+    /// Re-check auto-hide shortly while menus/interactions are still active.
+    private func scheduleAutoHideRetry() {
+        cancelAutoHide()
+        autoHideTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: false) { [weak self] _ in
+            guard let strongSelf = self else { return }
+            Task { @MainActor in
+                let now = ProcessInfo.processInfo.systemUptime
+                if strongSelf.shouldDeferAutoHide(now: now) {
+                    strongSelf.scheduleAutoHideRetry()
+                    return
+                }
+                strongSelf.hideAllSections()
+            }
+        }
+    }
+
+    /// Returns true when auto-hide should wait because user is still interacting with a menu.
+    private func shouldDeferAutoHide(now: TimeInterval) -> Bool {
+        if isLockedVisible {
+            return true
+        }
+        if hasActiveMenuWindow(now: now) {
+            return true
+        }
+        if hasAnyOnScreenPopupMenuWindow() {
+            return true
+        }
+        return false
+    }
+
+    /// Detect popup-menu windows globally (not just this app), to avoid hiding while a status menu is open.
+    private func hasAnyOnScreenPopupMenuWindow() -> Bool {
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let windows = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            return false
+        }
+        let currentPID = getpid()
+
+        let popUpLayer = Int(CGWindowLevelForKey(.popUpMenuWindow))
+        let statusLayer = Int(CGWindowLevelForKey(.statusWindow))
+        let mainMenuLayer = Int(CGWindowLevelForKey(.mainMenuWindow))
+        let acceptedLayers = Set([popUpLayer - 1, popUpLayer, popUpLayer + 1, statusLayer, mainMenuLayer])
+        let mouseAppKit = NSEvent.mouseLocation
+        let mouseQuartzRect = MenuBarFloatingCoordinateConverter.appKitToQuartz(
+            CGRect(x: mouseAppKit.x, y: mouseAppKit.y, width: 1, height: 1)
+        )
+        let mouseQuartzPoint = CGPoint(x: mouseQuartzRect.midX, y: mouseQuartzRect.midY)
+
+        for window in windows {
+            let ownerPID: pid_t
+            if let pid = window[kCGWindowOwnerPID as String] as? Int32 {
+                ownerPID = pid_t(pid)
+            } else if let pid = window[kCGWindowOwnerPID as String] as? Int {
+                ownerPID = pid_t(pid)
+            } else {
+                continue
+            }
+            // Ignore Droppy's own utility windows (floating panel/popovers).
+            if ownerPID == currentPID {
+                continue
+            }
+
+            let layer = window[kCGWindowLayer as String] as? Int ?? Int.min
+            guard acceptedLayers.contains(layer) else { continue }
+
+            if let boundsDict = window[kCGWindowBounds as String] as? NSDictionary,
+               let bounds = CGRect(dictionaryRepresentation: boundsDict),
+               !bounds.contains(mouseQuartzPoint) {
+                continue
+            }
+            return true
+        }
+
+        return false
     }
     
     /// Initializes a new menu bar manager instance.
@@ -944,7 +1059,20 @@ final class MenuBarManager: ObservableObject {
             for section in sections {
                 section.controlItem.removeFromMenuBar()
             }
+        } else {
+            setAlwaysHiddenSectionEnabled(false)
         }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if self.isEnabled {
+                MenuBarFloatingBarManager.shared.start()
+            } else {
+                MenuBarFloatingBarManager.shared.stop()
+            }
+        }
+
+        isInitializing = false
     }
     
     deinit {
@@ -977,6 +1105,7 @@ final class MenuBarManager: ObservableObject {
         sections = [
             MenuBarSection(name: .visible, manager: self),
             MenuBarSection(name: .hidden, manager: self),
+            MenuBarSection(name: .alwaysHidden, manager: self),
         ]
         
         print("[MenuBarManager] Sections initialized: \(sections.map { $0.name.rawValue })")
@@ -998,7 +1127,10 @@ final class MenuBarManager: ObservableObject {
             hiddenSection.controlItem.$state
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] newState in
-                    self?.state = newState
+                    guard let self else { return }
+                    self.state = newState
+                    guard !self.isInitializing else { return }
+                    MenuBarFloatingBarManager.shared.setMenuBarHiddenSectionVisible(newState == .showItems)
                 }
                 .store(in: &c)
         }
@@ -1024,14 +1156,11 @@ final class MenuBarManager: ObservableObject {
             .sink { [weak self] _ in
                 guard let self else { return }
                 self.activeMenuTrackingDepth += 1
+                self.lastMenuTrackingEventTime = ProcessInfo.processInfo.systemUptime
                 self.cachedHasActiveMenuWindow = true
                 self.isHoverPausedForActiveMenu = true
                 self.cancelAutoHide()
                 self.cancelPendingHoverHide()
-                if let monitor = self.mouseMonitor {
-                    NSEvent.removeMonitor(monitor)
-                    self.mouseMonitor = nil
-                }
             }
             .store(in: &c)
 
@@ -1040,12 +1169,10 @@ final class MenuBarManager: ObservableObject {
             .sink { [weak self] _ in
                 guard let self else { return }
                 self.activeMenuTrackingDepth = max(0, self.activeMenuTrackingDepth - 1)
+                self.lastMenuTrackingEventTime = ProcessInfo.processInfo.systemUptime
                 if self.activeMenuTrackingDepth == 0 {
                     self.cachedHasActiveMenuWindow = false
                     self.isHoverPausedForActiveMenu = false
-                    if self.showOnHover {
-                        self.setupMouseMonitoring()
-                    }
                 }
             }
             .store(in: &c)
@@ -1170,8 +1297,14 @@ final class MenuBarManager: ObservableObject {
         }
 
         if activeMenuTrackingDepth > 0 {
-            cachedHasActiveMenuWindow = true
-            return true
+            // NSMenu didBegin/didEnd can occasionally become unbalanced.
+            // Treat depth as authoritative only for a short grace period,
+            // then require corroborating menu-window evidence.
+            let trackingGrace: TimeInterval = 0.9
+            if now - lastMenuTrackingEventTime <= trackingGrace {
+                cachedHasActiveMenuWindow = true
+                return true
+            }
         }
 
         // Re-check at most ~30 Hz; active menu windows don't need per-event detection fidelity.
@@ -1188,6 +1321,9 @@ final class MenuBarManager: ObservableObject {
             return className.contains("menu")
         }
 
+        if !hasActiveMenu, activeMenuTrackingDepth > 0 {
+            activeMenuTrackingDepth = 0
+        }
         cachedHasActiveMenuWindow = hasActiveMenu
         return hasActiveMenu
     }
@@ -1196,11 +1332,96 @@ final class MenuBarManager: ObservableObject {
         cachedHasActiveMenuWindow = false
         lastActiveMenuWindowCheckTime = 0
         isHoverPausedForActiveMenu = false
+        activeMenuTrackingDepth = 0
+        lastMenuTrackingEventTime = 0
     }
     
     /// Returns the menu bar section with the given name.
     func section(withName name: MenuBarSection.Name) -> MenuBarSection? {
         sections.first { $0.name == name }
+    }
+
+    /// Returns whether a section's control item is currently present in the menu bar.
+    func isSectionEnabled(_ sectionName: MenuBarSection.Name) -> Bool {
+        section(withName: sectionName)?.controlItem.isAddedToMenuBar == true
+    }
+
+    /// Returns the window frame for a section control item.
+    func controlItemFrame(for sectionName: MenuBarSection.Name) -> CGRect? {
+        section(withName: sectionName)?.controlItem.windowFrame
+    }
+
+    /// Enables or disables the always-hidden section divider item.
+    func setAlwaysHiddenSectionEnabled(_ enabled: Bool) {
+        guard let alwaysHiddenSection = section(withName: .alwaysHidden) else { return }
+        if enabled {
+            // Keep AH divider left of the hidden divider in preferred-position defaults.
+            let hiddenAutosave = ControlItem.Identifier.hidden.rawValue
+            let alwaysAutosave = ControlItem.Identifier.alwaysHidden.rawValue
+            let hiddenPosition = StatusItemDefaults[.preferredPosition, hiddenAutosave] ?? 1
+            let alwaysPosition = StatusItemDefaults[.preferredPosition, alwaysAutosave] ?? (hiddenPosition + 1)
+            if alwaysPosition <= hiddenPosition {
+                StatusItemDefaults[.preferredPosition, alwaysAutosave] = hiddenPosition + 1
+            }
+            alwaysHiddenSection.controlItem.addToMenuBar()
+        } else {
+            alwaysHiddenSection.controlItem.state = .hideItems
+            alwaysHiddenSection.controlItem.removeFromMenuBar()
+        }
+    }
+
+    /// Temporarily reveal all sections while the settings pane is open so
+    /// users can scan and assign icons reliably.
+    func showAllSectionsForSettingsInspection() {
+        guard let visibleSection = section(withName: .visible),
+              let hiddenSection = section(withName: .hidden),
+              let alwaysHiddenSection = section(withName: .alwaysHidden) else {
+            return
+        }
+        cancelAutoHide()
+        cancelPendingHoverHide()
+        setAlwaysHiddenSectionEnabled(true)
+
+        // Shield transition (SaneBar pattern):
+        // 1) main hidden separator expands (shield),
+        // 2) always-hidden separator contracts to visual,
+        // 3) main separator contracts to reveal everything.
+        hiddenSection.controlItem.state = .hideItems
+        alwaysHiddenSection.controlItem.state = .showItems
+        visibleSection.controlItem.state = .showItems
+        hiddenSection.controlItem.state = .showItems
+    }
+
+    /// Restore section visibility after settings closes.
+    func restoreSectionVisibilityAfterSettings(
+        hiddenWasVisible: Bool,
+        alwaysHiddenWasVisible: Bool,
+        alwaysHiddenWasEnabled: Bool
+    ) {
+        guard let visibleSection = section(withName: .visible),
+              let hiddenSection = section(withName: .hidden),
+              let alwaysHiddenSection = section(withName: .alwaysHidden) else {
+            return
+        }
+
+        // Restore through a shield step to avoid separator race artifacts.
+        hiddenSection.controlItem.state = .hideItems
+        alwaysHiddenSection.controlItem.state = .hideItems
+
+        if hiddenWasVisible {
+            visibleSection.controlItem.state = .showItems
+            hiddenSection.controlItem.state = .showItems
+            alwaysHiddenSection.controlItem.state = alwaysHiddenWasVisible ? .showItems : .hideItems
+        } else {
+            visibleSection.controlItem.state = .hideItems
+            hiddenSection.controlItem.state = .hideItems
+            alwaysHiddenSection.controlItem.state = .hideItems
+        }
+
+        let floatingNeedsAlwaysHiddenSection =
+            MenuBarFloatingBarManager.shared.isFeatureEnabled
+            && !MenuBarFloatingBarManager.shared.alwaysHiddenItemIDs.isEmpty
+        setAlwaysHiddenSectionEnabled(alwaysHiddenWasEnabled || floatingNeedsAlwaysHiddenSection)
     }
     
     /// Toggles the hidden section.
@@ -1220,11 +1441,12 @@ final class MenuBarManager: ObservableObject {
             performSetup()
         }
         
-        for section in sections {
-            section.controlItem.addToMenuBar()
-        }
+        section(withName: .visible)?.controlItem.addToMenuBar()
+        section(withName: .hidden)?.controlItem.addToMenuBar()
+        setAlwaysHiddenSectionEnabled(false)
 
         setupMouseMonitoring()
+        MenuBarFloatingBarManager.shared.start()
         
         print("[MenuBarManager] Enabled")
     }
@@ -1242,6 +1464,7 @@ final class MenuBarManager: ObservableObject {
         for section in sections {
             section.controlItem.removeFromMenuBar()
         }
+        MenuBarFloatingBarManager.shared.stop()
         
         // Use unified state - both for backwards compatibility
         UserDefaults.standard.set(true, forKey: "MenuBarManager_Removed")
@@ -1258,6 +1481,7 @@ final class MenuBarManager: ObservableObject {
     /// Cleanup when extension is removed
     func cleanup() {
         disable()
+        MenuBarFloatingBarManager.shared.stop()
         cancelAutoHide()
         cancelPendingHoverHide()
         resetMenuWindowDetectionState()

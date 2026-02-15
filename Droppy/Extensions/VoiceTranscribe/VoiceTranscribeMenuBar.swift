@@ -59,6 +59,8 @@ final class VoiceTranscribeMenuBar {
             button.target = self
             button.action = #selector(handleClick)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.setAccessibilityIdentifier("DroppyVoiceTranscribe")
+            button.setAccessibilityTitle("Droppy Voice Transcribe")
         }
         
         updateIcon()

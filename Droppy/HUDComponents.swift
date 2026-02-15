@@ -417,6 +417,18 @@ struct MediaHUDView: View {
         .animation(DroppyAnimation.smooth(duration: 0.35, for: targetScreen), value: isHovered)
         .allowsHitTesting(true)
         .onTapGesture {
+            let shelfEnabled = UserDefaults.standard.preference(
+                AppPreferenceKey.enableNotchShelf,
+                default: PreferenceDefault.enableNotchShelf
+            )
+
+            // When shelf is disabled, mini media taps should open the source app
+            // instead of trying to expand a surface that isn't available.
+            guard shelfEnabled else {
+                MusicManager.shared.openMusicApp()
+                return
+            }
+
             withAnimation(DroppyAnimation.state) {
                 // Show media player when expanding from mini HUD
                 MusicManager.shared.isMediaHUDForced = true

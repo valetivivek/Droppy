@@ -718,7 +718,8 @@ final class WindowSnapManager: ObservableObject {
         // Use GlobalHotKey (Carbon-based) for reliable global shortcut detection
         hotkeyMonitors[action] = GlobalHotKey(
             keyCode: savedShortcut.keyCode,
-            modifiers: savedShortcut.modifiers
+            modifiers: savedShortcut.modifiers,
+            enableIOHIDFallback: false
         ) { [weak self] in
             guard let self = self else { return }
             // CRITICAL: Check if extension is disabled

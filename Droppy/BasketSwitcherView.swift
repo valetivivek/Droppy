@@ -562,6 +562,7 @@ final class BasketSwitcherWindowController {
     
     /// Debounce repeated keyDown events.
     private var lastShortcutTriggerAt: Date = .distantPast
+    private var shortcutSignature: String = ""
     
     private var userDefaultsObserver: NSObjectProtocol?
     
@@ -590,9 +591,6 @@ final class BasketSwitcherWindowController {
     }
     
     private func setupShortcutMonitor() {
-        // Remove existing shortcut registration, if any.
-        shortcutHotKey = nil
-        
         // Shortcut is only meaningful when floating basket and multi-basket are enabled.
         let floatingEnabled = UserDefaults.standard.preference(
             AppPreferenceKey.enableFloatingBasket,
@@ -603,18 +601,32 @@ final class BasketSwitcherWindowController {
             default: PreferenceDefault.enableMultiBasket
         )
         guard floatingEnabled, multiEnabled else {
+            guard shortcutSignature != "disabled" else { return }
+            shortcutSignature = "disabled"
+            shortcutHotKey = nil
             return
         }
         
         // Load saved shortcut.
         guard let data = UserDefaults.standard.data(forKey: AppPreferenceKey.basketSwitcherShortcut),
               let savedShortcut = try? JSONDecoder().decode(SavedShortcut.self, from: data) else {
+            guard shortcutSignature != "none" else { return }
+            shortcutSignature = "none"
+            shortcutHotKey = nil
             return
         }
 
+        let signature = "\(savedShortcut.keyCode):\(savedShortcut.modifiers)"
+        guard signature != shortcutSignature else { return }
+        shortcutSignature = signature
+
+        // Remove existing shortcut registration, then register the updated shortcut.
+        shortcutHotKey = nil
+
         shortcutHotKey = GlobalHotKey(
             keyCode: savedShortcut.keyCode,
-            modifiers: savedShortcut.modifiers
+            modifiers: savedShortcut.modifiers,
+            enableIOHIDFallback: false
         ) { [weak self] in
             guard let self else { return }
 

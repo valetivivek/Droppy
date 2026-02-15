@@ -30,6 +30,7 @@ final class CapsLockManager: ObservableObject {
     
     // MARK: - Private State
     private var eventMonitor: Any?
+    private var localEventMonitor: Any?
     private var hasInitialized: Bool = false
     
     // MARK: - Initialization
@@ -49,13 +50,15 @@ final class CapsLockManager: ObservableObject {
     // MARK: - Monitoring
     
     private func startMonitoring() {
+        stopMonitoring()
+
         // Monitor flagsChanged events globally to detect Caps Lock
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             self?.handleFlagsChanged(event)
         }
         
         // Also add local monitor for when Droppy is frontmost
-        NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             self?.handleFlagsChanged(event)
             return event
         }
@@ -67,8 +70,12 @@ final class CapsLockManager: ObservableObject {
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
-            print("CapsLockManager: Stopped monitoring")
         }
+        if let monitor = localEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            localEventMonitor = nil
+        }
+        print("CapsLockManager: Stopped monitoring")
     }
     
     private func handleFlagsChanged(_ event: NSEvent) {

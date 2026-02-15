@@ -58,6 +58,12 @@ class NotchDragContainer: NSView {
         return expandedShelfBaseWidth
     }
 
+    private func isNotificationHUDActiveOnThisDisplay() -> Bool {
+        guard HUDManager.shared.isNotificationHUDVisible else { return false }
+        guard NotificationHUDManager.shared.currentNotification != nil else { return false }
+        return true
+    }
+
     
     
     
@@ -236,6 +242,10 @@ class NotchDragContainer: NSView {
     // IMPORTANT: Only enable when shelf is expanded AND no other Droppy windows are visible
     // to prevent blocking interaction with Settings, Clipboard, etc.
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        if isNotificationHUDActiveOnThisDisplay() {
+            return true
+        }
+        
         // Only accept first mouse when shelf is expanded (has items to interact with)
         guard isExpandedOnTargetDisplay() else {
             return false
@@ -285,6 +295,11 @@ class NotchDragContainer: NSView {
     // Handle direct clicks on the notch to open shelf with single click
     // This bypasses the issue where first click focuses app and second opens shelf
     override func mouseDown(with event: NSEvent) {
+        if isNotificationHUDActiveOnThisDisplay() {
+            super.mouseDown(with: event)
+            return
+        }
+
         // Only proceed if notch shelf is enabled
         // CRITICAL: Use object() ?? true to match @AppStorage default
         guard (UserDefaults.standard.object(forKey: "enableNotchShelf") as? Bool) ?? true else {
@@ -340,6 +355,11 @@ class NotchDragContainer: NSView {
     // Pass mouse events down to SwiftUI if not handled
     // Pass mouse events down to SwiftUI if not handled
     override func hitTest(_ point: NSPoint) -> NSView? {
+        // Keep NotificationHUD interactive even when shelf itself is collapsed/non-hovering.
+        if isNotificationHUDActiveOnThisDisplay() {
+            return super.hitTest(point)
+        }
+
         // We want to be selective about when we intercept events vs letting them pass through to apps below.
         
         // 1. Convert point to view coordinates

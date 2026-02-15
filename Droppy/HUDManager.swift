@@ -185,7 +185,14 @@ final class HUDManager {
             activeHUD = hud
         }
 
-        resetDismissTimer(duration: request.duration)
+        if request.type == .notification {
+            // NotificationHUDManager owns notification lifecycle and hover-aware dismissal.
+            // Avoid a second competing timer that can dismiss while interacting.
+            dismissTimer?.invalidate()
+            dismissTimer = nil
+        } else {
+            resetDismissTimer(duration: request.duration)
+        }
 
         // Notify window controller to update mouse event handling for interactive HUDs
         if request.type == .notification {
@@ -217,7 +224,12 @@ final class HUDManager {
         )
         
         activeHUD = hud
-        resetDismissTimer(duration: request.duration)
+        if request.type == .notification {
+            dismissTimer?.invalidate()
+            dismissTimer = nil
+        } else {
+            resetDismissTimer(duration: request.duration)
+        }
     }
     
     private func queueRequest(_ request: HUDRequest) {

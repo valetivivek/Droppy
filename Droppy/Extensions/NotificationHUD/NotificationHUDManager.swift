@@ -50,6 +50,15 @@ struct CapturedNotification: Identifiable, Equatable {
 @Observable
 final class NotificationHUDManager {
     static let shared = NotificationHUDManager()
+
+    private enum InteractionHitZone {
+        static let notchStyleWidth: CGFloat = 450
+        static let dynamicIslandWidth: CGFloat = 260
+        static let dynamicIslandHeight: CGFloat = 70
+        static let builtInNotchHeight: CGFloat = 110
+        static let externalNotchHeightCompact: CGFloat = 78
+        static let externalNotchHeightWithPreview: CGFloat = 84
+    }
     
     // MARK: - Published State
     
@@ -82,6 +91,8 @@ final class NotificationHUDManager {
     private var dbConnection: OpaquePointer?
     private let pollingInterval: TimeInterval = 2.0  // Backup polling (file watcher is primary)
     private var dismissWorkItem: DispatchWorkItem?
+    private let autoDismissDelay: TimeInterval = 5.0
+    private var isUserInteractingWithHUD = false
     @ObservationIgnored
     private var dueSoonChimeSound: NSSound?
 
@@ -92,6 +103,10 @@ final class NotificationHUDManager {
     private var walFileDescriptor: Int32 = -1
     private var fileChangeDebounceWorkItem: DispatchWorkItem?
     private let fileChangeDebounceInterval: TimeInterval = 0.02  // 20ms debounce (reduced for speed)
+    private var recoveryTimer: Timer?
+    private let recoveryInterval: TimeInterval = 3.0
+    @ObservationIgnored
+    private var appDidBecomeActiveObserver: NSObjectProtocol?
     
     // Serial queue to ensure thread-safe SQLite and state access (fixes crashes #152, #156)
     private let databaseQueue = DispatchQueue(label: "app.getdroppy.NotificationHUD.database")
@@ -109,9 +124,22 @@ final class NotificationHUDManager {
         dueSoonChimeSound = Self.makeDueSoonChimeSound()
         // Check FDA on init
         recheckAccess()
+        
+        appDidBecomeActiveObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.recheckAccess()
+            self?.attemptAutoRecovery(trigger: "app activated")
+        }
     }
     
     deinit {
+        if let observer = appDidBecomeActiveObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        stopRecoveryTimer()
         stopMonitoring()
     }
     
@@ -119,20 +147,26 @@ final class NotificationHUDManager {
     
     func startMonitoring() {
         guard isInstalled else { return }
+        guard !ExtensionType.notificationHUD.isRemoved else { return }
         guard pollingTimer == nil else { return }
+        isUserInteractingWithHUD = false
 
         recheckAccess()
 
         guard hasFullDiskAccess else {
             print("NotificationHUD: Cannot start - Full Disk Access not granted")
+            startRecoveryTimer()
             return
         }
 
         // Connect to database
         guard connectToDatabase() else {
             print("NotificationHUD: Failed to connect to notification database")
+            startRecoveryTimer()
             return
         }
+        
+        stopRecoveryTimer()
 
         // Set initial record ID to avoid processing old notifications
         lastProcessedRecordID = getLatestRecordID()
@@ -280,9 +314,13 @@ final class NotificationHUDManager {
     func stopMonitoring() {
         pollingTimer?.invalidate()
         pollingTimer = nil
+        stopRecoveryTimer()
         stopFileMonitoring()  // Stop file system monitoring
         stopDarwinObserver()
         closeDatabase()
+        dismissWorkItem?.cancel()
+        dismissWorkItem = nil
+        isUserInteractingWithHUD = false
 
         DispatchQueue.main.async { [weak self] in
             self?.currentNotification = nil
@@ -295,8 +333,18 @@ final class NotificationHUDManager {
     // MARK: - Permission Management
     
     func recheckAccess() {
-        let testPath = Self.notificationDatabasePath
-        hasFullDiskAccess = FileManager.default.isReadableFile(atPath: testPath)
+        let previous = hasFullDiskAccess
+        hasFullDiskAccess = Self.resolveNotificationDatabasePath(requireReadable: true) != nil
+        
+        if previous != hasFullDiskAccess {
+            print("NotificationHUD: Full Disk Access state changed -> \(hasFullDiskAccess ? "granted" : "missing")")
+        }
+        
+        if !hasFullDiskAccess {
+            let bundlePath = Bundle.main.bundleURL.path
+            let executablePath = Bundle.main.executableURL?.path ?? "unknown"
+            print("NotificationHUD: Full Disk Access probe failed for bundle=\(bundlePath), executable=\(executablePath)")
+        }
     }
     
     func openFullDiskAccessSettings() {
@@ -307,31 +355,118 @@ final class NotificationHUDManager {
     
     // MARK: - Database Access
     
-    private static var notificationDatabasePath: String {
+    private static var notificationDatabaseCandidatePaths: [String] {
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
         
-        // Try multiple known locations (varies by macOS version)
-        let potentialPaths = [
+        return [
             // macOS Sequoia/Tahoe (15+/26+): Group Containers
             homeDir.appendingPathComponent("Library/Group Containers/group.com.apple.usernoted/db2/db").path,
-            homeDir.appendingPathComponent("Library/Group Containers/group.com.apple.UserNotifications/db2/db").path,
+            homeDir.appendingPathComponent("Library/Group Containers/group.com.apple.usernoted/db2/db/db").path,
             homeDir.appendingPathComponent("Library/Group Containers/group.com.apple.usernoted/db/db").path,
+            homeDir.appendingPathComponent("Library/Group Containers/group.com.apple.usernoted/db/db/db").path,
+            homeDir.appendingPathComponent("Library/Group Containers/group.com.apple.UserNotifications/db2/db").path,
+            homeDir.appendingPathComponent("Library/Group Containers/group.com.apple.UserNotifications/db2/db/db").path,
             homeDir.appendingPathComponent("Library/Group Containers/group.com.apple.UserNotifications/db/db").path,
-            // Legacy path (older macOS versions)
-            homeDir.appendingPathComponent("Library/Application Support/NotificationCenter/db2/db").path
+            homeDir.appendingPathComponent("Library/Group Containers/group.com.apple.UserNotifications/db/db/db").path,
+            // Legacy paths (older macOS versions)
+            homeDir.appendingPathComponent("Library/Application Support/NotificationCenter/db2/db").path,
+            homeDir.appendingPathComponent("Library/Application Support/NotificationCenter/db/db").path
         ]
-        
-        // Return first existing path
-        for path in potentialPaths {
-            if FileManager.default.fileExists(atPath: path) {
-                print("NotificationHUD: Using database at \(path)")
+    }
+    
+    private static func resolveNotificationDatabasePath(requireReadable: Bool) -> String? {
+        for path in notificationDatabaseCandidatePaths where FileManager.default.fileExists(atPath: path) {
+            if !requireReadable || canReadNotificationDatabase(at: path) {
                 return path
             }
         }
+        return nil
+    }
+    
+    /// Full Disk Access checks should verify real read capability, not only filesystem metadata.
+    /// Attempt to open and prepare a trivial query against the notification DB.
+    private static func canReadNotificationDatabase(at path: String) -> Bool {
+        var database: OpaquePointer?
+        defer {
+            if let database {
+                sqlite3_close(database)
+            }
+        }
         
-        // Fallback to first path (will fail with clear error)
-        print("NotificationHUD: No database found, tried: \(potentialPaths)")
-        return potentialPaths[0]
+        let openFlags = SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX
+        guard sqlite3_open_v2(path, &database, openFlags, nil) == SQLITE_OK, let database else {
+            return false
+        }
+        
+        var statement: OpaquePointer?
+        defer {
+            if let statement {
+                sqlite3_finalize(statement)
+            }
+        }
+        
+        let probeQuery = "SELECT name FROM sqlite_master LIMIT 1;"
+        guard sqlite3_prepare_v2(database, probeQuery, -1, &statement, nil) == SQLITE_OK else {
+            return false
+        }
+        
+        let stepResult = sqlite3_step(statement)
+        return stepResult == SQLITE_ROW || stepResult == SQLITE_DONE
+    }
+    
+    private static var notificationDatabasePath: String {
+        if let readablePath = resolveNotificationDatabasePath(requireReadable: true) {
+            print("NotificationHUD: Using readable database at \(readablePath)")
+            return readablePath
+        }
+        
+        if let existingPath = resolveNotificationDatabasePath(requireReadable: false) {
+            print("NotificationHUD: Database exists but is unreadable (likely missing Full Disk Access): \(existingPath)")
+            return existingPath
+        }
+        
+        print("NotificationHUD: No database found, tried: \(notificationDatabaseCandidatePaths)")
+        return notificationDatabaseCandidatePaths[0]
+    }
+    
+    private func startRecoveryTimer() {
+        guard recoveryTimer == nil else { return }
+        guard isInstalled else { return }
+        guard !ExtensionType.notificationHUD.isRemoved else { return }
+        
+        recoveryTimer = Timer.scheduledTimer(withTimeInterval: recoveryInterval, repeats: true) { [weak self] _ in
+            self?.attemptAutoRecovery(trigger: "timer")
+        }
+        
+        print("NotificationHUD: Started auto-recovery timer")
+    }
+    
+    private func stopRecoveryTimer() {
+        recoveryTimer?.invalidate()
+        recoveryTimer = nil
+    }
+    
+    private func attemptAutoRecovery(trigger: String) {
+        guard isInstalled else {
+            stopRecoveryTimer()
+            return
+        }
+        guard !ExtensionType.notificationHUD.isRemoved else {
+            stopRecoveryTimer()
+            return
+        }
+        guard pollingTimer == nil else {
+            stopRecoveryTimer()
+            return
+        }
+        
+        recheckAccess()
+        if !hasFullDiskAccess {
+            return
+        }
+        
+        print("NotificationHUD: Access restored, retrying start (\(trigger))")
+        startMonitoring()
     }
     
     private func connectToDatabase() -> Bool {
@@ -451,18 +586,18 @@ final class NotificationHUDManager {
                 }
             }
             
+            let canonicalBundleID = canonicalBundleIdentifier(from: bundleID)
             // Debug: Log extracted content
-            print("NotificationHUD: Notification from \(bundleID) - title: \(title ?? "nil"), subtitle: \(subtitle ?? "nil"), body: \(body ?? "nil")")
-            
+            print("NotificationHUD: Notification from \(canonicalBundleID) - title: \(title ?? "nil"), subtitle: \(subtitle ?? "nil"), body: \(body ?? "nil")")
             // Get app name and icon
-            let appName = getAppName(for: bundleID) ?? bundleID.components(separatedBy: ".").last ?? bundleID
-            let appIcon = getAppIcon(for: bundleID)
-            
+            let appName = getAppName(for: canonicalBundleID) ?? canonicalBundleID.components(separatedBy: ".").last ?? canonicalBundleID
+            let appIcon = getAppIcon(for: canonicalBundleID)
+
             // Get timestamp
             let timestamp = Date() // Use current time since delivered_date format varies
             
             let notification = CapturedNotification(
-                appBundleID: bundleID,
+                appBundleID: canonicalBundleID,
                 appName: appName,
                 title: title,
                 subtitle: subtitle,
@@ -473,8 +608,8 @@ final class NotificationHUDManager {
             )
             
             // Track this app as having sent notifications (safe: we're on databaseQueue)
-            if self.seenApps[bundleID] == nil {
-                self.seenApps[bundleID] = (name: appName, icon: appIcon)
+            if self.seenApps[canonicalBundleID] == nil {
+                self.seenApps[canonicalBundleID] = (name: appName, icon: appIcon)
             }
             
             newNotifications.append(notification)
@@ -523,6 +658,31 @@ final class NotificationHUDManager {
             return nil
         }
         return NSWorkspace.shared.icon(forFile: url.path)
+    }
+
+    private func runningApplicationCaseInsensitive(forBundleID bundleID: String) -> NSRunningApplication? {
+        let normalized = bundleID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return NSWorkspace.shared.runningApplications.first { app in
+            guard let runningBundleID = app.bundleIdentifier?.lowercased() else { return false }
+            return runningBundleID == normalized && !app.isTerminated
+        }
+    }
+
+    private func canonicalBundleIdentifier(from rawBundleID: String) -> String {
+        let trimmed = rawBundleID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return rawBundleID }
+
+        if let running = runningApplicationCaseInsensitive(forBundleID: trimmed),
+           let bundleID = running.bundleIdentifier, !bundleID.isEmpty {
+            return bundleID
+        }
+
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: trimmed),
+           let bundleID = Bundle(url: url)?.bundleIdentifier, !bundleID.isEmpty {
+            return bundleID
+        }
+
+        return trimmed
     }
     
     // MARK: - Debug Logging
@@ -657,17 +817,54 @@ final class NotificationHUDManager {
 
     private func scheduleAutoDismiss() {
         dismissWorkItem?.cancel()
+        dismissWorkItem = nil
+        
+        guard currentNotification != nil else { return }
 
         let workItem = DispatchWorkItem { [weak self] in
-            self?.dismissCurrentOnly()
+            self?.autoDismissCurrentIfIdle()
         }
         dismissWorkItem = workItem
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + autoDismissDelay, execute: workItem)
+    }
+
+    private func autoDismissCurrentIfIdle() {
+        let cursorInsideHUD = isCursorInsideNotificationHUDZone()
+
+        guard !cursorInsideHUD else {
+            debugLog("Auto-dismiss paused while cursor is inside Notification HUD")
+            scheduleAutoDismiss()
+            return
+        }
+
+        // Self-heal stale interaction state when hover-exit events are missed.
+        if isUserInteractingWithHUD {
+            isUserInteractingWithHUD = false
+        }
+        dismissCurrentOnly()
+    }
+    
+    func setUserInteractingWithHUD(_ isInteracting: Bool) {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.setUserInteractingWithHUD(isInteracting)
+            }
+            return
+        }
+        
+        guard isUserInteractingWithHUD != isInteracting else { return }
+        isUserInteractingWithHUD = isInteracting
+        
+        // Keep periodic idle checks active even while interacting so stale hover
+        // states cannot keep notifications pinned forever.
+        scheduleAutoDismiss()
     }
 
     func dismissCurrentOnly() {
         debugLog("Dismissing current notification, queue count: \(notificationQueue.count)")
+        dismissWorkItem?.cancel()
+        dismissWorkItem = nil
 
         // CRITICAL FIX: Check for next notification BEFORE dismissing
         // This prevents a race condition where the view observes nil state briefly
@@ -701,44 +898,41 @@ final class NotificationHUDManager {
         debugLog("Dismissing all notifications")
         dismissWorkItem?.cancel()
         dismissWorkItem = nil
+        isUserInteractingWithHUD = false
         currentNotification = nil
         notificationQueue.removeAll()
         HUDManager.shared.dismiss()
     }
 
-    // MARK: - App Activation (Called from event monitor for reliable click handling)
+    // MARK: - Click Handling
 
-    /// Opens the source app for the current notification
-    /// This is called from the local event monitor to bypass SwiftUI gesture issues on NSPanel
     func openCurrentNotificationApp() {
         guard let notification = currentNotification else {
             print("🔔 NotificationHUDManager: No current notification to open")
             return
         }
-
-        let bundleID = notification.appBundleID
+        let bundleID = canonicalBundleIdentifier(from: notification.appBundleID)
+        openNotificationApp(bundleID: bundleID, dismissAfterOpen: true)
+    }
+    
+    private func openNotificationApp(bundleID: String, dismissAfterOpen: Bool) {
         print("🔔 NotificationHUDManager: Opening app for bundle ID: \(bundleID)")
-
-        // Strategy: NSRunningApplication first (fast), then open -b (reliable)
-
-        // Step 1: Try NSRunningApplication for immediate activation
-        let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
-        if let app = runningApps.first {
+        
+        if let app = runningApplicationCaseInsensitive(forBundleID: bundleID) {
             if app.isHidden {
                 app.unhide()
             }
             app.activate()
             print("🔔 NotificationHUDManager: Activated via NSRunningApplication")
         }
-
-        // Step 2: ALWAYS use `open -b` as the reliable method
+        
         DispatchQueue.global(qos: .userInteractive).async {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
             process.arguments = ["-b", bundleID]
             process.standardOutput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
-
+            
             do {
                 try process.run()
                 process.waitUntilExit()
@@ -751,10 +945,80 @@ final class NotificationHUDManager {
                 }
             }
         }
-
-        // Dismiss the notification after opening
+        
+        guard dismissAfterOpen else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
             self?.dismissCurrentOnly()
         }
+    }
+
+    private func isCursorInsideNotificationHUDZone() -> Bool {
+        guard currentNotification != nil else { return false }
+
+        let mouseLocation = NSEvent.mouseLocation
+        guard let activeScreen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) else {
+            return false
+        }
+        guard let zone = notificationInteractionZone(on: activeScreen) else { return false }
+
+        return zone.insetBy(dx: -10, dy: -10).contains(mouseLocation)
+    }
+
+    private func notificationInteractionZone(on screen: NSScreen) -> NSRect? {
+        guard currentNotification != nil else { return nil }
+
+        let isDynamicIslandMode = notificationHUDUsesDynamicIsland(on: screen)
+        let width = isDynamicIslandMode
+            ? InteractionHitZone.dynamicIslandWidth
+            : InteractionHitZone.notchStyleWidth
+        let height = notificationHUDHeight(on: screen, isDynamicIslandMode: isDynamicIslandMode)
+        let topMargin = isDynamicIslandMode ? NotchLayoutConstants.dynamicIslandTopMargin : 0
+
+        return NSRect(
+            x: screen.notchAlignedCenterX - (width / 2),
+            y: screen.frame.maxY - topMargin - height,
+            width: width,
+            height: height
+        )
+    }
+
+    private func notificationHUDUsesDynamicIsland(on screen: NSScreen) -> Bool {
+        let hasPhysicalNotch = screen.auxiliaryTopLeftArea != nil && screen.auxiliaryTopRightArea != nil
+        let forceTest = UserDefaults.standard.bool(forKey: "forceDynamicIslandTest")
+
+        if !screen.isBuiltIn {
+            return (UserDefaults.standard.object(forKey: AppPreferenceKey.externalDisplayUseDynamicIsland) as? Bool) ?? true
+        }
+
+        let useDynamicIsland = (UserDefaults.standard.object(forKey: AppPreferenceKey.useDynamicIslandStyle) as? Bool) ?? true
+        return (!hasPhysicalNotch || forceTest) && useDynamicIsland
+    }
+
+    private func notificationHUDHeight(on screen: NSScreen, isDynamicIslandMode: Bool) -> CGFloat {
+        let baseHeight: CGFloat
+
+        if isDynamicIslandMode {
+            baseHeight = InteractionHitZone.dynamicIslandHeight
+        } else {
+            let isExternalNotchStyle = !screen.isBuiltIn &&
+                !((UserDefaults.standard.object(forKey: AppPreferenceKey.externalDisplayUseDynamicIsland) as? Bool) ?? true)
+            if !isExternalNotchStyle {
+                baseHeight = InteractionHitZone.builtInNotchHeight
+            } else {
+                let hasPreviewTextLine: Bool = {
+                    guard showPreview, let notification = currentNotification else { return false }
+                    let previewText = [notification.displaySubtitle, notification.body]
+                        .compactMap { $0 }
+                        .joined(separator: " · ")
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    return !previewText.isEmpty
+                }()
+                baseHeight = hasPreviewTextLine
+                    ? InteractionHitZone.externalNotchHeightWithPreview
+                    : InteractionHitZone.externalNotchHeightCompact
+            }
+        }
+
+        return baseHeight
     }
 }

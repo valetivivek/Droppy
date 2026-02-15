@@ -65,6 +65,7 @@ enum ElementCaptureMode: String, CaseIterable, Identifiable {
 enum EditorShortcut: String, CaseIterable, Identifiable {
     // Tool shortcuts
     case arrow, curvedArrow, line, rectangle, ellipse, freehand, highlighter, blur, text
+    case cursorSticker, pointerSticker, cursorStickerCircled, pointerStickerCircled, typingIndicatorSticker
     // Action shortcuts
     case strokeSmall, strokeMedium, strokeLarge
     case zoomIn, zoomOut, zoomReset
@@ -84,6 +85,11 @@ enum EditorShortcut: String, CaseIterable, Identifiable {
         case .highlighter: return "Highlighter"
         case .blur: return "Blur"
         case .text: return "Text"
+        case .cursorSticker: return "Cursor Sticker"
+        case .pointerSticker: return "Pointer Sticker"
+        case .cursorStickerCircled: return "Cursor Sticker (Circle)"
+        case .pointerStickerCircled: return "Pointer Sticker (Circle)"
+        case .typingIndicatorSticker: return "Typing Indicator"
         case .strokeSmall: return "Small Stroke"
         case .strokeMedium: return "Medium Stroke"
         case .strokeLarge: return "Large Stroke"
@@ -108,6 +114,9 @@ enum EditorShortcut: String, CaseIterable, Identifiable {
         case .highlighter: return "highlighter"
         case .blur: return "eye.slash"
         case .text: return "textformat"
+        case .cursorSticker, .cursorStickerCircled: return "cursorarrow"
+        case .pointerSticker, .pointerStickerCircled: return "hand.point.up.left.fill"
+        case .typingIndicatorSticker: return "ibeam"
         case .strokeSmall: return "1.circle"
         case .strokeMedium: return "2.circle"
         case .strokeLarge: return "3.circle"
@@ -137,6 +146,11 @@ enum EditorShortcut: String, CaseIterable, Identifiable {
         case .highlighter: return 4  // H
         case .blur: return 11        // B
         case .text: return 17        // T
+        case .cursorSticker: return 32          // U
+        case .pointerSticker: return 35         // P
+        case .cursorStickerCircled: return 34   // I
+        case .pointerStickerCircled: return 40  // K
+        case .typingIndicatorSticker: return 16 // Y
         case .strokeSmall: return 18  // 1
         case .strokeMedium: return 19 // 2
         case .strokeLarge: return 20  // 3
@@ -167,7 +181,7 @@ enum EditorShortcut: String, CaseIterable, Identifiable {
     /// Is this a tool shortcut vs action shortcut
     var isTool: Bool {
         switch self {
-        case .arrow, .curvedArrow, .line, .rectangle, .ellipse, .freehand, .highlighter, .blur, .text:
+        case .arrow, .curvedArrow, .line, .rectangle, .ellipse, .freehand, .highlighter, .blur, .text, .cursorSticker, .pointerSticker, .cursorStickerCircled, .pointerStickerCircled, .typingIndicatorSticker:
             return true
         default:
             return false
@@ -176,7 +190,7 @@ enum EditorShortcut: String, CaseIterable, Identifiable {
     
     /// Tool shortcuts only
     static var tools: [EditorShortcut] {
-        [.arrow, .curvedArrow, .line, .rectangle, .ellipse, .freehand, .highlighter, .blur, .text]
+        [.arrow, .curvedArrow, .line, .rectangle, .ellipse, .freehand, .highlighter, .blur, .text, .cursorSticker, .pointerSticker, .cursorStickerCircled, .pointerStickerCircled, .typingIndicatorSticker]
     }
     
     /// Action shortcuts only
@@ -464,7 +478,8 @@ final class ElementCaptureManager: ObservableObject {
         // Use GlobalHotKey (Carbon-based) for reliable global shortcut detection
         globalHotKeys[mode] = GlobalHotKey(
             keyCode: savedShortcut.keyCode,
-            modifiers: savedShortcut.modifiers
+            modifiers: savedShortcut.modifiers,
+            enableIOHIDFallback: false
         ) { [weak self] in
             guard let self = self else { return }
             guard !ExtensionType.elementCapture.isRemoved else { return }
@@ -850,15 +865,30 @@ final class ElementCaptureManager: ObservableObject {
     
     // MARK: - Coordinate Conversion
     
-    /// Global Quartz reference maxY across all connected screens.
-    /// Quartz top-left conversions should use the top edge of the full virtual desktop,
-    /// not just the first screen's height.
-    private func globalQuartzReferenceMaxY() -> CGFloat {
-        NSScreen.screens.map { $0.frame.maxY }.max() ?? (NSScreen.main?.frame.maxY ?? 0)
+    /// Quartz global coordinates (AX/CGWindow) are anchored to the primary display's
+    /// top edge, not the virtual desktop's absolute highest Y across all displays.
+    /// Use CGMainDisplayID to avoid NSScreen enumeration-order drift across launches/rebuilds.
+    private func quartzReferenceScreen() -> NSScreen? {
+        let mainDisplayID = CGMainDisplayID()
+        if let screen = NSScreen.screens.first(where: { $0.displayID == mainDisplayID }) {
+            return screen
+        }
+        return NSScreen.main ?? NSScreen.screens.first
+    }
+
+    private func quartzReferenceMaxY() -> CGFloat {
+        if let screen = quartzReferenceScreen() {
+            return screen.frame.maxY
+        }
+        let mainBounds = CGDisplayBounds(CGMainDisplayID())
+        if mainBounds.height > 0 {
+            return mainBounds.maxY
+        }
+        return NSScreen.screens.map { $0.frame.maxY }.max() ?? 0
     }
     
     private func quartzScreenFrame(for screen: NSScreen) -> CGRect {
-        let topY = globalQuartzReferenceMaxY()
+        let topY = quartzReferenceMaxY()
         return CGRect(
             x: screen.frame.origin.x,
             y: topY - screen.frame.origin.y - screen.frame.height,
@@ -875,13 +905,13 @@ final class ElementCaptureManager: ObservableObject {
 
     /// Convert Cocoa coordinates (bottom-left origin) to Quartz coordinates (top-left origin)
     private func convertToQuartzCoordinates(_ point: NSPoint, screen: NSScreen) -> CGPoint {
-        let topY = globalQuartzReferenceMaxY()
+        let topY = quartzReferenceMaxY()
         return CGPoint(x: point.x, y: topY - point.y)
     }
     
     /// Convert Quartz coordinates (top-left origin) to Cocoa coordinates (bottom-left origin)
     private func convertToCocoaCoordinates(_ rect: CGRect, screen: NSScreen) -> CGRect {
-        let topY = globalQuartzReferenceMaxY()
+        let topY = quartzReferenceMaxY()
         return CGRect(
             x: rect.origin.x,
             y: topY - rect.origin.y - rect.height,
@@ -1382,15 +1412,9 @@ final class ElementCaptureManager: ObservableObject {
             throw CaptureError.noElement
         }
         
-        // Map Cocoa point-space (screen-local) to ScreenCaptureKit display-space.
-        let screenWidth = max(screen.frame.width, 1)
-        let screenHeight = max(screen.frame.height, 1)
-        let xScale = displayBounds.width / screenWidth
-        let yScale = displayBounds.height / screenHeight
-        guard xScale.isFinite, yScale.isFinite, xScale > 0, yScale > 0 else {
-            throw CaptureError.captureFailed
-        }
-
+        // ScreenCaptureKit sourceRect is expressed in display logical points.
+        // Use direct point-space mapping from screen-local Cocoa coordinates.
+        
         // Render output at native display pixel density for sharper captures,
         // especially on Retina / HiDPI screens.
         let nativePixelWidth = max(CGFloat(CGDisplayPixelsWide(targetDisplayID)), displayWidthPoints)
@@ -1424,10 +1448,10 @@ final class ElementCaptureManager: ObservableObject {
         let localYFromTop = screen.frame.height - localYFromBottom - clampedCocoaRect.height
         
         var sourceRect = CGRect(
-            x: localX * xScale,
-            y: localYFromTop * yScale,
-            width: clampedCocoaRect.width * xScale,
-            height: clampedCocoaRect.height * yScale
+            x: localX,
+            y: localYFromTop,
+            width: clampedCocoaRect.width,
+            height: clampedCocoaRect.height
         )
         
         // Expand to integral bounds so we never lose edge pixels due fractional coordinates.

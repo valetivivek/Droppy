@@ -241,6 +241,8 @@ struct MediaPlayerView: View {
     @AppStorage(AppPreferenceKey.enableMediaAlbumArtGlow) private var enableMediaAlbumArtGlow = PreferenceDefault.enableMediaAlbumArtGlow
     @AppStorage(AppPreferenceKey.useTransparentBackground) private var useTransparentBackground = PreferenceDefault.useTransparentBackground
     @AppStorage(AppPreferenceKey.enableHUDReplacement) private var enableHUDReplacement = PreferenceDefault.enableHUDReplacement
+    @AppStorage(AppPreferenceKey.enableVolumeHUDReplacement) private var enableVolumeHUDReplacement = PreferenceDefault.enableVolumeHUDReplacement
+    @AppStorage(AppPreferenceKey.enableBrightnessHUDReplacement) private var enableBrightnessHUDReplacement = PreferenceDefault.enableBrightnessHUDReplacement
     @AppStorage(AppPreferenceKey.enableBatteryHUD) private var enableBatteryHUD = PreferenceDefault.enableBatteryHUD
     @AppStorage(AppPreferenceKey.enableCapsLockHUD) private var enableCapsLockHUD = PreferenceDefault.enableCapsLockHUD
     @AppStorage(AppPreferenceKey.enableAirPodsHUD) private var enableAirPodsHUD = PreferenceDefault.enableAirPodsHUD
@@ -458,12 +460,12 @@ struct MediaPlayerView: View {
         AnyView(
             view
                 .onChange(of: volumeManager.lastChangeAt) { _, _ in
-                    guard enableHUDReplacement else { return }
+                    guard enableHUDReplacement, enableVolumeHUDReplacement else { return }
                     let volumeValue = volumeManager.isMuted ? 0.0 : CGFloat(volumeManager.rawVolume)
                     triggerInlineHUD(.volume, value: volumeValue, muted: volumeManager.isMuted)
                 }
                 .onChange(of: brightnessManager.lastChangeAt) { _, _ in
-                    guard enableHUDReplacement else { return }
+                    guard enableHUDReplacement, enableBrightnessHUDReplacement else { return }
                     triggerInlineHUD(.brightness, value: CGFloat(brightnessManager.rawBrightness))
                 }
                 .onChange(of: batteryManager.lastChangeAt) { _, _ in

@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 /// Polished Notification HUD with smooth animations and clear layout
 /// - Expands smoothly from notch
@@ -70,83 +71,22 @@ struct NotificationHUDView: View {
     private func overlayTone(_ opacity: Double) -> Color {
         useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(opacity) : .white.opacity(opacity)
     }
-
+    
     var body: some View {
         Group {
             if isCompact {
                 compactLayout
+                    .highPriorityGesture(notificationCardGesture())
             } else {
                 expandedNotchLayout
             }
         }
-        .contentShape(Rectangle())
         .onHover { hovering in
             withAnimation(DroppyAnimation.hover) {
                 isHovering = hovering
             }
-            if hovering {
-                NSCursor.pointingHand.push()
-            } else {
-                NSCursor.pop()
-            }
+            syncInteractionState()
         }
-        // HIGH PRIORITY GESTURE: Must capture clicks BEFORE parent view's hover/expand logic
-        // Using highPriorityGesture ensures notification clicks aren't consumed by shelf
-        .highPriorityGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { value in
-                    // Debug: Log that gesture is receiving events
-                    if !isPressed {
-                        print("🔔 NotificationHUDView: Gesture onChanged - press started")
-                    }
-                    // Visual press feedback
-                    if !isPressed {
-                        withAnimation(.easeOut(duration: 0.1)) {
-                            isPressed = true
-                        }
-                    }
-                    // Drag up for dismiss (only track upward drags past threshold)
-                    if value.translation.height < -8 {
-                        dragOffset = value.translation.height * 0.6
-                    }
-                }
-                .onEnded { value in
-                    let dragDistance = abs(value.translation.height) + abs(value.translation.width)
-                    print("🔔 NotificationHUDView: Gesture onEnded - dragDistance=\(dragDistance), translation=\(value.translation)")
-
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        isPressed = false
-                    }
-
-                    // Check if this was a swipe up to dismiss
-                    if value.translation.height < -30 || value.predictedEndTranslation.height < -50 {
-                        // Swipe up - dismiss the notification
-                        print("🔔 NotificationHUDView: Swipe up detected - dismissing")
-                        withAnimation(DroppyAnimation.hoverScale) {
-                            dragOffset = -100
-                            appearOpacity = 0
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            manager.dismissCurrentOnly()
-                            dragOffset = 0
-                            appearOpacity = 1
-                        }
-                    } else if dragDistance < 10 {
-                        // This was a TAP (minimal movement) - open the source app
-                        print("🔔 NotificationHUDView: TAP detected - opening source app")
-                        withAnimation(DroppyAnimation.hover) {
-                            dragOffset = 0
-                        }
-                        openSourceApp()
-                    } else {
-                        // Small drag that wasn't a dismiss - reset position
-                        print("🔔 NotificationHUDView: Small drag detected - resetting position")
-                        withAnimation(DroppyAnimation.hover) {
-                            dragOffset = 0
-                        }
-                    }
-                }
-        )
         .offset(y: dragOffset)
         .opacity(appearOpacity * (1.0 - Double(abs(dragOffset)) / 80.0))
         .scaleEffect(appearScale * (isPressed ? 0.97 : (isHovering ? 1.02 : 1.0)))
@@ -156,6 +96,7 @@ struct NotificationHUDView: View {
                 appearScale = 1.0
                 appearOpacity = 1.0
             }
+            syncInteractionState()
         }
         .onChange(of: manager.currentNotification?.id) { _, _ in
             appearScale = 0.9
@@ -164,6 +105,10 @@ struct NotificationHUDView: View {
                 appearScale = 1.0
                 appearOpacity = 1.0
             }
+            syncInteractionState()
+        }
+        .onDisappear {
+            manager.setUserInteractingWithHUD(false)
         }
     }
 
@@ -210,13 +155,6 @@ struct NotificationHUDView: View {
                 if manager.queueCount > 1 {
                     queueIndicator
                 }
-
-                if isHovering {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(secondaryText(0.7))
-                        .transition(.scale.combined(with: .opacity))
-                }
             }
         }
         .padding(.horizontal, 16)
@@ -228,14 +166,24 @@ struct NotificationHUDView: View {
     // MARK: - Expanded Notch Layout (Beautiful Notification Card)
 
     private var expandedNotchLayout: some View {
-        // Notification content - use SSOT padding to match MediaPlayerView
+        VStack(alignment: .leading, spacing: 0) {
+            expandedNotificationRow
+                .contentShape(Rectangle())
+                .highPriorityGesture(notificationCardGesture())
+        }
+        // Use SSOT for consistent padding across all expanded views
+        // contentEdgeInsets provides correct padding for each mode:
+        // - Built-in notch: notchHeight top, 30pt left/right, 20pt bottom
+        // - External notch style: 20pt top/bottom, 30pt left/right
+        // - Pure Island mode: 30pt on all 4 edges
+        .padding(notificationContentInsets)
+    }
+    
+    private var expandedNotificationRow: some View {
         HStack(alignment: .center, spacing: 12) {
-            // App Icon
             appIconView(size: 38)
             
-            // Content
             VStack(alignment: .leading, spacing: 3) {
-                // Top row: App name + timestamp + queue
                 HStack(alignment: .center, spacing: 8) {
                     if let notification = manager.currentNotification {
                         Text(notification.appName)
@@ -261,7 +209,6 @@ struct NotificationHUDView: View {
                     }
                 }
                 
-                // Title
                 if let notification = manager.currentNotification {
                     Text(notification.displayTitle)
                         .font(.system(size: 14, weight: .semibold))
@@ -269,7 +216,6 @@ struct NotificationHUDView: View {
                         .lineLimit(1)
                 }
                 
-                // Subtitle/Body
                 if let notification = manager.currentNotification {
                     let displayText = [notification.displaySubtitle, notification.body]
                         .compactMap { $0 }
@@ -285,21 +231,7 @@ struct NotificationHUDView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            
-            // Hover chevron
-            if isHovering {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(secondaryText(0.6))
-                    .transition(.scale.combined(with: .opacity))
-            }
         }
-        // Use SSOT for consistent padding across all expanded views
-        // contentEdgeInsets provides correct padding for each mode:
-        // - Built-in notch: notchHeight top, 30pt left/right, 20pt bottom
-        // - External notch style: 20pt top/bottom, 30pt left/right
-        // - Pure Island mode: 30pt on all 4 edges
-        .padding(notificationContentInsets)
     }
     
     /// Content layout notch height - 0 for external displays (no physical notch)
@@ -387,6 +319,59 @@ struct NotificationHUDView: View {
                     .foregroundStyle(secondaryText(0.68))
             }
         }
+    }
+    
+    private func syncInteractionState() {
+        manager.setUserInteractingWithHUD(isHovering)
+    }
+    
+    private func notificationCardGesture() -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                if !isPressed {
+                    print("🔔 NotificationHUDView: Gesture onChanged - press started")
+                }
+                if !isPressed {
+                    withAnimation(.easeOut(duration: 0.1)) {
+                        isPressed = true
+                    }
+                }
+                if value.translation.height < -8 {
+                    dragOffset = value.translation.height * 0.6
+                }
+            }
+            .onEnded { value in
+                let dragDistance = abs(value.translation.height) + abs(value.translation.width)
+                print("🔔 NotificationHUDView: Gesture onEnded - dragDistance=\(dragDistance), translation=\(value.translation)")
+
+                withAnimation(.easeOut(duration: 0.15)) {
+                    isPressed = false
+                }
+
+                if value.translation.height < -30 || value.predictedEndTranslation.height < -50 {
+                    print("🔔 NotificationHUDView: Swipe up detected - dismissing")
+                    withAnimation(DroppyAnimation.hoverScale) {
+                        dragOffset = -100
+                        appearOpacity = 0
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        manager.dismissCurrentOnly()
+                        dragOffset = 0
+                        appearOpacity = 1
+                    }
+                } else if dragDistance < 10 {
+                    print("🔔 NotificationHUDView: TAP detected - opening source app")
+                    withAnimation(DroppyAnimation.hover) {
+                        dragOffset = 0
+                    }
+                    openSourceApp()
+                } else {
+                    print("🔔 NotificationHUDView: Small drag detected - resetting position")
+                    withAnimation(DroppyAnimation.hover) {
+                        dragOffset = 0
+                    }
+                }
+            }
     }
 
     // MARK: - Debug Logging

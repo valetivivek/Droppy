@@ -212,7 +212,7 @@ final class DragMonitor: ObservableObject {
         autoreleasepool {
             // SAFETY: Cache NSEvent class properties immediately to minimize
             // repeated access during HID event system contention
-            let mouseIsDown = NSEvent.pressedMouseButtons & 1 != 0
+            let mouseIsDown = CGEventSource.buttonState(.combinedSessionState, button: .left)
             let currentMouseLocation = NSEvent.mouseLocation
             
             // DEBUG: Log state periodically to trace stuck isDragging after SkyLight unlock
@@ -456,7 +456,8 @@ final class DragMonitor: ObservableObject {
         guard dragRevealHotKey == nil else { return }
         dragRevealHotKey = GlobalHotKey(
             keyCode: shortcut.keyCode,
-            modifiers: shortcut.modifiers
+            modifiers: shortcut.modifiers,
+            enableIOHIDFallback: false
         ) { [weak self] in
             self?.handleDragRevealShortcut()
         }

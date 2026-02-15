@@ -33,7 +33,13 @@ private enum NotificationHUDHitZone {
 @inline(__always)
 private func isNotificationHUDActive(on displayID: CGDirectDisplayID) -> Bool {
     guard let activeHUD = HUDManager.shared.activeHUD else { return false }
-    return activeHUD.type == .notification && activeHUD.displayID == displayID
+    guard activeHUD.type == .notification else { return false }
+    // Notification HUD is a global surface (single current notification), so
+    // allow interaction on any display even if the original show() used another displayID.
+    if activeHUD.displayID == displayID {
+        return true
+    }
+    return NotificationHUDManager.shared.currentNotification != nil
 }
 
 @inline(__always)
@@ -50,34 +56,41 @@ private func notificationHUDUsesDynamicIsland(on screen: NSScreen) -> Bool {
 }
 
 private func notificationHUDHeight(on screen: NSScreen, isDynamicIslandMode: Bool) -> CGFloat {
+    let baseHeight: CGFloat
+    
     if isDynamicIslandMode {
-        return NotificationHUDHitZone.dynamicIslandHeight
+        baseHeight = NotificationHUDHitZone.dynamicIslandHeight
+    } else {
+        let isExternalNotchStyle = !screen.isBuiltIn &&
+            !((UserDefaults.standard.object(forKey: AppPreferenceKey.externalDisplayUseDynamicIsland) as? Bool) ?? true)
+        if !isExternalNotchStyle {
+            baseHeight = NotificationHUDHitZone.builtInNotchHeight
+        } else {
+            let hasPreviewTextLine: Bool = {
+                let manager = NotificationHUDManager.shared
+                guard manager.showPreview, let notification = manager.currentNotification else { return false }
+                let previewText = [notification.displaySubtitle, notification.body]
+                    .compactMap { $0 }
+                    .joined(separator: " · ")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return !previewText.isEmpty
+            }()
+            baseHeight = hasPreviewTextLine
+                ? NotificationHUDHitZone.externalNotchHeightWithPreview
+                : NotificationHUDHitZone.externalNotchHeightCompact
+        }
     }
-
-    let isExternalNotchStyle = !screen.isBuiltIn &&
-        !((UserDefaults.standard.object(forKey: AppPreferenceKey.externalDisplayUseDynamicIsland) as? Bool) ?? true)
-    guard isExternalNotchStyle else { return NotificationHUDHitZone.builtInNotchHeight }
-
-    let hasPreviewTextLine: Bool = {
-        let manager = NotificationHUDManager.shared
-        guard manager.showPreview, let notification = manager.currentNotification else { return false }
-        let previewText = [notification.displaySubtitle, notification.body]
-            .compactMap { $0 }
-            .joined(separator: " · ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return !previewText.isEmpty
-    }()
-
-    return hasPreviewTextLine
-        ? NotificationHUDHitZone.externalNotchHeightWithPreview
-        : NotificationHUDHitZone.externalNotchHeightCompact
+    
+    return baseHeight
 }
 
 private func notificationHUDInteractionZone(on screen: NSScreen) -> NSRect? {
     guard NotificationHUDManager.shared.currentNotification != nil else { return nil }
 
     let isDynamicIslandMode = notificationHUDUsesDynamicIsland(on: screen)
-    let width = isDynamicIslandMode ? NotificationHUDHitZone.dynamicIslandWidth : NotificationHUDHitZone.notchStyleWidth
+    let width = isDynamicIslandMode
+        ? NotificationHUDHitZone.dynamicIslandWidth
+        : NotificationHUDHitZone.notchStyleWidth
     let height = notificationHUDHeight(on: screen, isDynamicIslandMode: isDynamicIslandMode)
     let topMargin = isDynamicIslandMode ? NotchLayoutConstants.dynamicIslandTopMargin : 0
     let centerX = screen.notchAlignedCenterX
@@ -140,6 +153,7 @@ final class NotchWindowController: NSObject, ObservableObject {
     
     /// Timer for auto-expand on hover
     private var autoExpandTimer: Timer?
+    private var autoExpandTimerDisplayID: CGDirectDisplayID?
     
     /// Monitor for scroll wheel events (2-finger swipe for media HUD toggle)
     private var scrollMonitor: Any?
@@ -679,8 +693,7 @@ final class NotchWindowController: NSObject, ObservableObject {
             stopHiddenRightClickMonitor()  // Stop listening for right-click
             
             // Restart media key interceptor if HUD replacement is enabled
-            let hudEnabled = (UserDefaults.standard.object(forKey: "enableHUDReplacement") as? Bool) ?? true
-            if hudEnabled {
+            if MediaKeyInterceptor.shouldRunForCurrentPreferences() {
                 MediaKeyInterceptor.shared.start()
             }
             
@@ -947,6 +960,12 @@ final class NotchWindowController: NSObject, ObservableObject {
             // Find the window whose screen contains the mouse
             guard let (targetWindow, targetScreen) = self.findWindowForMouseLocation(mouseLocation) else { return }
 
+            // While Notification HUD is visible on this display, don't run notch-click
+            // shelf toggles from the global monitor.
+            if isNotificationHUDActive(on: targetScreen.displayID) {
+                return
+            }
+
             // Use media-aware collapsed hit zone so hover/click behavior matches
             // the visible mini player wings in notch mode (Issue #213).
             let notchRect = targetWindow.collapsedInteractionRect()
@@ -1150,15 +1169,17 @@ final class NotchWindowController: NSObject, ObservableObject {
                 let isInNotchZone = clickZone.contains(mouseLocation)
                 let isInExpandedShelfZone = isExpandedOnTarget && expandedShelfZone.contains(mouseLocation)
 
-                // Notification HUD click forwarding (strict to the visible HUD bounds).
-                if isNotificationHUDActive(on: targetScreen.displayID),
-                   let notifZone = notificationHUDInteractionZone(on: targetScreen),
-                   notifZone.contains(mouseLocation) {
-                    print("🔔 LocalMonitor: Click detected in notification HUD area - opening source app")
-                    DispatchQueue.main.async {
-                        NotificationHUDManager.shared.openCurrentNotificationApp()
+                // Notification HUD has priority over notch click toggles.
+                if isNotificationHUDActive(on: targetScreen.displayID) {
+                    if let notifZone = notificationHUDInteractionZone(on: targetScreen),
+                       notifZone.contains(mouseLocation) {
+                        print("🔔 LocalMonitor: Click detected in notification HUD area - opening source app")
+                        DispatchQueue.main.async {
+                            NotificationHUDManager.shared.openCurrentNotificationApp()
+                        }
+                        return nil  // Consume the click
                     }
-                    return nil  // Consume the click
+                    return event
                 }
 
                 if isInNotchZone {
@@ -1373,6 +1394,16 @@ final class NotchWindowController: NSObject, ObservableObject {
                         }
                         // Start auto-expand timer with screen context
                         self?.startAutoExpandTimer(for: displayID)
+                    }
+                    break  // Found a match, no need to check other windows
+                } else if isWithinNotchX &&
+                            DroppyState.shared.isHovering(for: screen.displayID) &&
+                            !DroppyState.shared.isExpanded(for: screen.displayID) {
+                    // Hover may stay latched while a one-shot timer gets cancelled mid-transition.
+                    // Re-arm the timer so repeated hover-expand cycles stay reliable.
+                    let displayID = screen.displayID
+                    DispatchQueue.main.async { [weak self] in
+                        self?.ensureAutoExpandTimer(for: displayID)
                     }
                     break  // Found a match, no need to check other windows
                 }
@@ -2157,6 +2188,13 @@ final class NotchWindowController: NSObject, ObservableObject {
     /// Start timer to auto-expand shelf if hovering persists
     /// - Parameter displayID: The display to expand when timer fires (optional for backwards compat)
     func startAutoExpandTimer(for displayID: CGDirectDisplayID? = nil) {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.startAutoExpandTimer(for: displayID)
+            }
+            return
+        }
+
         // DEBUG: Log when timer is started
         notchDebugLog("🟢 startAutoExpandTimer CALLED for displayID: \(displayID?.description ?? "nil")")
         
@@ -2195,8 +2233,10 @@ final class NotchWindowController: NSObject, ObservableObject {
         let delay = UserDefaults.standard.double(forKey: "autoExpandDelay")
         let actualDelay = delay > 0 ? delay : 1.0  // Fallback to 1.0s if not set
         notchDebugLog("🟢 AUTO-EXPAND TIMER STARTED with delay: \(actualDelay)s for displayID: \(displayID?.description ?? "nil")")
-        autoExpandTimer = Timer.scheduledTimer(withTimeInterval: actualDelay, repeats: false) { [weak self] _ in
-            guard self != nil else { return }
+        let timer = Timer(timeInterval: actualDelay, repeats: false) { [weak self] _ in
+            guard let self else { return }
+            self.autoExpandTimer = nil
+            self.autoExpandTimerDisplayID = nil
 
             // CRITICAL: Don't expand shelf when NotificationHUD is visible
             // User needs to click the notification, not accidentally expand the shelf
@@ -2240,11 +2280,11 @@ final class NotchWindowController: NSObject, ObservableObject {
             // Find the target screen and check if mouse is in notch zone
             var isMouseOverNotchZone = false
             if let targetDisplayID = displayID,
-               let targetWindow = self?.notchWindows[targetDisplayID] {
-                isMouseOverNotchZone = self?.isMouseInAutoExpandIntentZone(
+               let targetWindow = self.notchWindows[targetDisplayID] {
+                isMouseOverNotchZone = self.isMouseInAutoExpandIntentZone(
                     mouseLocation: currentMouse,
                     window: targetWindow
-                ) ?? false
+                )
             }
             
             // Also check DroppyState as backup
@@ -2255,7 +2295,7 @@ final class NotchWindowController: NSObject, ObservableObject {
             
             // Expand if EITHER state or geometry says we're hovering
             if shouldExpand {
-                let animationScreen = displayID.flatMap { self?.notchWindows[$0]?.notchScreen }
+                let animationScreen = displayID.flatMap { self.notchWindows[$0]?.notchScreen }
                 DispatchQueue.main.async {
                     withAnimation(DroppyAnimation.notchState(for: animationScreen)) {
                         if let displayID = displayID {
@@ -2275,14 +2315,40 @@ final class NotchWindowController: NSObject, ObservableObject {
                 notchDebugLog("⏰ AUTO-EXPAND SKIPPED: stateHovering=\(stateHovering), geometryHovering=\(isMouseOverNotchZone), isExpanded=\(isExpanded)")
             }
         }
+        timer.tolerance = min(0.05, actualDelay * 0.25)
+        autoExpandTimer = timer
+        autoExpandTimerDisplayID = displayID
+        // Keep firing even during short event-tracking mode switches.
+        RunLoop.main.add(timer, forMode: .common)
     }
     
     func cancelAutoExpandTimer() {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.cancelAutoExpandTimer()
+            }
+            return
+        }
         if autoExpandTimer != nil {
             notchDebugLog("🔴 cancelAutoExpandTimer CALLED (timer was active)")
         }
         autoExpandTimer?.invalidate()
         autoExpandTimer = nil
+        autoExpandTimerDisplayID = nil
+    }
+
+    func ensureAutoExpandTimer(for displayID: CGDirectDisplayID) {
+        guard (UserDefaults.standard.object(forKey: AppPreferenceKey.autoExpandShelf) as? Bool) ?? true else { return }
+        guard DroppyState.shared.isHovering(for: displayID) else { return }
+        guard !DroppyState.shared.isExpanded(for: displayID) else { return }
+
+        if let timer = autoExpandTimer,
+           timer.isValid,
+           autoExpandTimerDisplayID == displayID {
+            return
+        }
+
+        startAutoExpandTimer(for: displayID)
     }
 
     /// Hover intent zone for shelf auto-expand.
@@ -3029,6 +3095,17 @@ class NotchWindow: NSPanel {
             isOverNotch = currentlyHovering ? isOverExactOrEdge : isOverExpandedZone
         }
 
+        let enableNotchShelf = (UserDefaults.standard.object(forKey: AppPreferenceKey.enableNotchShelf) as? Bool) ?? true
+        if !enableNotchShelf {
+            if currentlyHovering {
+                DispatchQueue.main.async {
+                    DroppyState.shared.setHovering(for: displayID, isHovering: false)
+                }
+            }
+            NotchWindowController.shared.cancelAutoExpandTimer()
+            return
+        }
+
         if notchMotionDebugLogs {
             // DEBUG: Unconditional check for isDragging being stuck after unlock
             struct DragDebugCounter { static var lastLog = Date.distantPast; static var count = 0 }
@@ -3076,6 +3153,11 @@ class NotchWindow: NSPanel {
                     // Start auto-expand timer with THIS screen's displayID
                     // Critical for multi-monitor: ensures correct screen expands
                     NotchWindowController.shared.startAutoExpandTimer(for: targetScreen.displayID)
+                }
+            } else if isOverNotch && currentlyHovering && !DroppyState.shared.isExpanded(for: displayID) {
+                // Self-heal if hover remains true but the timer is no longer active.
+                DispatchQueue.main.async {
+                    NotchWindowController.shared.ensureAutoExpandTimer(for: targetScreen.displayID)
                 }
             } else if !isOverNotch && currentlyHovering && !DroppyState.shared.isExpanded(for: displayID) {
                 // Only reset hover if not expanded (expanded has its own area)
@@ -3204,27 +3286,31 @@ class NotchWindow: NSPanel {
         // CRITICAL: Use object() ?? true to match @AppStorage defaults
         let enableNotchShelf = (UserDefaults.standard.object(forKey: "enableNotchShelf") as? Bool) ?? true
 
-        // Notification HUD click-through rule: only capture events while cursor is inside
-        // the visible notification surface on THIS display.
+        // Notification HUD click-through rule: capture events while cursor is inside
+        // the visible notification surface (geometry-driven per window).
         let isNotificationHUDActiveOnDisplay = isNotificationHUDActive(on: displayID)
         let isMouseInNotificationHUDZone: Bool = {
             guard isNotificationHUDActiveOnDisplay,
-                  let screen = resolvedScreen,
-                  let notificationZone = notificationHUDInteractionZone(on: screen) else {
+                  let notificationZone = notificationHUDInteractionZoneForCurrentWindow() else {
                 return false
             }
-            return notificationZone.contains(mouseLocation)
+            return notificationZone.insetBy(dx: -10, dy: -10).contains(mouseLocation)
         }()
+
+        let shouldCaptureCollapsedSurface = !enableNotchShelf && shouldAcceptCollapsedSurfaceEvents(at: mouseLocation)
 
         // Window should accept mouse events when:
         // - Shelf is expanded AND shelf is enabled (need to interact with items)
         // - Drop is actively targeted on the notch AND shelf is enabled
         // - User is dragging files AND they are OVER a valid drop zone AND shelf is enabled
         // - Cursor is over NotificationHUD (need click to open source app)
+        // - Cursor is over collapsed HUD/media surface while that surface is interactive
         // NOTE: isHovering is intentionally NOT included - hovering just shows the visual effect,
         // but the window should NOT block clicks to underlying apps (e.g., browser tabs) - Issue #150
-        // When shelf is disabled, the window passes through ALL mouse events (except for interactive HUDs).
-        let shouldAcceptEvents = (enableNotchShelf && (isMouseInExpandedShelfZone || isDropTargeted || isDragOverValidZone)) || isMouseInNotificationHUDZone
+        let shouldAcceptEvents =
+            (enableNotchShelf && (isMouseInExpandedShelfZone || isDropTargeted || isDragOverValidZone)) ||
+            isMouseInNotificationHUDZone ||
+            shouldCaptureCollapsedSurface
 
         // DEBUG: Log notification HUD state affecting mouse events
         if isNotificationHUDActiveOnDisplay {
@@ -3252,6 +3338,66 @@ class NotchWindow: NSPanel {
                 self.becomesKeyOnlyIfNeeded = true
             }
         }
+    }
+
+    /// Computes the active notification interaction area for this exact window.
+    /// Uses a screen-geometry path when available and falls back to the window
+    /// frame so external-display interaction remains stable during screen churn.
+    private func notificationHUDInteractionZoneForCurrentWindow() -> NSRect? {
+        guard NotificationHUDManager.shared.currentNotification != nil else { return nil }
+
+        let isDynamicIslandMode = needsDynamicIsland
+        let width = isDynamicIslandMode
+            ? NotificationHUDHitZone.dynamicIslandWidth
+            : NotificationHUDHitZone.notchStyleWidth
+        let topMargin = isDynamicIslandMode ? NotchLayoutConstants.dynamicIslandTopMargin : 0
+
+        if let screen = notchScreen {
+            let height = notificationHUDHeight(on: screen, isDynamicIslandMode: isDynamicIslandMode)
+            return NSRect(
+                x: screen.notchAlignedCenterX - (width / 2),
+                y: screen.frame.maxY - topMargin - height,
+                width: width,
+                height: height
+            )
+        }
+
+        let fallbackHeight = max(frame.height, NotificationHUDHitZone.dynamicIslandHeight)
+        return NSRect(
+            x: frame.midX - (width / 2),
+            y: frame.maxY - topMargin - fallbackHeight,
+            width: width,
+            height: fallbackHeight
+        )
+    }
+
+    /// Collapsed notch/island should still be interactive for media/HUD actions,
+    /// even when the shelf feature is disabled.
+    private func shouldAcceptCollapsedSurfaceEvents(at mouseLocation: NSPoint) -> Bool {
+        guard !NotchWindowController.shared.isTemporarilyHidden else { return false }
+        guard alphaValue > 0.01 else { return false }
+        guard collapsedInteractionRect().contains(mouseLocation) else { return false }
+
+        let displayID = targetDisplayID != 0 ? targetDisplayID : (notchScreen?.displayID ?? 0)
+
+        if let activeHUD = HUDManager.shared.activeHUD,
+           activeHUD.displayID == displayID {
+            return true
+        }
+
+        guard displayID == 0 || !NotchWindowController.shared.fullscreenDisplayIDs.contains(displayID) else {
+            return false
+        }
+
+        let showMediaPlayer = UserDefaults.standard.preference(
+            AppPreferenceKey.showMediaPlayer,
+            default: PreferenceDefault.showMediaPlayer
+        )
+        guard showMediaPlayer else { return false }
+
+        let music = MusicManager.shared
+        guard music.isMediaAvailable, !music.isPlayerIdle else { return false }
+        return music.isMediaHUDForced || (music.isPlaying && !music.isMediaHUDHidden)
     }
 
     func checkForFullscreen() {
@@ -3399,9 +3545,17 @@ class NotchWindow: NSPanel {
         // - Shelf is expanded and needs interaction
         // - Mouse is hovering (about to interact)
         // - NotificationHUD is visible on this display
+        // - Collapsed media/HUD surface is interactive under the cursor
+        let enableNotchShelf = (UserDefaults.standard.object(forKey: AppPreferenceKey.enableNotchShelf) as? Bool) ?? true
+        let collapsedSurfaceNeedsKey = !enableNotchShelf && shouldAcceptCollapsedSurfaceEvents(at: NSEvent.mouseLocation)
         return DroppyState.shared.isExpanded(for: displayID) ||
             DroppyState.shared.isHovering(for: displayID) ||
-            isNotificationHUDActiveOnDisplay
+            isNotificationHUDActiveOnDisplay ||
+            collapsedSurfaceNeedsKey
+    }
+
+    override var canBecomeMain: Bool {
+        canBecomeKey
     }
 }
 

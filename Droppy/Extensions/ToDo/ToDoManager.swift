@@ -1618,7 +1618,8 @@ final class ToDoManager {
 
         quickOpenHotKey = GlobalHotKey(
             keyCode: shortcut.keyCode,
-            modifiers: shortcut.modifiers
+            modifiers: shortcut.modifiers,
+            enableIOHIDFallback: false
         ) { [weak self] in
             self?.handleQuickOpenShortcutTriggered()
         }

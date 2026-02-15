@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct NotificationHUDInfoView: View {
     @AppStorage(AppPreferenceKey.useTransparentBackground) private var useTransparentBackground = PreferenceDefault.useTransparentBackground
@@ -48,6 +49,9 @@ struct NotificationHUDInfoView: View {
         .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.xl, style: .continuous))
         .sheet(isPresented: $showReviewsSheet) {
             ExtensionReviewsSheet(extensionType: .notificationHUD)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            manager.recheckAccess()
         }
     }
 
@@ -141,6 +145,7 @@ struct NotificationHUDInfoView: View {
         VStack(alignment: .leading, spacing: 12) {
             featureRow(icon: "bell.badge", text: "Notification display in the notch")
             featureRow(icon: "app.badge", text: "App icon and notification preview")
+            featureRow(icon: "arrowshape.turn.up.left", text: "Quick reply for supported messaging apps")
             featureRow(icon: "slider.horizontal.3", text: "Per-app notification filtering")
             featureRow(icon: "eye.slash", text: "Option to replace system notifications")
 

@@ -1173,7 +1173,8 @@ extension VoiceTranscribeManager {
         if let shortcut = quickRecordShortcut, quickRecordHotkey == nil {
             quickRecordHotkey = GlobalHotKey(
                 keyCode: shortcut.keyCode,
-                modifiers: shortcut.modifiers
+                modifiers: shortcut.modifiers,
+                enableIOHIDFallback: false
             ) { [weak self] in
                 guard let self = self else { return }
                 guard !ExtensionType.voiceTranscribe.isRemoved else { return }
@@ -1188,7 +1189,8 @@ extension VoiceTranscribeManager {
         if let shortcut = invisiRecordShortcut, invisiRecordHotkey == nil {
             invisiRecordHotkey = GlobalHotKey(
                 keyCode: shortcut.keyCode,
-                modifiers: shortcut.modifiers
+                modifiers: shortcut.modifiers,
+                enableIOHIDFallback: false
             ) { [weak self] in
                 guard let self = self else { return }
                 guard !ExtensionType.voiceTranscribe.isRemoved else { return }

@@ -476,7 +476,8 @@ class TerminalNotchManager: ObservableObject {
         // Use GlobalHotKey (Carbon-based) for reliable global shortcut detection
         terminalHotkey = GlobalHotKey(
             keyCode: shortcut.keyCode,
-            modifiers: shortcut.modifiers
+            modifiers: shortcut.modifiers,
+            enableIOHIDFallback: false
         ) { [weak self] in
             guard let self = self else { return }
             guard !ExtensionType.terminalNotch.isRemoved else { return }

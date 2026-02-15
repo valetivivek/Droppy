@@ -12,6 +12,7 @@ class GlobalHotKey {
     internal var callback: (() -> Void)?
     private let targetKeyCode: Int
     private let targetModifiers: UInt
+    private let enableIOHIDFallback: Bool
     
     // Carbon
     internal var hotKeyID: EventHotKeyID
@@ -53,10 +54,16 @@ class GlobalHotKey {
         0x36: kVK_ANSI_Comma, 0x37: kVK_ANSI_Period, 0x38: kVK_ANSI_Slash
     ]
 
-    init(keyCode: Int, modifiers: UInt, block: @escaping () -> Void) {
+    init(
+        keyCode: Int,
+        modifiers: UInt,
+        enableIOHIDFallback: Bool = true,
+        block: @escaping () -> Void
+    ) {
         self.callback = block
         self.targetKeyCode = keyCode
         self.targetModifiers = modifiers
+        self.enableIOHIDFallback = enableIOHIDFallback
         self.hotKeyID = EventHotKeyID(signature: 0x44525059, id: Self.uniqueID)
         Self.uniqueID += 1
         
@@ -69,8 +76,10 @@ class GlobalHotKey {
             print("ℹ️ GlobalHotKey: Skipping Carbon for modifier-only or side-specific shortcut")
         }
         
-        // 2. Setup IOHIDManager as backup
-        setupIOHIDManager()
+        // 2. Setup IOHIDManager as backup when explicitly enabled
+        if enableIOHIDFallback {
+            setupIOHIDManager()
+        }
     }
     
     deinit {

@@ -14,7 +14,7 @@ struct NotificationHUDExtension: ExtensionDefinition {
     static let category: ExtensionGroup = .productivity
     static let categoryColor: Color = .red // Matches red notification bell icon
     
-    static let description = "Capture macOS notifications and display them directly in the notch, like iPhone's Dynamic Island. Click to open the source app, swipe up to dismiss."
+    static let description = "Capture macOS notifications and display them directly in the notch, like iPhone's Dynamic Island. Click to open and swipe up to dismiss."
     
     static let features: [(icon: String, text: String)] = [
         ("bell.badge.fill", "Display notifications in the notch"),

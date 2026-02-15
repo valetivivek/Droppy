@@ -33,6 +33,8 @@ struct NotchShelfView: View {
     @AppStorage(AppPreferenceKey.externalDisplayUseDynamicIsland) private var externalDisplayUseDynamicIsland = PreferenceDefault.externalDisplayUseDynamicIsland
     @AppStorage(AppPreferenceKey.showIdleNotchOnExternalDisplays) private var showIdleNotchOnExternalDisplays = PreferenceDefault.showIdleNotchOnExternalDisplays
     @AppStorage(AppPreferenceKey.enableHUDReplacement) private var enableHUDReplacement = PreferenceDefault.enableHUDReplacement
+    @AppStorage(AppPreferenceKey.enableVolumeHUDReplacement) private var enableVolumeHUDReplacement = PreferenceDefault.enableVolumeHUDReplacement
+    @AppStorage(AppPreferenceKey.enableBrightnessHUDReplacement) private var enableBrightnessHUDReplacement = PreferenceDefault.enableBrightnessHUDReplacement
     @AppStorage(AppPreferenceKey.enableBatteryHUD) private var enableBatteryHUD = PreferenceDefault.enableBatteryHUD
     @AppStorage(AppPreferenceKey.enableCapsLockHUD) private var enableCapsLockHUD = PreferenceDefault.enableCapsLockHUD
     @AppStorage(AppPreferenceKey.enableAirPodsHUD) private var enableAirPodsHUD = PreferenceDefault.enableAirPodsHUD
@@ -1013,10 +1015,10 @@ struct NotchShelfView: View {
 
     private var notificationHUDHeight: CGFloat {
         let isExternalNotchStyle = isExternalDisplay && !externalDisplayUseDynamicIsland
+        let baseHeight: CGFloat
         if isDynamicIslandMode {
-            return 70
-        }
-        if isExternalNotchStyle {
+            baseHeight = 70
+        } else if isExternalNotchStyle {
             let hasPreviewTextLine: Bool = {
                 guard notificationHUDManager.showPreview,
                       let notification = notificationHUDManager.currentNotification else { return false }
@@ -1028,9 +1030,12 @@ struct NotchShelfView: View {
             }()
             // External-notch style with SSOT 20/30/20/30 insets:
             // 38pt icon + 20 top + 20 bottom = 78 base, slightly taller with preview text.
-            return hasPreviewTextLine ? 84 : 78
+            baseHeight = hasPreviewTextLine ? 84 : 78
+        } else {
+            baseHeight = 110
         }
-        return 110
+
+        return baseHeight
     }
     /// Helper to check if current screen is built-in (MacBook display)
     private var isBuiltInDisplay: Bool {
@@ -1467,12 +1472,12 @@ struct NotchShelfView: View {
                 capsLockLayoutIsOn = capsLockManager.isCapsLockOn
             }
             .onChange(of: volumeManager.lastChangeAt) { _, _ in
-                guard enableHUDReplacement, !isExpandedOnThisScreen else { return }
+                guard enableHUDReplacement, enableVolumeHUDReplacement, !isExpandedOnThisScreen else { return }
                 guard shouldShowMediaKeyHUD(on: volumeManager.lastChangeDisplayID) else { return }
                 triggerVolumeHUD()
             }
             .onChange(of: brightnessManager.lastChangeAt) { _, _ in
-                guard enableHUDReplacement, !isExpandedOnThisScreen else { return }
+                guard enableHUDReplacement, enableBrightnessHUDReplacement, !isExpandedOnThisScreen else { return }
                 guard shouldShowMediaKeyHUD(on: brightnessManager.lastChangeDisplayID) else { return }
                 triggerBrightnessHUD()
             }
@@ -1642,6 +1647,20 @@ struct NotchShelfView: View {
                 guard isTodoExtensionActive else { return }
                 guard !isTerminalViewVisible && !isCaffeineViewVisible && !isCameraViewVisible else {
                     SettingsWindowController.shared.showSettings(openingExtension: .todo)
+                    return
+                }
+
+                if isTodoListExpanded {
+                    withAnimation(DroppyAnimation.smoothContent) {
+                        isTodoListExpanded = false
+                    }
+                    todoManager.isShelfListExpanded = false
+                    if state.shelfDisplaySlotCount == 0 {
+                        withAnimation(displayExpandCloseAnimation) {
+                            state.expandedDisplayID = nil
+                        }
+                    }
+                    NotchWindowController.shared.forceRecalculateAllWindowSizes()
                     return
                 }
 

@@ -28,8 +28,6 @@ struct DroppyApp: App {
 struct DroppyMenuContent: View {
     // Track shortcut changes via notification
     @State private var shortcutRefreshId = UUID()
-    @State private var clipboardMenuItems: [ClipboardItem] = []
-    @State private var clipboardMenuTitles: [UUID: String] = [:]
     @State private var todoManager = ToDoManager.shared
     @ObservedObject private var clipboardManager = ClipboardManager.shared
     
@@ -176,7 +174,7 @@ struct DroppyMenuContent: View {
                                 ClipboardManager.shared.paste(item: item)
                             } label: {
                                 // Show icon based on type
-                                Label(clipboardMenuTitle(for: item), systemImage: iconFor(item: item))
+                                Label(item.title, systemImage: iconFor(item: item))
                             }
                         }
                         
@@ -184,7 +182,6 @@ struct DroppyMenuContent: View {
                         
                         Button(role: .destructive) {
                             clipboardManager.clearAllHistory()
-                            refreshClipboardMenuSnapshot(includePasteboardPreview: true)
                         } label: {
                             Label("Clear History", systemImage: "trash")
                         }
@@ -326,12 +323,6 @@ struct DroppyMenuContent: View {
                 // Refresh when extension is disabled/enabled
                 shortcutRefreshId = UUID()
             }
-            .onReceive(clipboardManager.$history) { _ in
-                refreshClipboardMenuSnapshot()
-            }
-            }
-            .onAppear {
-                refreshClipboardMenuSnapshot(includePasteboardPreview: true)
             }
         }
     }
@@ -365,25 +356,8 @@ struct DroppyMenuContent: View {
         }
     }
 
-    private func refreshClipboardMenuSnapshot(includePasteboardPreview: Bool = false) {
-        var items = Array(clipboardManager.history.prefix(15))
-        if includePasteboardPreview,
-           items.isEmpty,
-           let previewItem = clipboardManager.currentPasteboardPreviewItem() {
-            items = [previewItem]
-        }
-        clipboardMenuItems = items
-
-        var titles: [UUID: String] = [:]
-        titles.reserveCapacity(items.count)
-        for item in items {
-            titles[item.id] = item.title
-        }
-        clipboardMenuTitles = titles
-    }
-
-    private func clipboardMenuTitle(for item: ClipboardItem) -> String {
-        clipboardMenuTitles[item.id] ?? item.title
+    private var clipboardMenuItems: [ClipboardItem] {
+        Array(clipboardManager.history.prefix(15))
     }
 
     private var shouldShowUpcomingMenu: Bool {
@@ -483,6 +457,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             AppPreferenceKey.quickshareRequireUploadConfirmation: PreferenceDefault.quickshareRequireUploadConfirmation,
             AppPreferenceKey.enableNotchShelf: PreferenceDefault.enableNotchShelf,
             AppPreferenceKey.enableHUDReplacement: PreferenceDefault.enableHUDReplacement,
+            AppPreferenceKey.enableVolumeHUDReplacement: PreferenceDefault.enableVolumeHUDReplacement,
+            AppPreferenceKey.enableBrightnessHUDReplacement: PreferenceDefault.enableBrightnessHUDReplacement,
+            AppPreferenceKey.enableBetterDisplayCompatibility: PreferenceDefault.enableBetterDisplayCompatibility,
             AppPreferenceKey.showMediaPlayer: PreferenceDefault.showMediaPlayer,
             AppPreferenceKey.enableMediaAlbumArtGlow: PreferenceDefault.enableMediaAlbumArtGlow,
             AppPreferenceKey.enableRealAudioVisualizer: PreferenceDefault.enableRealAudioVisualizer,
@@ -647,9 +624,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let notchIsSet = UserDefaults.standard.object(forKey: "enableNotchShelf") != nil
             let notchShelfEnabled = enableNotch || !notchIsSet  // Default true
 
-            let hudEnabled = UserDefaults.standard.object(forKey: "enableHUDReplacement") == nil
-                ? true
-                : UserDefaults.standard.bool(forKey: "enableHUDReplacement")
+            let hudEnabled = MediaKeyInterceptor.shouldRunForCurrentPreferences()
 
             let mediaEnabled = UserDefaults.standard.object(forKey: "showMediaPlayer") == nil
                 ? true
@@ -674,7 +649,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // 3. Media Key Interceptor for HUD replacement
             // Start if HUD replacement is enabled to suppress system HUD
             // (hudEnabled already calculated above)
-            if hudEnabled {
+            if MediaKeyInterceptor.shouldRunForCurrentPreferences() {
                 print("🎛️ Droppy: Starting Media Key Interceptor for HUD")
                 MediaKeyInterceptor.shared.start()
             }
@@ -734,7 +709,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             // 6. AUTO-PROMPT FOR PERMISSIONS
             // If any accessibility-dependent feature is enabled but permission not granted, prompt
-            let needsAccessibility = hudEnabled || clipboardEnabled
+            let needsAccessibility = MediaKeyInterceptor.shouldRunForCurrentPreferences() || clipboardEnabled
             let axTrusted = AXIsProcessTrusted()
             let cacheValue = UserDefaults.standard.bool(forKey: "accessibilityGranted")
             let isGranted = PermissionManager.shared.isAccessibilityGranted
@@ -789,9 +764,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         showOnboardingIfNeeded()
 
-        // Poll for accessibility permission in case user just returned from System Settings
-        // This handles the "TCC delay" where permission is granted but system API returns false for a few seconds
-        PermissionManager.shared.startPollingForAccessibility()
+        // Poll only when accessibility is still missing.
+        // Avoid restarting a 20s polling timer on every app activation.
+        if !PermissionManager.shared.isAccessibilityGranted {
+            PermissionManager.shared.startPollingForAccessibility()
+        }
     }
     
     func applicationWillTerminate(_ notification: Notification) {
